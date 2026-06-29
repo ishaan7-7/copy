@@ -1,0 +1,160 @@
+import os
+import json
+import asyncio
+import pandas as pd
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# --- Paths & Constants ---
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+SILVER_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "silver")
+ALERTS_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "gold", "alerts")
+ALERTS_CHECKPOINT = os.path.join(CURRENT_DIR, "state", "checkpoints.json")
+
+VEHICLE_MODULES = ["engine", "transmission", "battery", "body", "tyre"]
+
+# --- Utils ---
+def safe_read_json(file_path):
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+# --- Cache ---
+ALERTS_METRICS_CACHE = {
+    "active_alerts_count": 0,
+    "critical_vehicles": 0,
+    "processing_lag": 0,
+    "open_alerts": [],
+    "closed_alerts": []
+}
+
+# --- App Definition ---
+app = FastAPI(title="Alerts Service Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Background Logic ---
+_last_alerts_mtime = 0.0
+
+def _scandir_parquets(directory, max_files=0):
+    files = []
+    if not os.path.exists(directory):
+        return files
+    try:
+        for entry in os.scandir(directory):
+            if entry.is_file() and entry.name.endswith(".parquet"):
+                files.append((entry.path, entry.stat().st_mtime))
+            elif entry.is_dir() and not entry.name.startswith("_"):
+                for sub in os.scandir(entry.path):
+                    if sub.is_file() and sub.name.endswith(".parquet"):
+                        files.append((sub.path, sub.stat().st_mtime))
+    except Exception:
+        pass
+    files.sort(key=lambda x: x[1], reverse=True)
+    paths = [f for f, _ in files]
+    return paths[:max_files] if max_files > 0 else paths
+
+
+def _sync_update_alerts():
+    global ALERTS_METRICS_CACHE, _last_alerts_mtime
+    try:
+        current_mtime = 0.0
+        if os.path.exists(ALERTS_ROOT):
+            for entry in os.scandir(ALERTS_ROOT):
+                if entry.is_file() and entry.name.endswith(".parquet"):
+                    mt = entry.stat().st_mtime
+                    if mt > current_mtime:
+                        current_mtime = mt
+
+        if current_mtime > 0 and current_mtime <= _last_alerts_mtime:
+            return
+        _last_alerts_mtime = current_mtime
+
+        lag_rows = 0
+        try:
+            ckpt = safe_read_json(ALERTS_CHECKPOINT) or {}
+            primary_mod = VEHICLE_MODULES[0]
+            last_ts = ckpt.get(primary_mod, "1970-01-01T00:00:00")
+            silver_primary = os.path.join(SILVER_ROOT, primary_mod)
+            s_files = _scandir_parquets(silver_primary, max_files=3)
+            for f in s_files:
+                try:
+                    df = pd.read_parquet(f, columns=["inference_ts"])
+                    if 'inference_ts' in df.columns:
+                        df['inference_ts'] = pd.to_datetime(df['inference_ts'], utc=True)
+                        lag_rows += len(df[df['inference_ts'] > pd.to_datetime(last_ts, utc=True)])
+                except:
+                    pass
+        except:
+            pass
+
+        df_alerts = pd.DataFrame()
+        afiles = _scandir_parquets(ALERTS_ROOT, max_files=10)
+        dfs = []
+        for f in afiles:
+            try:
+                df = pd.read_parquet(f)
+                if not df.empty:
+                    dfs.append(df)
+            except:
+                pass
+        if dfs:
+            df_alerts = pd.concat(dfs, ignore_index=True)
+
+        active_alerts = 0
+        crit_vehicles = 0
+        open_alerts = []
+        closed_alerts = []
+
+        if not df_alerts.empty:
+            df_alerts = df_alerts.fillna(0)
+            for col in df_alerts.select_dtypes(include=['datetime64[ns]', 'datetime64[ns, UTC]']).columns:
+                df_alerts[col] = df_alerts[col].astype(str)
+
+            df_alerts = df_alerts.sort_values('peak_anomaly_ts', ascending=False).head(50)
+            open_df = df_alerts[df_alerts['status'] == "OPEN"]
+            closed_df = df_alerts[df_alerts['status'] == "CLOSED"]
+
+            active_alerts = len(open_df)
+            crit_vehicles = open_df['source_id'].nunique() if not open_df.empty else 0
+            open_alerts = open_df.to_dict(orient="records")
+            closed_alerts = closed_df.to_dict(orient="records")
+
+        ALERTS_METRICS_CACHE["active_alerts_count"] = active_alerts
+        ALERTS_METRICS_CACHE["critical_vehicles"] = crit_vehicles
+        ALERTS_METRICS_CACHE["processing_lag"] = lag_rows
+        ALERTS_METRICS_CACHE["open_alerts"] = open_alerts
+        ALERTS_METRICS_CACHE["closed_alerts"] = closed_alerts
+
+    except Exception as e:
+        print(f"Alerts metrics loop failed: {e}")
+
+async def update_alerts_metrics_loop():
+    while True:
+        await asyncio.to_thread(_sync_update_alerts)
+        await asyncio.sleep(5)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(update_alerts_metrics_loop())
+
+# --- Endpoints ---
+@app.get("/api/alerts/metrics")
+def get_alerts_metrics():
+    return ALERTS_METRICS_CACHE
+
+if __name__ == "__main__":
+    import uvicorn
+    # Alerts & DTC runs on port 8004
+    uvicorn.run("api:app", host="127.0.0.1", port=8004, reload=True)

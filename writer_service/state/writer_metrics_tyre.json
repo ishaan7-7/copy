@@ -1,0 +1,17 @@
+{
+  "status": "RUNNING",
+  "last_updated": 1782748999.772892,
+  "streams": {
+    "tyre": {
+      "status": "ACTIVE",
+      "timestamp": "2026-06-29T16:02:55.454Z",
+      "batch_id": 9,
+      "num_input_rows": 101,
+      "total_rows_processed": 945,
+      "backlog": 0,
+      "input_rate": 6.943966998968718,
+      "process_rate": 7.766840972008613,
+      "duration_ms": 13004
+    }
+  }
+}

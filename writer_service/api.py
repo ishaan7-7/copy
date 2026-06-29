@@ -1,0 +1,151 @@
+import os
+import json
+import time
+import asyncio
+import pandas as pd
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+
+# --- Paths & Constants ---
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+DELTA_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "bronze")
+STATE_DIR = os.path.join(CURRENT_DIR, "state")
+
+VEHICLE_MODULES = ["battery", "body", "engine", "transmission", "tyre"]
+SERVICE_START_TIME = time.time()
+
+# --- Utils ---
+def safe_read_json(file_path):
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+# --- Cache ---
+WRITER_METRICS_CACHE = {
+    module: {
+        "module": module.upper(),
+        "status": "OFFLINE",
+        "kafka_total": 0,
+        "delta_total": 0,
+        "true_lag": 0,
+        "throughput": "0.0",
+        "processed": "0.0",
+        "latency_ms": 0
+    } for module in VEHICLE_MODULES
+}
+
+# --- App Definition ---
+app = FastAPI(title="Writer Service Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+async def update_writer_metrics_loop():
+    while True:
+        try:
+            for module in VEHICLE_MODULES:
+                file_path = os.path.join(STATE_DIR, f"writer_metrics_{module}.json")
+                spark_data = safe_read_json(file_path) or {}
+                stream_data = spark_data.get("streams", {}).get(module, {})
+
+                status = spark_data.get("status", "OFFLINE")
+                last_updated = spark_data.get("last_updated", 0)
+                if status == "RUNNING":
+                    if last_updated < SERVICE_START_TIME:
+                        status = "STARTING"
+                    elif time.time() - last_updated > 10:
+                        status = "STALLED"
+
+                total_processed = stream_data.get("total_rows_processed", 0)
+                backlog = stream_data.get("backlog", 0)
+                input_rate = stream_data.get("input_rate", 0.0)
+                process_rate = stream_data.get("process_rate", 0.0)
+                if backlog == 0 and input_rate > 0 and process_rate > 0:
+                    backlog = max(0, int((input_rate - process_rate) * 5))
+
+                WRITER_METRICS_CACHE[module] = {
+                    "module": module.upper(),
+                    "status": status,
+                    "kafka_total": total_processed + backlog,
+                    "delta_total": total_processed,
+                    "true_lag": backlog,
+                    "throughput": str(round(input_rate, 1)),
+                    "processed": str(round(process_rate, 1)),
+                    "latency_ms": stream_data.get("duration_ms", 0)
+                }
+        except Exception as e:
+            print(f"Writer metric update failed: {e}")
+        await asyncio.sleep(2)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(update_writer_metrics_loop())
+
+# --- Endpoints ---
+@app.get("/api/writer/metrics")
+def get_writer_metrics():
+    return WRITER_METRICS_CACHE
+
+@app.get("/api/writer/inspector/{module}")
+def get_writer_inspector(module: str, limit: int = Query(default=100, ge=1, le=500)):
+    if module not in VEHICLE_MODULES:
+        raise HTTPException(status_code=400, detail="Invalid module")
+    path = Path(DELTA_ROOT) / module
+    if not path.exists():
+        return {"data": []}
+    try:
+        dfs = []
+        for entry in sorted(path.iterdir(), key=lambda e: e.name):
+            if not (entry.is_dir() and entry.name.startswith("source_id=")):
+                continue
+            sim_id = entry.name.split("=", 1)[1]
+            part_files = sorted(
+                (f for f in entry.iterdir() if f.is_file() and f.name.endswith(".parquet")),
+                key=lambda f: f.stat().st_mtime,
+                reverse=True,
+            )[:2]
+            for f in part_files:
+                try:
+                    df_file = pd.read_parquet(f)
+                    df_file["source_id"] = sim_id
+                    if not df_file.empty:
+                        dfs.append(df_file)
+                except Exception:
+                    pass
+
+        if not dfs:
+            return {"data": []}
+
+        combined = pd.concat(dfs, ignore_index=True)
+        if "ingest_ts" in combined.columns:
+            combined["ingest_ts"] = pd.to_datetime(combined["ingest_ts"], utc=True)
+            combined = combined.sort_values("ingest_ts", ascending=False)
+            if "source_id" in combined.columns:
+                n_sims = max(combined["source_id"].nunique(), 1)
+                rows_per_sim = max(10, 100 // n_sims)
+                combined = combined.groupby("source_id", group_keys=False).head(rows_per_sim)
+                combined = combined.sort_values("ingest_ts", ascending=False)
+            combined = combined.head(limit)
+            combined["ingest_ts"] = combined["ingest_ts"].astype(str)
+        combined = combined.fillna(0)
+        for col in combined.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
+            combined[col] = combined[col].astype(str)
+        return {"data": combined.to_dict(orient="records")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    # Writer runs on port 8001
+    uvicorn.run("api:app", host="127.0.0.1", port=8001, reload=True)
