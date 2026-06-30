@@ -14,14 +14,14 @@ import 'ag-grid-community/styles/ag-theme-balham.css';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '../store';
 import { useChartTheme } from '../hooks/useChartTheme';
-import { fetchApi } from '../hooks/useApi';
+import { fetchApi, liveInterval, useRefetchOnActivate } from '../hooks/useApi';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
-export default function DashboardInference() {
+export default function DashboardInference({ isActive = true }: { isActive?: boolean }) {
   const { autoRefresh, darkMode } = useStore();
   const theme = useTheme();
   const ct = useChartTheme();
@@ -30,11 +30,13 @@ export default function DashboardInference() {
   const [selectedModule, setSelectedModule] = useState<string>('engine');
   const [filterSim, setFilterSim] = useState<string>('ALL');
 
-  const { data: metricsData, isLoading: metricsLoading, isError: metricsError } = useQuery({
+  const { data: metricsData, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = useQuery({
     queryKey: ['inferenceMetrics'],
     queryFn: fetchApi('/api/inference/metrics'),
-    refetchInterval: (viewMode === 'metrics' && autoRefresh) ? 3000 : false,
+    refetchInterval: liveInterval(3000, isActive && viewMode === 'metrics', autoRefresh),
   });
+
+  useRefetchOnActivate(isActive && viewMode === 'metrics', [refetchMetrics]);
 
   const { data: inspectorData, isLoading: inspectorLoading, refetch: refetchInspector } = useQuery({
     queryKey: ['inferenceTail', selectedModule],

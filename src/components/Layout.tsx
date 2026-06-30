@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography, AppBar, Toolbar, Button, IconButton, Tooltip } from '@mui/material';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import HomeIcon from '@mui/icons-material/Home';
@@ -12,6 +13,13 @@ import BugReportIcon from '@mui/icons-material/BugReport';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useStore } from '../store';
+import FleetCenter from '../pages/FleetCenter';
+import WriterOps from '../pages/WriterOps';
+import GoldHealth from '../pages/GoldHealth';
+import AutomotiveDive from '../pages/AutomotiveDive';
+import DashboardInference from '../pages/DashboardInference';
+import DashboardAlerts from '../pages/DashboardAlerts';
+import DtcInvestigation from '../pages/DtcInvestigation';
 
 const DRAWER_WIDTH = 240;
 
@@ -25,11 +33,40 @@ const menuItems = [
   { text: 'DTC Investigation', path: '/dtc', icon: <BugReportIcon />, index: 6 },
 ];
 
+// Pages stay permanently mounted and are toggled with CSS display instead of
+// being unmounted by router navigation. Unmounting destroys the Leaflet map
+// (forces tile re-download) and resets every chart/query subscription, which
+// is what caused "blank map" / "stuck stale data" on page revisit. Each page
+// receives isActive so it can pause its own polling while hidden (see
+// liveInterval/useRefetchOnActivate in hooks/useApi.ts) — otherwise every
+// visited page would poll forever in the background for the whole session.
+const pageRegistry: { path: string; Component: React.ComponentType<{ isActive: boolean }> }[] = [
+  { path: '/', Component: FleetCenter },
+  { path: '/writer-ops', Component: WriterOps },
+  { path: '/inference', Component: DashboardInference },
+  { path: '/gold', Component: GoldHealth },
+  { path: '/alerts', Component: DashboardAlerts },
+  { path: '/automotive', Component: AutomotiveDive },
+  { path: '/dtc', Component: DtcInvestigation },
+];
+
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const { autoRefresh, darkMode, toggleAutoRefresh, toggleDarkMode, setActiveTab } = useStore();
+
+  // Each page mounts once on its first visit, then stays mounted (hidden via
+  // CSS) for the rest of the session. This avoids both extremes: mounting
+  // all 7 pages eagerly at cold start (heavy RAM/CPU from second one), and
+  // unmounting on every navigation (blank map, stale data on revisit).
+  const [visitedPaths, setVisitedPaths] = useState<Set<string>>(() => new Set([location.pathname]));
+
+  useEffect(() => {
+    if (!visitedPaths.has(location.pathname)) {
+      setVisitedPaths((prev) => new Set(prev).add(location.pathname));
+    }
+  }, [location.pathname, visitedPaths]);
 
   const handleNavigation = (path: string, index: number) => {
     setActiveTab(index);
@@ -129,7 +166,16 @@ export default function Layout() {
         component="main"
         sx={{ flexGrow: 1, p: 3, bgcolor: 'background.default', mt: '48px', overflow: 'auto' }}
       >
-        <Outlet />
+        {pageRegistry
+          .filter(({ path }) => visitedPaths.has(path))
+          .map(({ path, Component }) => {
+            const isActive = location.pathname === path;
+            return (
+              <Box key={path} sx={{ display: isActive ? 'block' : 'none', height: '100%' }}>
+                <Component isActive={isActive} />
+              </Box>
+            );
+          })}
       </Box>
     </Box>
   );

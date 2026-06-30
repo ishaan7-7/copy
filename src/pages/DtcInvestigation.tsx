@@ -74,7 +74,7 @@ interface BatchResult {
   leftAfterCap: number;
 }
 
-export default function DtcInvestigation() {
+export default function DtcInvestigation({ isActive = true }: { isActive?: boolean }) {
   const { autoRefresh, darkMode } = useStore();
   const theme = useTheme();
   const ct = useChartTheme();
@@ -101,6 +101,31 @@ export default function DtcInvestigation() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
+
+  // Page now stays mounted across navigations (see Layout.tsx keep-alive
+  // routing), so initVehicle/initPeakTs only seed useState on first mount.
+  // Re-sync from the URL whenever a fresh deep-link (e.g. from Alerts) is
+  // navigated to while this page is already mounted. The pendingAutoRun flag
+  // distinguishes "URL told us to analyze" from manual dropdown/field edits,
+  // which must NOT auto-trigger the heavy DTC model run.
+  const lastParamsRef = useRef<string>(searchParams.toString());
+  const pendingAutoRun = useRef(false);
+  useEffect(() => {
+    const current = searchParams.toString();
+    if (current === lastParamsRef.current) return;
+    lastParamsRef.current = current;
+    const v = searchParams.get('vehicle') || '';
+    const m = searchParams.get('module') || 'engine';
+    const pts = searchParams.get('peak_ts') || '';
+    const tabStr = searchParams.get('tab') || (v ? '1' : '0');
+    if (!v) return;
+    setActiveTab(parseInt(tabStr, 10));
+    setSelectedVehicle(v);
+    setSelectedModule(ALL_MODULES.includes(m) ? m : 'engine');
+    setPeakTs(pts);
+    setLoadEvidence(!!pts && !!v);
+    if (pts) pendingAutoRun.current = true;
+  }, [searchParams]);
 
   const sensorKeys = MODULE_SENSOR_KEYS[selectedModule] || [];
 
@@ -189,8 +214,11 @@ export default function DtcInvestigation() {
   });
 
   useEffect(() => {
-    if (initVehicle && initPeakTs) dtcAnalysisQuery.refetch();
-  }, []);
+    if (!pendingAutoRun.current || !selectedVehicle || !peakTs) return;
+    pendingAutoRun.current = false;
+    dtcAnalysisQuery.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVehicle, selectedModule, peakTs]);
 
   useEffect(() => {
     if (dtcAnalysisQuery.isSuccess && (dtcAnalysisQuery.data as any)?.success) {

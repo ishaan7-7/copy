@@ -14,14 +14,14 @@ import 'ag-grid-community/styles/ag-theme-balham.css';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '../store';
 import { useChartTheme } from '../hooks/useChartTheme';
-import { fetchApi } from '../hooks/useApi';
+import { fetchApi, liveInterval, useRefetchOnActivate } from '../hooks/useApi';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
-export default function WriterOps() {
+export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
   const { autoRefresh, darkMode } = useStore();
   const theme = useTheme();
   const ct = useChartTheme();
@@ -33,10 +33,10 @@ export default function WriterOps() {
   const [inspectorVid, setInspectorVid] = useState<string>('');
   const [inspectorSource, setInspectorSource] = useState<string>('ALL (Latest)');
 
-  const { data: metricsData, isLoading: metricsLoading, isError: metricsError } = useQuery({
+  const { data: metricsData, isLoading: metricsLoading, isError: metricsError, refetch: refetchMetrics } = useQuery({
     queryKey: ['writerMetrics'],
     queryFn: fetchApi('/api/writer/metrics'),
-    refetchInterval: (viewMode === 'operations' && autoRefresh) ? 3000 : false,
+    refetchInterval: liveInterval(3000, isActive && viewMode === 'operations', autoRefresh),
   });
 
   const { data: inspectorData, isLoading: inspectorLoading, refetch: refetchInspector } = useQuery({
@@ -48,12 +48,15 @@ export default function WriterOps() {
     staleTime: 60000,
   });
 
-  const { data: observerData } = useQuery({
+  const { data: observerData, refetch: refetchObserver } = useQuery({
     queryKey: ['observerSnapshot'],
     queryFn: fetchApi('/api/observer/snapshot'),
     enabled: viewMode === 'live',
-    refetchInterval: (viewMode === 'live' && autoRefresh) ? 3000 : false,
+    refetchInterval: liveInterval(3000, isActive && viewMode === 'live', autoRefresh),
   });
+
+  useRefetchOnActivate(isActive && viewMode === 'operations', [refetchMetrics]);
+  useRefetchOnActivate(isActive && viewMode === 'live', [refetchObserver]);
 
   const metricsRowData = useMemo(() => {
     if (!metricsData) return [];

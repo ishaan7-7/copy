@@ -6,13 +6,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { API } from './hooks/useApi';
 import Layout from './components/Layout';
-import FleetCenter from './pages/FleetCenter';
-import WriterOps from './pages/WriterOps';
-import GoldHealth from './pages/GoldHealth';
-import AutomotiveDive from './pages/AutomotiveDive';
-import DashboardInference from './pages/DashboardInference';
-import DashboardAlerts from './pages/DashboardAlerts';
-import DtcInvestigation from './pages/DtcInvestigation';
 import { useStore } from './store';
 import { lightTheme, darkTheme } from './theme';
 
@@ -42,15 +35,7 @@ function App() {
       <HashRouter>
         <DataPrefetcher />
         <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<FleetCenter />} />
-            <Route path="writer-ops" element={<WriterOps />} />
-            <Route path="inference" element={<DashboardInference />} />
-            <Route path="gold" element={<GoldHealth />} />
-            <Route path="alerts" element={<DashboardAlerts />} />
-            <Route path="automotive" element={<AutomotiveDive />} />
-            <Route path="dtc" element={<DtcInvestigation />} />
-          </Route>
+          <Route path="/*" element={<Layout />} />
         </Routes>
       </HashRouter>
     </ThemeProvider>

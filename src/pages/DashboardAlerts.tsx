@@ -12,23 +12,25 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-balham.css';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '../store';
-import { fetchApi } from '../hooks/useApi';
+import { fetchApi, liveInterval, useRefetchOnActivate } from '../hooks/useApi';
 import { SEVERITY_BG_DARK, SEVERITY_BG_LIGHT } from '../constants/chartColors';
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
-export default function DashboardAlerts() {
+export default function DashboardAlerts({ isActive = true }: { isActive?: boolean }) {
   const { autoRefresh, darkMode } = useStore();
   const navigate = useNavigate();
   const theme = useTheme();
 
   const [activeTab, setActiveTab] = useState<'OPEN' | 'CLOSED'>('OPEN');
 
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
+  const { data: metrics, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery({
     queryKey: ['alertsMetrics'],
     queryFn: fetchApi('/api/alerts/metrics'),
-    refetchInterval: autoRefresh ? 20000 : false,
+    refetchInterval: liveInterval(20000, isActive, autoRefresh),
   });
+
+  useRefetchOnActivate(isActive, [refetchMetrics]);
 
   const tableColDefs = useMemo<ColDef[]>(() => [
     {

@@ -14,7 +14,7 @@ import 'ag-grid-community/styles/ag-theme-balham.css';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useStore } from '../store';
-import { fetchApi, keepPreviousData } from '../hooks/useApi';
+import { fetchApi, keepPreviousData, liveInterval, useRefetchOnActivate } from '../hooks/useApi';
 import { useChartTheme } from '../hooks/useChartTheme';
 import EChart from '../components/EChart';
 import type { EChartsOption } from 'echarts';
@@ -240,7 +240,7 @@ function SensorChart({
   );
 }
 
-export default function AutomotiveDive() {
+export default function AutomotiveDive({ isActive = true }: { isActive?: boolean }) {
   const { autoRefresh, darkMode } = useStore();
   const theme = useTheme();
   const ct = useChartTheme();
@@ -291,7 +291,7 @@ export default function AutomotiveDive() {
   const fleetQuery = useQuery({
     queryKey: ['autoFleetSummary'],
     queryFn: fetchApi(`/api/automotive/fleet-summary`),
-    refetchInterval: autoRefresh ? 15000 : false,
+    refetchInterval: liveInterval(15000, isActive, autoRefresh),
   });
 
   const sensorQuery = useQuery({
@@ -307,7 +307,7 @@ export default function AutomotiveDive() {
     queryFn: fetchApi(`/api/automotive/module-health/${selectedVehicle}/${selectedModule}`),
     enabled: !!selectedVehicle && activeTab === 'vehicle',
     placeholderData: keepPreviousData,
-    refetchInterval: autoRefresh ? 10000 : false,
+    refetchInterval: liveInterval(10000, isActive, autoRefresh),
   });
 
   const vehicleHealthQuery = useQuery({
@@ -315,7 +315,7 @@ export default function AutomotiveDive() {
     queryFn: fetchApi(`/api/automotive/vehicle-health-history/${selectedVehicle}`),
     enabled: !!selectedVehicle && activeTab === 'vehicle',
     placeholderData: keepPreviousData,
-    refetchInterval: autoRefresh ? 10000 : false,
+    refetchInterval: liveInterval(10000, isActive, autoRefresh),
   });
 
   const vehicleDecompQuery = useQuery({
@@ -371,7 +371,7 @@ export default function AutomotiveDive() {
     queryFn: fetchApi(`/api/automotive/module-fleet-health/${analysisModule}`),
     enabled: activeTab === 'module',
     placeholderData: keepPreviousData,
-    refetchInterval: (activeTab === 'module' && autoRefresh) ? 10000 : false,
+    refetchInterval: liveInterval(10000, isActive && activeTab === 'module', autoRefresh),
   });
 
   const moduleSensorStatsQuery = useQuery({
@@ -389,6 +389,10 @@ export default function AutomotiveDive() {
     placeholderData: keepPreviousData,
     refetchInterval: false,
   });
+
+  useRefetchOnActivate(isActive, [
+    fleetQuery.refetch, moduleHealthQuery.refetch, vehicleHealthQuery.refetch, moduleFleetHealthQuery.refetch,
+  ]);
 
   useEffect(() => {
     const vehicles = fleetQuery.data?.vehicles;

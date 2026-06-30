@@ -12,7 +12,7 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-balham.css';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '../store';
-import { fetchApi, keepPreviousData } from '../hooks/useApi';
+import { fetchApi, keepPreviousData, liveInterval, useRefetchOnActivate } from '../hooks/useApi';
 import { useChartTheme } from '../hooks/useChartTheme';
 import { MODULE_COLORS } from '../constants/chartColors';
 import {
@@ -129,7 +129,7 @@ function WeightPanel({
   );
 }
 
-export default function GoldHealth() {
+export default function GoldHealth({ isActive = true }: { isActive?: boolean }) {
   const { autoRefresh, darkMode } = useStore();
   const theme = useTheme();
   const ct = useChartTheme();
@@ -147,19 +147,21 @@ export default function GoldHealth() {
     try { return JSON.parse(localStorage.getItem('gold_weight_presets') || '{}'); } catch { return {}; }
   });
 
-  const { data: metrics } = useQuery({ queryKey: ['goldMetrics'], queryFn: fetchGoldMetrics, refetchInterval: (activeTab === 'operations' && autoRefresh) ? 5000 : false });
+  const { data: metrics, refetch: refetchMetrics } = useQuery({ queryKey: ['goldMetrics'], queryFn: fetchGoldMetrics, refetchInterval: liveInterval(5000, isActive && activeTab === 'operations', autoRefresh) });
   const { data: config } = useQuery({ queryKey: ['goldConfig'], queryFn: fetchGoldConfig, refetchInterval: false });
 
   const availableSims = useMemo(() => metrics?.active_sims || [], [metrics]);
 
-  const { data: history } = useQuery({
+  const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ['goldHistory', filterSim],
     queryFn: fetchApi(`/api/gold/history/${filterSim}`),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     select: (d: { data: any[] }) => d.data,
     placeholderData: keepPreviousData,
-    refetchInterval: (activeTab === 'operations' && autoRefresh) ? 8000 : false,
+    refetchInterval: liveInterval(8000, isActive && activeTab === 'operations', autoRefresh),
   });
+
+  useRefetchOnActivate(isActive && activeTab === 'operations', [refetchMetrics, refetchHistory]);
 
   useEffect(() => {
     if (config && activeModules.length === 0) {

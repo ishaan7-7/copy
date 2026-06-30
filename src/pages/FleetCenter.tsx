@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import axios from 'axios';
-import { fetchApi, fetchFleet } from '../hooks/useApi';
+import { fetchApi, fetchFleet, liveInterval, useRefetchOnActivate } from '../hooks/useApi';
 import {
   Box, Paper, Typography, Drawer, IconButton, Tabs, Tab, LinearProgress,
   Chip, Divider, Select, MenuItem, FormControl, InputLabel,
@@ -156,6 +156,21 @@ function createEventIcon(type: string): L.DivIcon {
       <span style="color:white;font-size:11px;font-weight:700;font-family:Roboto,sans-serif;">${label}</span>
     </div>`,
   });
+}
+
+function MapVisibilityHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const observer = new ResizeObserver(() => {
+      if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+        map.invalidateSize();
+      }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
 }
 
 function MapController({ selectedVehicle, tripData }: {
@@ -352,7 +367,7 @@ function SpeedByRoad({ data }: { data: BehaviorData }) {
   return <ReactECharts option={option} style={{ height: 160 }} lazyUpdate notMerge={false} />;
 }
 
-export default function FleetCenter() {
+export default function FleetCenter({ isActive = true }: { isActive?: boolean }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const autoRefresh = useStore((s) => s.autoRefresh);
@@ -360,16 +375,16 @@ export default function FleetCenter() {
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [drawerTab, setDrawerTab] = useState(0);
 
-  const { data: summary } = useQuery<FleetSummary>({
+  const { data: summary, refetch: refetchSummary } = useQuery<FleetSummary>({
     queryKey: ['fleet-summary'],
     queryFn: fetchFleet('/api/fleet/summary'),
-    refetchInterval: autoRefresh ? 10000 : false,
+    refetchInterval: liveInterval(10000, isActive, autoRefresh),
   });
 
-  const { data: positions } = useQuery<VehiclePosition[]>({
+  const { data: positions, refetch: refetchPositions } = useQuery<VehiclePosition[]>({
     queryKey: ['fleet-positions'],
     queryFn: fetchFleet('/api/fleet/positions'),
-    refetchInterval: autoRefresh ? 8000 : false,
+    refetchInterval: liveInterval(8000, isActive, autoRefresh),
   });
 
   const activeIds = useMemo(() => (positions || []).filter(v => v.status === 'active').map(v => v.vehicle_id), [positions]);
@@ -392,7 +407,7 @@ export default function FleetCenter() {
     },
     enabled: activeIds.length > 0,
     staleTime: 60000,
-    refetchInterval: autoRefresh ? 20000 : false,
+    refetchInterval: liveInterval(20000, isActive, autoRefresh),
   });
 
   const { data: vehicleDetail } = useQuery<VehicleDetail>({
@@ -419,10 +434,10 @@ export default function FleetCenter() {
     staleTime: 30000,
   });
 
-  const { data: pipelineFleet } = useQuery<PipelineFleetSummary>({
+  const { data: pipelineFleet, refetch: refetchPipelineFleet } = useQuery<PipelineFleetSummary>({
     queryKey: ['pipeline-fleet-summary'],
     queryFn: fetchApi('/api/automotive/fleet-summary'),
-    refetchInterval: autoRefresh ? 8000 : false,
+    refetchInterval: liveInterval(8000, isActive, autoRefresh),
     retry: 1,
   });
 
@@ -430,17 +445,17 @@ export default function FleetCenter() {
   const [timelineXAxis, setTimelineXAxis] = useState<'timestamp' | 'mileage'>('mileage');
   const scatterReady = true;
 
-  const { data: healthHistory } = useQuery<HealthHistoryResponse>({
+  const { data: healthHistory, refetch: refetchHealthHistory } = useQuery<HealthHistoryResponse>({
     queryKey: ['pipeline-health-history', healthTimelineVehicle],
     queryFn: fetchApi(`/api/automotive/vehicle-health-history/${healthTimelineVehicle}`),
     placeholderData: keepPreviousData,
-    refetchInterval: autoRefresh ? 8000 : false,
+    refetchInterval: liveInterval(8000, isActive, autoRefresh),
     retry: 1,
   });
 
   const activeVehicleIds = useMemo(() => (pipelineFleet?.vehicles || []).map(v => v.vehicle_id), [pipelineFleet]);
 
-  const { data: fleetHealthScatter } = useQuery<{ vehicle_id: string; data: HealthHistoryRow[] }[]>({
+  const { data: fleetHealthScatter, refetch: refetchScatter } = useQuery<{ vehicle_id: string; data: HealthHistoryRow[] }[]>({
     queryKey: ['fleet-health-scatter', activeVehicleIds],
     queryFn: async ({ signal }) => {
       const results = await Promise.all(
@@ -454,9 +469,13 @@ export default function FleetCenter() {
     },
     enabled: scatterReady && activeVehicleIds.length > 0,
     placeholderData: keepPreviousData,
-    refetchInterval: autoRefresh ? 8000 : false,
+    refetchInterval: liveInterval(8000, isActive, autoRefresh),
     retry: 1,
   });
+
+  useRefetchOnActivate(isActive, [
+    refetchSummary, refetchPositions, refetchPipelineFleet, refetchHealthHistory, refetchScatter,
+  ]);
 
   const pipelineHealthMap = useMemo(() => {
     const map: Record<string, PipelineVehicle> = {};
@@ -565,6 +584,7 @@ export default function FleetCenter() {
         >
           <TileLayer url={tileUrl} attribution={tileAttribution} keepBuffer={6} updateWhenZooming={false} updateWhenIdle={true} />
           <MapController selectedVehicle={selectedVehicle} tripData={tripData ?? null} />
+          <MapVisibilityHandler />
 
           {positions?.map(v => {
             const liveH = v.status === 'active' ? getVehicleHealth(v.vehicle_id, v.health) : v.health;
