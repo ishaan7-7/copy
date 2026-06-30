@@ -1,12 +1,15 @@
 import time
 import os
-from pathlib import Path
+import sys
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 from src.state_manager import GoldStateManager
 from src.aggregator import HealthAggregator
 from src import config
+
+_ROOT_FOR_IMPORT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _ROOT_FOR_IMPORT not in sys.path:
+    sys.path.insert(0, _ROOT_FOR_IMPORT)
+from common import duck_reader as dr
 
 
 def main():
@@ -20,6 +23,7 @@ def main():
     state = GoldStateManager()
     aggregator = HealthAggregator(state)
     last_silver_mtime = 0.0
+    last_compact = 0.0
 
     os.makedirs(config.GOLD_TABLE_DIR, exist_ok=True)
 
@@ -58,39 +62,21 @@ def main():
                 continue
             try:
                 last_ts = state.checkpoints.get(mod, "1970-01-01")
-                pq_files = []
-                for entry in os.scandir(mod_path):
-                    if entry.is_file() and entry.name.endswith(".parquet"):
-                        pq_files.append((entry.path, entry.stat().st_mtime))
-                    elif entry.is_dir() and not entry.name.startswith("_"):
-                        for sub in os.scandir(entry.path):
-                            if sub.is_file() and sub.name.endswith(".parquet"):
-                                pq_files.append((sub.path, sub.stat().st_mtime))
-                pq_files.sort(key=lambda x: x[1], reverse=True)
-
-                dfs = []
-                rows_collected = 0
-                for fp, _ in pq_files[:15]:
-                    try:
-                        df = pd.read_parquet(fp)
-                        if not df.empty and "inference_ts" in df.columns:
-                            df = df[df["inference_ts"] > last_ts]
-                            if not df.empty:
-                                dfs.append(df)
-                                rows_collected += len(df)
-                                if rows_collected >= config.BATCH_SIZE:
-                                    break
-                    except Exception:
-                        pass
-
-                if dfs:
-                    combined = pd.concat(dfs, ignore_index=True)
-                    combined = combined.sort_values("inference_ts", ascending=True).head(config.BATCH_SIZE)
-                    combined["module_name"] = mod
-                    if "source_id" not in combined.columns:
-                        combined["source_id"] = "unknown"
-                    raw_frames.append(combined)
-                    new_checkpoints[mod] = str(combined["inference_ts"].max())
+                files = dr.list_files(mod_path, max_files=15)
+                if not files:
+                    continue
+                combined = dr.query_df(
+                    "SELECT * FROM read_parquet(?) WHERE CAST(inference_ts AS VARCHAR) > ?",
+                    files, params=[last_ts],
+                )
+                if combined.empty:
+                    continue
+                combined = combined.sort_values("inference_ts", ascending=True).head(config.BATCH_SIZE)
+                combined["module_name"] = mod
+                if "source_id" not in combined.columns:
+                    combined["source_id"] = "unknown"
+                raw_frames.append(combined)
+                new_checkpoints[mod] = str(combined["inference_ts"].max())
             except Exception:
                 pass
 
@@ -133,29 +119,33 @@ def main():
                 state.save_state()
 
                 print(f"Wrote {len(gold_df)} Gold records.")
-                _cleanup_old_files(config.GOLD_TABLE_DIR, keep=200)
             except Exception as e:
                 print(f"Failed to write Gold table: {e}")
 
-        time.sleep(config.POLL_INTERVAL)
-
-
-def _cleanup_old_files(directory, keep=200):
-    try:
-        files = []
-        for entry in os.scandir(directory):
-            if entry.is_file() and entry.name.endswith(".parquet"):
-                files.append((entry.path, entry.stat().st_mtime))
-        if len(files) <= keep:
-            return
-        files.sort(key=lambda x: x[1])
-        for fp, _ in files[:len(files) - keep]:
+        # Gold writes plain parquet (no _delta_log), so true Delta compaction
+        # doesn't apply here — merge small files directly instead, on a timer
+        # rather than every write since each write is cheap and frequent.
+        # This preserves full history (merge, not delete-oldest) regardless
+        # of how long the stream runs, unlike the old keep=200 retention cap
+        # which silently dropped data older than ~20 minutes. Gold is also
+        # append-only — the same (source_id, window) gets rewritten every
+        # time that window's state is touched again, not just once (confirmed
+        # on real data: 337 rows for only 98 unique windows). Dedup on
+        # gold_write_ts so compaction keeps the most-recently-written value
+        # per window instead of accumulating every intermediate version.
+        if time.time() - last_compact >= 90:
+            last_compact = time.time()
             try:
-                os.remove(fp)
-            except Exception:
-                pass
-    except Exception:
-        pass
+                merged = dr.compact_flat_dir(
+                    config.GOLD_TABLE_DIR, min_files_to_compact=5,
+                    dedup_subset=["source_id", "gold_window_ts"], dedup_sort_col="gold_write_ts",
+                )
+                if merged:
+                    print(f"Compacted {merged} Gold files.")
+            except Exception as e:
+                print(f"Gold compaction failed: {e}")
+
+        time.sleep(config.POLL_INTERVAL)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,12 @@
 import os
-from pathlib import Path
+import sys
 import pandas as pd
 from src import config
+
+_ROOT_FOR_IMPORT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if _ROOT_FOR_IMPORT not in sys.path:
+    sys.path.insert(0, _ROOT_FOR_IMPORT)
+from common import duck_reader as dr
 
 
 class BronzeReader:
@@ -15,57 +20,50 @@ class BronzeReader:
             return pd.DataFrame()
 
         try:
-            pq_files = []
-            vid_map = {}
-            for entry in os.scandir(path):
-                if entry.is_dir() and entry.name.startswith("source_id="):
-                    vid = entry.name.split("=", 1)[1]
-                    try:
+            # Cheap mtime pre-check across all partitions before paying for a
+            # DuckDB read — skip entirely when nothing changed since last poll.
+            latest_mtime = 0.0
+            try:
+                for entry in os.scandir(path):
+                    if entry.is_dir() and entry.name.startswith("source_id="):
                         for f in os.scandir(entry.path):
                             if f.is_file() and f.name.endswith(".parquet"):
-                                pq_files.append((f.path, f.stat().st_mtime))
-                                vid_map[f.path] = vid
-                    except Exception:
-                        pass
+                                mt = f.stat().st_mtime
+                                if mt > latest_mtime:
+                                    latest_mtime = mt
+            except Exception:
+                pass
 
-            if not pq_files:
+            if latest_mtime == 0.0:
                 return pd.DataFrame()
-
-            latest_mtime = max(mt for _, mt in pq_files)
             if latest_mtime <= self._last_mtime.get(module, 0):
                 return pd.DataFrame()
             self._last_mtime[module] = latest_mtime
 
-            pq_files.sort(key=lambda x: x[1], reverse=True)
-            recent_files = [fp for fp, _ in pq_files[:15]]
+            # Per-partition file cap (not a global top-15 across all
+            # vehicles) — guarantees every vehicle's latest data is read
+            # each cycle instead of letting a few high-frequency writers
+            # crowd out the rest of the fleet from a shared top-N list.
+            files = dr.list_partitioned_files(path, max_files_per_partition=15)
+            if not files:
+                return pd.DataFrame()
 
             checkpoints = [v for k, v in self.state.checkpoints.items() if k.endswith(f"_{module}")]
 
-            dfs = []
-            for fp in recent_files:
-                try:
-                    df = pd.read_parquet(fp)
-                    if not df.empty:
-                        if "source_id" not in df.columns:
-                            df["source_id"] = vid_map.get(fp, "unknown")
-                        dfs.append(df)
-                except Exception:
-                    pass
-
-            if not dfs:
-                return pd.DataFrame()
-
-            combined = pd.concat(dfs, ignore_index=True)
-
             if checkpoints:
                 min_watermark = str(min(checkpoints))
-                combined = combined[combined['ingest_ts'].astype(str) > min_watermark]
+                combined = dr.query_df(
+                    "SELECT * FROM read_parquet(?) WHERE CAST(ingest_ts AS VARCHAR) > ?",
+                    files, params=[min_watermark], hive_partitioning=True,
+                )
+            else:
+                combined = dr.query_df("SELECT * FROM read_parquet(?)", files, hive_partitioning=True)
 
             if combined.empty:
                 return combined
 
-            if 'ingest_ts' in combined.columns:
-                combined = combined.sort_values('ingest_ts', ascending=True)
+            if "ingest_ts" in combined.columns:
+                combined = combined.sort_values("ingest_ts", ascending=True)
 
             return combined
 

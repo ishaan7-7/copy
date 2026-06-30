@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import asyncio
@@ -12,6 +13,11 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 DELTA_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "bronze")
 STATE_DIR = os.path.join(CURRENT_DIR, "state")
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from common import duck_reader as dr
+from deltalake import DeltaTable
 
 VEHICLE_MODULES = ["battery", "body", "engine", "transmission", "tyre"]
 SERVICE_START_TIME = time.time()
@@ -88,9 +94,48 @@ async def update_writer_metrics_loop():
             print(f"Writer metric update failed: {e}")
         await asyncio.sleep(2)
 
+# Spark's structured streaming writes a new small file per (vehicle,
+# trigger) — with a 5s trigger and 7 vehicle partitions this is the fastest
+# file-count growth of any layer (~8,400 files over a 20-min stream, no
+# cleanup). delta-rs's compact()/vacuum() are explicitly built to interoperate
+# with Spark-written Delta tables via the standard transaction log (optimistic
+# concurrency handles any overlap with Spark's concurrent commits — verified
+# compact() correctly compacts per-partition, not across partitions, and
+# vacuum(retention_hours=0) only removes files compact() just superseded, not
+# anything Spark is concurrently writing). 90s interval (vs Silver's 60s)
+# because Bronze has more partitions to walk each pass.
+_BRONZE_COMPACT_INTERVAL_SEC = 90
+
+def _compact_bronze_module(module):
+    path = os.path.join(DELTA_ROOT, module)
+    if not os.path.exists(path):
+        return
+    try:
+        dt = DeltaTable(path)
+        dt.optimize.compact()
+        dt.vacuum(retention_hours=0, dry_run=False, enforce_retention_duration=False)
+    except Exception as e:
+        print(f"⚠️ Bronze compaction failed for {module}: {e}")
+
+async def compact_bronze_loop():
+    # Sleeping the full interval before the first pass let Bronze build up
+    # uncompacted across all 5 modules x 7 partitions before ever being
+    # touched — confirmed live: this produced an initial backlog of ~380
+    # files, and compacting that much in one pass was expensive enough to
+    # contribute to a system-wide stall. A short initial delay (let Spark's
+    # first micro-batch actually land) keeps every pass small instead.
+    await asyncio.sleep(20)
+    for module in VEHICLE_MODULES:
+        await asyncio.to_thread(_compact_bronze_module, module)
+    while True:
+        await asyncio.sleep(_BRONZE_COMPACT_INTERVAL_SEC)
+        for module in VEHICLE_MODULES:
+            await asyncio.to_thread(_compact_bronze_module, module)
+
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(update_writer_metrics_loop())
+    asyncio.create_task(compact_bronze_loop())
 
 # --- Endpoints ---
 @app.get("/api/writer/metrics")
@@ -105,29 +150,13 @@ def get_writer_inspector(module: str, limit: int = Query(default=100, ge=1, le=5
     if not path.exists():
         return {"data": []}
     try:
-        dfs = []
-        for entry in sorted(path.iterdir(), key=lambda e: e.name):
-            if not (entry.is_dir() and entry.name.startswith("source_id=")):
-                continue
-            sim_id = entry.name.split("=", 1)[1]
-            part_files = sorted(
-                (f for f in entry.iterdir() if f.is_file() and f.name.endswith(".parquet")),
-                key=lambda f: f.stat().st_mtime,
-                reverse=True,
-            )[:2]
-            for f in part_files:
-                try:
-                    df_file = pd.read_parquet(f)
-                    df_file["source_id"] = sim_id
-                    if not df_file.empty:
-                        dfs.append(df_file)
-                except Exception:
-                    pass
-
-        if not dfs:
+        files = dr.list_partitioned_files(str(path), max_files_per_partition=2)
+        if not files:
+            return {"data": []}
+        combined = dr.query_df("SELECT * FROM read_parquet(?)", files, hive_partitioning=True)
+        if combined.empty:
             return {"data": []}
 
-        combined = pd.concat(dfs, ignore_index=True)
         if "ingest_ts" in combined.columns:
             combined["ingest_ts"] = pd.to_datetime(combined["ingest_ts"], utc=True)
             combined = combined.sort_values("ingest_ts", ascending=False)

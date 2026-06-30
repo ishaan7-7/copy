@@ -1,9 +1,25 @@
 import os
+import time
 from pathlib import Path
-from deltalake import write_deltalake
+from deltalake import write_deltalake, DeltaTable
 from src import config
 
+# Each write creates a new small Delta file (per vehicle, per module, per
+# ~5s cycle) with no compaction — over a 20-min stream this grows to ~1,200
+# files/module with nothing bounding it. Periodically merge the small files
+# into one and physically remove the superseded ones. retention_hours=0 is
+# intentional: this is a short-lived demo stream with no need for Delta's
+# time-travel/audit retention, and the actual safety margin against deleting
+# a file a concurrent reader is mid-read on comes from the compaction cadence
+# (60s, vastly longer than any reader's list-then-read window) plus every
+# reader's per-file fallback (common/duck_reader.py) tolerating a missing file.
+_COMPACT_INTERVAL_SEC = 60
+
+
 class SilverWriter:
+    def __init__(self):
+        self._last_compact: dict = {}
+
     def write(self, df, module):
         """ Appends inferred DataFrame to Silver Delta Table """
         path = os.path.join(config.SILVER_DIR, module)
@@ -19,3 +35,17 @@ class SilverWriter:
         except Exception as e:
             print(f"❌ Failed to write {module} to Silver: {e}")
             raise e
+
+        self._maybe_compact(module, path)
+
+    def _maybe_compact(self, module, path):
+        now = time.time()
+        if now - self._last_compact.get(module, 0) < _COMPACT_INTERVAL_SEC:
+            return
+        self._last_compact[module] = now
+        try:
+            dt = DeltaTable(Path(path).as_posix())
+            dt.optimize.compact()
+            dt.vacuum(retention_hours=0, dry_run=False, enforce_retention_duration=False)
+        except Exception as e:
+            print(f"⚠️ Silver compaction failed for {module}: {e}")

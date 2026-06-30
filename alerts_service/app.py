@@ -1,13 +1,18 @@
 
 import time
 import os
-from pathlib import Path
+import sys
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from src.state_manager import AlertStateManager
 from src.alert_engine import AlertEngine
 from src import config
+
+_ROOT_FOR_IMPORT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _ROOT_FOR_IMPORT not in sys.path:
+    sys.path.insert(0, _ROOT_FOR_IMPORT)
+from common import duck_reader as dr
 
 
 def main():
@@ -20,6 +25,7 @@ def main():
     state = AlertStateManager()
     engine = AlertEngine(state)
     last_silver_mtime = 0.0
+    last_compact = 0.0
 
     ALERT_SCHEMA = pa.schema([
         ("alert_id", pa.string()),
@@ -72,39 +78,21 @@ def main():
                 continue
             try:
                 last_ts = state.checkpoints.get(mod, "1970-01-01")
-                pq_files = []
-                for entry in os.scandir(mod_path):
-                    if entry.is_file() and entry.name.endswith(".parquet"):
-                        pq_files.append((entry.path, entry.stat().st_mtime))
-                    elif entry.is_dir() and not entry.name.startswith("_"):
-                        for sub in os.scandir(entry.path):
-                            if sub.is_file() and sub.name.endswith(".parquet"):
-                                pq_files.append((sub.path, sub.stat().st_mtime))
-                pq_files.sort(key=lambda x: x[1], reverse=True)
-
-                dfs = []
-                rows_collected = 0
-                for fp, _ in pq_files[:15]:
-                    try:
-                        df = pd.read_parquet(fp)
-                        if not df.empty and "inference_ts" in df.columns:
-                            df = df[df["inference_ts"] > last_ts]
-                            if not df.empty:
-                                dfs.append(df)
-                                rows_collected += len(df)
-                                if rows_collected >= per_module_limit:
-                                    break
-                    except Exception:
-                        pass
-
-                if dfs:
-                    combined = pd.concat(dfs, ignore_index=True)
-                    combined = combined.sort_values("inference_ts", ascending=True).head(per_module_limit)
-                    combined["module_name"] = mod
-                    if "source_id" not in combined.columns:
-                        combined["source_id"] = "unknown"
-                    raw_frames.append(combined)
-                    new_checkpoints[mod] = str(combined["inference_ts"].max())
+                files = dr.list_files(mod_path, max_files=15)
+                if not files:
+                    continue
+                combined = dr.query_df(
+                    "SELECT * FROM read_parquet(?) WHERE CAST(inference_ts AS VARCHAR) > ?",
+                    files, params=[last_ts],
+                )
+                if combined.empty:
+                    continue
+                combined = combined.sort_values("inference_ts", ascending=True).head(per_module_limit)
+                combined["module_name"] = mod
+                if "source_id" not in combined.columns:
+                    combined["source_id"] = "unknown"
+                raw_frames.append(combined)
+                new_checkpoints[mod] = str(combined["inference_ts"].max())
             except Exception:
                 pass
 
@@ -132,7 +120,6 @@ def main():
                 f"alerts_{int(time.time()*1000)}.parquet",
             )
             pq.write_table(pa_table, out_path)
-            _cleanup_old_files(config.GOLD_ALERTS_DIR, keep=100)
 
         for mod, ts in new_checkpoints.items():
             state.checkpoints[mod] = ts
@@ -145,25 +132,27 @@ def main():
             with open(config.CHECKPOINT_FILE, "w") as f:
                 json.dump(state.checkpoints, f, indent=4)
 
-        time.sleep(config.POLL_INTERVAL)
-
-
-def _cleanup_old_files(directory, keep=100):
-    try:
-        files = []
-        for entry in os.scandir(directory):
-            if entry.is_file() and entry.name.endswith(".parquet"):
-                files.append((entry.path, entry.stat().st_mtime))
-        if len(files) <= keep:
-            return
-        files.sort(key=lambda x: x[1])
-        for fp, _ in files[:len(files) - keep]:
+        # Alerts writes plain parquet (no _delta_log) with upsert-style
+        # semantics — the same alert_id is rewritten on every status
+        # transition (OPEN -> updated score -> CLOSED) since the move off
+        # DeltaTable's merge(). Without dedup, every historical version
+        # accumulates forever (confirmed on real data: 441 rows for just 28
+        # unique alerts). Compaction here both bounds file count AND fixes
+        # that correctness bug by keeping only the most-recently-updated row
+        # per alert_id.
+        if time.time() - last_compact >= 90:
+            last_compact = time.time()
             try:
-                os.remove(fp)
-            except Exception:
-                pass
-    except Exception:
-        pass
+                merged = dr.compact_flat_dir(
+                    config.GOLD_ALERTS_DIR, min_files_to_compact=5,
+                    dedup_subset=["alert_id"], dedup_sort_col="last_updated_ts",
+                )
+                if merged:
+                    print(f"Compacted {merged} Alert files.")
+            except Exception as e:
+                print(f"Alert compaction failed: {e}")
+
+        time.sleep(config.POLL_INTERVAL)
 
 
 if __name__ == "__main__":

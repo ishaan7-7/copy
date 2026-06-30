@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import asyncio
 import pandas as pd
@@ -11,6 +12,10 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 SILVER_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "silver")
 ALERTS_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "gold", "alerts")
 ALERTS_CHECKPOINT = os.path.join(CURRENT_DIR, "state", "checkpoints.json")
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from common import duck_reader as dr
 
 VEHICLE_MODULES = ["engine", "transmission", "battery", "body", "tyre"]
 
@@ -47,25 +52,6 @@ app.add_middleware(
 # --- Background Logic ---
 _last_alerts_mtime = 0.0
 
-def _scandir_parquets(directory, max_files=0):
-    files = []
-    if not os.path.exists(directory):
-        return files
-    try:
-        for entry in os.scandir(directory):
-            if entry.is_file() and entry.name.endswith(".parquet"):
-                files.append((entry.path, entry.stat().st_mtime))
-            elif entry.is_dir() and not entry.name.startswith("_"):
-                for sub in os.scandir(entry.path):
-                    if sub.is_file() and sub.name.endswith(".parquet"):
-                        files.append((sub.path, sub.stat().st_mtime))
-    except Exception:
-        pass
-    files.sort(key=lambda x: x[1], reverse=True)
-    paths = [f for f, _ in files]
-    return paths[:max_files] if max_files > 0 else paths
-
-
 def _sync_update_alerts():
     global ALERTS_METRICS_CACHE, _last_alerts_mtime
     try:
@@ -87,30 +73,17 @@ def _sync_update_alerts():
             primary_mod = VEHICLE_MODULES[0]
             last_ts = ckpt.get(primary_mod, "1970-01-01T00:00:00")
             silver_primary = os.path.join(SILVER_ROOT, primary_mod)
-            s_files = _scandir_parquets(silver_primary, max_files=3)
-            for f in s_files:
-                try:
-                    df = pd.read_parquet(f, columns=["inference_ts"])
-                    if 'inference_ts' in df.columns:
-                        df['inference_ts'] = pd.to_datetime(df['inference_ts'], utc=True)
-                        lag_rows += len(df[df['inference_ts'] > pd.to_datetime(last_ts, utc=True)])
-                except:
-                    pass
+            s_files = dr.list_files(silver_primary, max_files=3)
+            if s_files:
+                sdf = dr.query_df("SELECT inference_ts FROM read_parquet(?)", s_files)
+                if not sdf.empty and "inference_ts" in sdf.columns:
+                    sdf["inference_ts"] = pd.to_datetime(sdf["inference_ts"], utc=True)
+                    lag_rows = int((sdf["inference_ts"] > pd.to_datetime(last_ts, utc=True)).sum())
         except:
             pass
 
-        df_alerts = pd.DataFrame()
-        afiles = _scandir_parquets(ALERTS_ROOT, max_files=10)
-        dfs = []
-        for f in afiles:
-            try:
-                df = pd.read_parquet(f)
-                if not df.empty:
-                    dfs.append(df)
-            except:
-                pass
-        if dfs:
-            df_alerts = pd.concat(dfs, ignore_index=True)
+        afiles = dr.list_files(ALERTS_ROOT, max_files=10)
+        df_alerts = dr.query_df("SELECT * FROM read_parquet(?)", afiles) if afiles else pd.DataFrame()
 
         active_alerts = 0
         crit_vehicles = 0
@@ -118,6 +91,14 @@ def _sync_update_alerts():
         closed_alerts = []
 
         if not df_alerts.empty:
+            # Upsert-style data (same alert_id rewritten on every status
+            # transition) — dedup before counting/displaying, otherwise a
+            # single alert that's been updated N times shows as N alerts.
+            if "alert_id" in df_alerts.columns and "last_updated_ts" in df_alerts.columns:
+                df_alerts = (
+                    df_alerts.sort_values("last_updated_ts")
+                    .drop_duplicates(subset=["alert_id"], keep="last")
+                )
             df_alerts = df_alerts.fillna(0)
             for col in df_alerts.select_dtypes(include=['datetime64[ns]', 'datetime64[ns, UTC]']).columns:
                 df_alerts[col] = df_alerts[col].astype(str)

@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import asyncio
 import pandas as pd
@@ -11,6 +12,10 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 SILVER_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "silver")
 STATE_DIR = os.path.join(CURRENT_DIR, "state")
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from common import duck_reader as dr
 
 VEHICLE_MODULES = ["battery", "body", "engine", "transmission", "tyre"]
 
@@ -89,32 +94,17 @@ def _sync_update_metrics():
             path = os.path.join(SILVER_ROOT, mod)
             if not os.path.exists(path): continue
 
-            files = []
-            try:
-                for entry in os.scandir(path):
-                    if entry.is_file() and entry.name.endswith(".parquet"):
-                        files.append((entry.path, entry.stat().st_mtime))
-            except Exception:
-                pass
-            files.sort(key=lambda x: x[1], reverse=True)
-            files = [f for f, _ in files]
-
-            dfs = []
-            mod_max = pd.Timestamp("1970-01-01", tz="UTC")
-            for f in files[:3]:
-                try:
-                    df = pd.read_parquet(f, columns=_metric_cols)
-                    if not df.empty and 'inference_ts' in df.columns:
-                        df['inference_ts'] = pd.to_datetime(df['inference_ts'], utc=True)
-                        max_df_ts = df['inference_ts'].max()
-                        if max_df_ts > latest_ts:
-                            latest_ts = max_df_ts
-                        if max_df_ts > mod_max:
-                            mod_max = max_df_ts
-                        dfs.append(df)
-                except: pass
-            if dfs:
-                dfs_by_mod[mod] = pd.concat(dfs, ignore_index=True)
+            files = dr.list_files(path, max_files=3)
+            if not files:
+                continue
+            col_sql = ", ".join(_metric_cols)
+            df = dr.query_df(f"SELECT {col_sql} FROM read_parquet(?)", files)
+            if not df.empty and "inference_ts" in df.columns:
+                df["inference_ts"] = pd.to_datetime(df["inference_ts"], utc=True)
+                mod_max = df["inference_ts"].max()
+                if mod_max > latest_ts:
+                    latest_ts = mod_max
+                dfs_by_mod[mod] = df
                 mod_latest_ts[mod] = mod_max
 
         recent_alerts = []
@@ -202,28 +192,10 @@ def get_inference_tail(module: str):
     if not path.exists():
         return {"data": []}
     try:
-        files = []
-        try:
-            for entry in os.scandir(str(path)):
-                if entry.is_file() and entry.name.endswith(".parquet"):
-                    files.append((entry.path, entry.stat().st_mtime))
-        except Exception:
-            pass
+        files = dr.list_files(str(path), max_files=5)
         if not files:
             return {"data": []}
-        files.sort(key=lambda x: x[1], reverse=True)
-        files = [Path(f) for f, _ in files[:5]]
-        dfs = []
-        for f in files:
-            try:
-                df_file = pd.read_parquet(f)
-                if not df_file.empty:
-                    dfs.append(df_file)
-            except Exception:
-                pass
-        if not dfs:
-            return {"data": []}
-        df = pd.concat(dfs, ignore_index=True)
+        df = dr.query_df("SELECT * FROM read_parquet(?)", files)
         if df.empty:
             return {"data": []}
         if "inference_ts" in df.columns:

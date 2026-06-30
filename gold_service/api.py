@@ -1,4 +1,5 @@
 import os
+import sys
 import asyncio
 import pandas as pd
 from pathlib import Path
@@ -10,6 +11,10 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 SILVER_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "silver")
 GOLD_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "gold", "vehicle_health")
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from common import duck_reader as dr
 
 try:
     from src import config as gold_config
@@ -38,6 +43,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_GOLD_MAX_FILES = 200
 
 # --- Background Logic ---
 _last_gold_mtime = 0.0
@@ -124,56 +131,33 @@ def get_gold_config():
 
 @app.get("/api/gold/history/{sim_id}")
 def get_gold_history(sim_id: str):
-    import os as _os
-    gold_path = Path(GOLD_ROOT)
-    if not gold_path.exists():
-        return {"data": []}
     try:
-        parquet_files = []
-        for entry in _os.scandir(str(gold_path)):
-            if entry.is_file() and entry.name.endswith(".parquet"):
-                parquet_files.append((entry.path, entry.stat().st_mtime))
-            elif entry.is_dir() and not entry.name.startswith("_"):
-                for sub in _os.scandir(entry.path):
-                    if sub.is_file() and sub.name.endswith(".parquet"):
-                        parquet_files.append((sub.path, sub.stat().st_mtime))
-
-        if not parquet_files:
+        files = dr.list_files(GOLD_ROOT, max_files=_GOLD_MAX_FILES)
+        if not files:
             return {"data": []}
-
-        parquet_files.sort(key=lambda x: x[1], reverse=True)
-        parquet_files = [Path(p) for p, _ in parquet_files[:20]]
-
-        dfs = []
-        for f in parquet_files:
-            try:
-                df_file = pd.read_parquet(f)
-                if not df_file.empty:
-                    if sim_id.upper() != "ALL" and "source_id" in df_file.columns:
-                        df_file = df_file[df_file["source_id"] == sim_id]
-                    if not df_file.empty:
-                        dfs.append(df_file)
-            except Exception:
-                pass
-
-        if not dfs:
+        if sim_id.upper() != "ALL":
+            df = dr.query_df("SELECT * FROM read_parquet(?) WHERE source_id = ?", files, params=[sim_id])
+            if not df.empty and "source_id" in df.columns:
+                df = df[df["source_id"] == sim_id]
+        else:
+            df = dr.query_df("SELECT * FROM read_parquet(?)", files)
+        if df.empty or "source_id" not in df.columns:
             return {"data": []}
-
-        df = pd.concat(dfs, ignore_index=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    if df.empty or 'source_id' not in df.columns:
-        return {"data": []}
-
-    if df.empty:
-        return {"data": []}
-
     if 'gold_window_ts' in df.columns:
         df['gold_window_ts'] = pd.to_datetime(df['gold_window_ts'])
+        # Gold is append-only — the same (source_id, window) gets a new row
+        # every time that window's state is touched. Dedup on the write-order
+        # column (not gold_window_ts itself, which ties don't order
+        # meaningfully) to keep the most-recently-written version. ALL mode
+        # must include source_id in the subset or rows from different
+        # vehicles sharing a window timestamp would incorrectly collapse.
+        sort_col = 'gold_write_ts' if 'gold_write_ts' in df.columns else 'gold_window_ts'
+        dedup_subset = ['gold_window_ts'] if sim_id.upper() != "ALL" else ['source_id', 'gold_window_ts']
+        df = df.sort_values(sort_col).drop_duplicates(subset=dedup_subset, keep='last')
         df = df.sort_values('gold_window_ts', ascending=True)
-        if sim_id.upper() != "ALL":
-            df = df.drop_duplicates(subset=['gold_window_ts'], keep='last')
 
     df = df.fillna(0)
     for col in df.select_dtypes(include=['datetime64[ns]', 'datetime64[ns, UTC]']).columns:

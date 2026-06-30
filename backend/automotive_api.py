@@ -1,10 +1,15 @@
 
 import os
+import sys
 import json
 import time
 from threading import Lock
 from fastapi import APIRouter, HTTPException
-from parquet_cache import list_parquets, get_latest_mtime
+
+_PROJECT_ROOT_FOR_IMPORT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _PROJECT_ROOT_FOR_IMPORT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT_FOR_IMPORT)
+from common import duck_reader as dr
 
 router = APIRouter()
 
@@ -28,11 +33,13 @@ def _set_cache(key: str, value):
             oldest_key = min(_response_cache, key=lambda k: _response_cache[k][0])
             del _response_cache[oldest_key]
 
-_PROJECT_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_PROJECT_ROOT   = _PROJECT_ROOT_FOR_IMPORT
 _DELTA_ROOT     = os.path.join(_PROJECT_ROOT, "data", "delta", "bronze")
 _SILVER_ROOT    = os.path.join(_PROJECT_ROOT, "data", "delta", "silver")
 _GOLD_ROOT      = os.path.join(_PROJECT_ROOT, "data", "delta", "gold", "vehicle_health")
 _VEHICLE_MODULES = ["battery", "body", "engine", "transmission", "tyre"]
+_GOLD_MAX_FILES = 200
+_SILVER_MAX_FILES = 200
 
 # ── Demo / Presentation Mode state ──────────────────────────────────────────
 
@@ -227,36 +234,44 @@ def _seed_all_demo_data() -> None:
         _DEMO_VEHICLE_HEALTH_CACHE[vid] = _generate_vehicle_health_history(_DEMO_SILVER_CACHE[vid])
 
 
+# ── Single-vehicle query helper ──────────────────────────────────────────────
+# Pushes the source_id filter into SQL (DuckDB only scans/transfers matching
+# rows) and re-applies it in pandas afterward as a no-op-on-the-fast-path
+# safety net for query_df()'s unfiltered fallback if DuckDB errors on a file.
+
+def _query_vehicle_df(directory: str, vehicle_id: str, max_files: int, hive: bool = False):
+    import pandas as pd
+    files = (
+        dr.list_partitioned_files(directory, max_files_per_partition=max_files)
+        if hive else dr.list_files(directory, max_files=max_files)
+    )
+    if not files:
+        return pd.DataFrame()
+    df = dr.query_df(
+        "SELECT * FROM read_parquet(?) WHERE source_id = ?", files, params=[vehicle_id], hive_partitioning=hive,
+    )
+    if not df.empty and "source_id" in df.columns:
+        df = df[df["source_id"] == vehicle_id]
+    return df
+
+
 # ── Bronze partition iterator — reads Hive-partitioned source_id=X dirs ──────
 
 def _iter_bronze_by_vehicle(module: str, max_files_per_vehicle: int = 10, columns=None):
-    import pandas as pd
     bronze_path = os.path.join(_DELTA_ROOT, module)
-    if not os.path.exists(bronze_path):
+    files = dr.list_partitioned_files(bronze_path, max_files_per_partition=max_files_per_vehicle)
+    if not files:
         return
-    try:
-        for entry in os.scandir(bronze_path):
-            if not entry.is_dir() or not entry.name.startswith("source_id="):
-                continue
-            vid = entry.name.split("=", 1)[1]
-            pfiles = sorted(
-                [f.path for f in os.scandir(entry.path) if f.is_file() and f.name.endswith(".parquet")],
-                key=os.path.getmtime, reverse=True,
-            )
-            dfs = []
-            for fp in pfiles[:max_files_per_vehicle]:
-                try:
-                    df = pd.read_parquet(fp, columns=columns) if columns else pd.read_parquet(fp)
-                    if not df.empty:
-                        dfs.append(df)
-                except Exception:
-                    pass
-            if dfs:
-                vdf = pd.concat(dfs, ignore_index=True)
-                vdf["source_id"] = vid
-                yield vid, vdf
-    except Exception:
-        pass
+    if columns:
+        col_list = list(dict.fromkeys(list(columns) + ["source_id"]))
+        col_sql = ", ".join(f'"{c}"' for c in col_list)
+    else:
+        col_sql = "*"
+    df = dr.query_df(f"SELECT {col_sql} FROM read_parquet(?)", files, hive_partitioning=True)
+    if df.empty or "source_id" not in df.columns:
+        return
+    for vid, grp in df.groupby("source_id"):
+        yield str(vid), grp.reset_index(drop=True)
 
 
 # ── Mileage join helper ───────────────────────────────────────────────────────
@@ -267,19 +282,15 @@ def _attach_mileage(combined, vehicle_id: str):
     if not os.path.exists(body_partition):
         combined["mileage"] = range(len(combined))
         return combined
-    bfiles = list_parquets(body_partition, max_files=5)
+    bfiles = dr.list_files(body_partition, max_files=5)
+    body_raw = dr.query_df("SELECT * FROM read_parquet(?)", bfiles) if bfiles else pd.DataFrame()
     bdfs = []
-    for fp in bfiles:
-        try:
-            bdf = pd.read_parquet(fp)
-            if not bdf.empty and "odometer_reading" in bdf.columns:
-                btc = next((c for c in ("timestamp", "ingest_ts") if c in bdf.columns), None)
-                if btc:
-                    raw_ts = pd.to_datetime(bdf[btc], errors="coerce", utc=True)
-                    bdf["_body_ts"] = raw_ts.dt.tz_convert(None)
-                    bdfs.append(bdf[["_body_ts", "odometer_reading"]].dropna(subset=["_body_ts"]))
-        except Exception:
-            pass
+    if not body_raw.empty and "odometer_reading" in body_raw.columns:
+        btc = next((c for c in ("timestamp", "ingest_ts") if c in body_raw.columns), None)
+        if btc:
+            raw_ts = pd.to_datetime(body_raw[btc], errors="coerce", utc=True)
+            body_raw["_body_ts"] = raw_ts.dt.tz_convert(None)
+            bdfs.append(body_raw[["_body_ts", "odometer_reading"]].dropna(subset=["_body_ts"]))
     if bdfs:
         body_merged = (
             pd.concat(bdfs, ignore_index=True)
@@ -349,20 +360,19 @@ def get_automotive_fleet_summary():
     gold_vehicle_map: dict = {}
 
     if os.path.exists(_GOLD_ROOT):
-        gfiles = list_parquets(_GOLD_ROOT, max_files=10)
-        dfs = []
-        for fp in gfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty:
-                    dfs.append(df)
-            except Exception:
-                pass
-        if dfs:
-            gdf = pd.concat(dfs, ignore_index=True)
+        gfiles = dr.list_files(_GOLD_ROOT, max_files=_GOLD_MAX_FILES)
+        gdf = dr.query_df("SELECT * FROM read_parquet(?)", gfiles) if gfiles else pd.DataFrame()
+        if not gdf.empty:
             if "gold_window_ts" in gdf.columns and "source_id" in gdf.columns:
                 gdf["gold_window_ts"] = pd.to_datetime(gdf["gold_window_ts"])
-                latest = gdf.sort_values("gold_window_ts").groupby("source_id").last().reset_index()
+                # Gold is append-only — ties on gold_window_ts (same window
+                # touched more than once) must be broken by actual write
+                # order, not left to sort stability, or .last() can return a
+                # stale duplicate instead of the most recently written one.
+                sort_cols = ["gold_window_ts"]
+                if "gold_write_ts" in gdf.columns:
+                    sort_cols.append("gold_write_ts")
+                latest = gdf.sort_values(sort_cols).groupby("source_id").last().reset_index()
                 for _, row in latest.iterrows():
                     entry: dict = {
                         "vehicle_id": str(row.get("source_id", "")),
@@ -435,18 +445,10 @@ def get_automotive_sensor_history(vehicle_id: str, module: str):
 
     partition_path = os.path.join(_DELTA_ROOT, module, f"source_id={vehicle_id}")
     if os.path.exists(partition_path):
-        pfiles = list_parquets(partition_path, max_files=20)
-        dfs = []
-        for fp in pfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty:
-                    dfs.append(df)
-            except Exception:
-                pass
+        pfiles = dr.list_files(partition_path, max_files=20)
+        combined = dr.query_df("SELECT * FROM read_parquet(?)", pfiles) if pfiles else pd.DataFrame()
 
-        if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+        if not combined.empty:
             combined["source_id"] = vehicle_id
             ts_col = next((c for c in ("timestamp", "ingest_ts") if c in combined.columns), None)
             if ts_col:
@@ -490,20 +492,9 @@ def get_automotive_module_health(vehicle_id: str, module: str):
 
     silver_path = os.path.join(_SILVER_ROOT, module)
     if os.path.exists(silver_path):
-        pfiles = list_parquets(silver_path, max_files=20)
-        dfs = []
-        for fp in pfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty and "source_id" in df.columns:
-                    vdf = df[df["source_id"] == vehicle_id]
-                    if not vdf.empty:
-                        dfs.append(vdf)
-            except Exception:
-                pass
+        combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
 
-        if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+        if not combined.empty:
             ts_col = next((c for c in ("inference_ts", "ingest_ts", "timestamp") if c in combined.columns), None)
             if ts_col:
                 combined["timestamp"] = pd.to_datetime(combined[ts_col]).dt.strftime("%Y-%m-%d %H:%M:%S.%f").str[:-3]
@@ -541,21 +532,17 @@ def get_automotive_vehicle_health_history(vehicle_id: str):
     data_source = "none"
 
     if os.path.exists(_GOLD_ROOT):
-        gfiles = list_parquets(_GOLD_ROOT, max_files=50)
-        dfs = []
-        for fp in gfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty and "source_id" in df.columns:
-                    vdf = df[df["source_id"] == vehicle_id]
-                    if not vdf.empty:
-                        dfs.append(vdf)
-            except Exception:
-                pass
-        if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+        combined = _query_vehicle_df(_GOLD_ROOT, vehicle_id, _GOLD_MAX_FILES)
+        if not combined.empty:
             if "gold_window_ts" in combined.columns:
                 combined["gold_window_ts"] = pd.to_datetime(combined["gold_window_ts"])
+                # Gold is append-only — the same (source_id, window) gets a
+                # new row every time that window's state is touched, not just
+                # once. Without dedup the scatter/timeline plots show multiple
+                # stacked points per window instead of one (confirmed on real
+                # data: 337 rows for only 98 unique windows).
+                sort_col = "gold_write_ts" if "gold_write_ts" in combined.columns else "gold_window_ts"
+                combined = combined.sort_values(sort_col).drop_duplicates(subset=["gold_window_ts"], keep="last")
                 combined = combined.sort_values("gold_window_ts")
                 combined["ts"] = combined["gold_window_ts"].dt.strftime("%Y-%m-%d %H:%M:%S.%f")
             if "ts" not in combined.columns:
@@ -603,21 +590,10 @@ def get_vehicle_module_decomposition(vehicle_id: str):
         silver_path = os.path.join(_SILVER_ROOT, mod)
         if not os.path.exists(silver_path):
             continue
-        pfiles = list_parquets(silver_path, max_files=20)
-        dfs: list = []
-        for fp in pfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty and "source_id" in df.columns and "health_score" in df.columns:
-                    vdf = df[df["source_id"] == vehicle_id]
-                    if not vdf.empty:
-                        dfs.append(vdf)
-            except Exception:
-                pass
-        if not dfs:
+        combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
+        if combined.empty or "health_score" not in combined.columns:
             continue
         try:
-            combined = pd.concat(dfs, ignore_index=True)
             ts_col = next((c for c in ("timestamp", "ingest_ts", "inference_ts") if c in combined.columns), None)
             if not ts_col:
                 continue
@@ -714,32 +690,32 @@ _DTC_HISTORY_FILE = os.path.join(_PROJECT_ROOT, "data", "dtc_history.json")
 
 @router.get("/api/automotive/alerts/{vehicle_id}")
 def get_vehicle_alerts(vehicle_id: str):
-    import pandas as pd
     if not os.path.exists(_GOLD_ALERTS_DIR):
         return {"vehicle_id": vehicle_id, "open": [], "closed": []}
-    try:
-        afiles = list_parquets(_GOLD_ALERTS_DIR, max_files=20)
-        if not afiles:
-            return {"vehicle_id": vehicle_id, "open": [], "closed": []}
-        dfs = []
-        for fp in afiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty:
-                    dfs.append(df)
-            except Exception:
-                pass
-        if not dfs:
-            return {"vehicle_id": vehicle_id, "open": [], "closed": []}
-        combined = pd.concat(dfs, ignore_index=True)
-    except Exception:
-        return {"vehicle_id": vehicle_id, "open": [], "closed": []}
-    vehicle_df = combined[combined["source_id"] == vehicle_id].copy()
+    vehicle_df = _query_vehicle_df(_GOLD_ALERTS_DIR, vehicle_id, max_files=100)
     if vehicle_df.empty:
         return {"vehicle_id": vehicle_id, "open": [], "closed": []}
+    # Alerts is upsert-style (same alert_id rewritten on every status
+    # transition); compaction dedups periodically, but reads must also dedup
+    # for whatever's accumulated in the not-yet-compacted recent files.
+    if "alert_id" in vehicle_df.columns and "last_updated_ts" in vehicle_df.columns:
+        vehicle_df = (
+            vehicle_df.sort_values("last_updated_ts")
+            .drop_duplicates(subset=["alert_id"], keep="last")
+        )
     for col in vehicle_df.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
         vehicle_df[col] = vehicle_df[col].astype(str)
-    vehicle_df = vehicle_df.fillna("")
+    # Compacted vs not-yet-compacted alert files can briefly disagree on a
+    # column's inferred type (e.g. max_composite_score as float64 in one file,
+    # int-like in another) — DuckDB's union_by_name resolves that per-query,
+    # which can leave a numeric column as a nullable Int dtype. A blanket
+    # fillna("") then throws TypeError on that column (confirmed live: a
+    # single request failed with "Invalid value '' for dtype 'Int32'"), so
+    # fill object/string columns with "" and numeric columns with 0 separately.
+    obj_cols = vehicle_df.select_dtypes(include=["object"]).columns
+    vehicle_df[obj_cols] = vehicle_df[obj_cols].fillna("")
+    num_cols = vehicle_df.select_dtypes(include=["number"]).columns
+    vehicle_df[num_cols] = vehicle_df[num_cols].fillna(0)
     open_df = vehicle_df[vehicle_df["status"] == "OPEN"].sort_values("peak_anomaly_ts", ascending=False)
     closed_df = vehicle_df[vehicle_df["status"] == "CLOSED"].sort_values("alert_end_ts", ascending=False)
     return {
@@ -780,17 +756,11 @@ def get_module_fleet_ranking(module: str):
     vehicle_data: dict = {}
     silver_path = os.path.join(_SILVER_ROOT, module)
     if os.path.exists(silver_path):
-        pfiles = list_parquets(silver_path, max_files=20)
-        dfs = []
-        for fp in pfiles:
-            try:
-                df = pd.read_parquet(fp, columns=["source_id", "health_score"])
-                if not df.empty:
-                    dfs.append(df)
-            except Exception:
-                pass
-        if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+        pfiles = dr.list_files(silver_path, max_files=_SILVER_MAX_FILES)
+        combined = dr.query_df(
+            "SELECT source_id, health_score FROM read_parquet(?)", pfiles,
+        ) if pfiles else pd.DataFrame()
+        if not combined.empty:
             for vid, grp in combined.groupby("source_id"):
                 vehicle_data[str(vid)] = grp["health_score"].dropna().tolist()
 
@@ -801,23 +771,13 @@ def get_module_fleet_ranking(module: str):
 
     alert_counts: dict = {}
     if os.path.exists(_GOLD_ALERTS_DIR):
-        try:
-            files = list_parquets(_GOLD_ALERTS_DIR, max_files=10)
-            adfs = []
-            for fp in files:
-                try:
-                    df = pd.read_parquet(fp)
-                    if not df.empty:
-                        adfs.append(df)
-                except Exception:
-                    pass
-            if adfs:
-                adf = pd.concat(adfs, ignore_index=True)
-                if "source_id" in adf.columns:
-                    for vid, cnt in adf.groupby("source_id").size().items():
-                        alert_counts[str(vid)] = int(cnt)
-        except Exception:
-            pass
+        afiles = dr.list_files(_GOLD_ALERTS_DIR, max_files=100)
+        adf = dr.query_df("SELECT source_id, alert_id FROM read_parquet(?)", afiles) if afiles else pd.DataFrame()
+        if not adf.empty and "source_id" in adf.columns:
+            if "alert_id" in adf.columns:
+                adf = adf.drop_duplicates(subset=["alert_id"])
+            for vid, cnt in adf.groupby("source_id").size().items():
+                alert_counts[str(vid)] = int(cnt)
 
     rankings = []
     for vid, scores in vehicle_data.items():
@@ -853,17 +813,9 @@ def get_module_fleet_health(module: str):
     vehicle_pts: dict = {}
     silver_path = os.path.join(_SILVER_ROOT, module)
     if os.path.exists(silver_path):
-        pfiles = list_parquets(silver_path, max_files=20)
-        dfs = []
-        for fp in pfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty and "source_id" in df.columns and "health_score" in df.columns:
-                    dfs.append(df)
-            except Exception:
-                pass
-        if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+        pfiles = dr.list_files(silver_path, max_files=_SILVER_MAX_FILES)
+        combined = dr.query_df("SELECT * FROM read_parquet(?)", pfiles) if pfiles else pd.DataFrame()
+        if not combined.empty and "source_id" in combined.columns and "health_score" in combined.columns:
             ts_col = next((c for c in ("inference_ts", "ingest_ts", "timestamp") if c in combined.columns), None)
             if ts_col:
                 combined["_ts"] = pd.to_datetime(combined[ts_col], errors="coerce")
@@ -1035,17 +987,11 @@ def get_module_top_features(module: str):
 
     silver_path = os.path.join(_SILVER_ROOT, module)
     if os.path.exists(silver_path):
-        pfiles = list_parquets(silver_path, max_files=20)
-        dfs = []
-        for fp in pfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty and "top_features" in df.columns:
-                    dfs.append(df[["top_features"]])
-            except Exception:
-                pass
-        if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+        pfiles = dr.list_files(silver_path, max_files=_SILVER_MAX_FILES)
+        combined = dr.query_df(
+            "SELECT top_features FROM read_parquet(?) WHERE top_features IS NOT NULL", pfiles,
+        ) if pfiles else pd.DataFrame()
+        if not combined.empty:
             for raw in combined["top_features"].dropna():
                 try:
                     feats = json.loads(str(raw))
@@ -1094,17 +1040,9 @@ def get_dtc_sensor_evidence(vehicle: str, module: str, sensor: str, around_ts: s
 
     partition_path = os.path.join(_DELTA_ROOT, module, f"source_id={vehicle}")
     if os.path.exists(partition_path):
-        pfiles = list_parquets(partition_path, max_files=20)
-        dfs = []
-        for fp in pfiles:
-            try:
-                df = pd.read_parquet(fp)
-                if not df.empty and sensor in df.columns:
-                    dfs.append(df)
-            except Exception:
-                pass
-        if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+        pfiles = dr.list_files(partition_path, max_files=20)
+        combined = dr.query_df("SELECT * FROM read_parquet(?)", pfiles) if pfiles else pd.DataFrame()
+        if not combined.empty and sensor in combined.columns:
             ts_col = next((c for c in ("timestamp", "ingest_ts") if c in combined.columns), None)
             if ts_col:
                 combined["_ts"] = pd.to_datetime(combined[ts_col], errors="coerce")

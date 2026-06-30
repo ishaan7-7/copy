@@ -1,17 +1,17 @@
 {
   "status": "RUNNING",
-  "last_updated": 1782748999.772892,
+  "last_updated": 1782845042.3840542,
   "streams": {
     "transmission": {
       "status": "ACTIVE",
-      "timestamp": "2026-06-29T16:02:47.153Z",
-      "batch_id": 9,
-      "num_input_rows": 103,
-      "total_rows_processed": 885,
+      "timestamp": "2026-06-30T18:43:31.348Z",
+      "batch_id": 162,
+      "num_input_rows": 26,
+      "total_rows_processed": 14518,
       "backlog": 0,
-      "input_rate": 6.724554416661226,
-      "process_rate": 6.88088716681141,
-      "duration_ms": 14969
+      "input_rate": 0.8985346972629251,
+      "process_rate": 1.7919911778895858,
+      "duration_ms": 14509
     }
   }
 }
