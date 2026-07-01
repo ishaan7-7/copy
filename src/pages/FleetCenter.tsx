@@ -442,7 +442,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
   });
 
   const [healthTimelineVehicle, setHealthTimelineVehicle] = useState<string>('sim001');
-  const [timelineXAxis, setTimelineXAxis] = useState<'timestamp' | 'mileage'>('mileage');
+  const [timelineXAxis, setTimelineXAxis] = useState<'timestamp' | 'mileage'>('timestamp');
   const scatterReady = true;
 
   const { data: healthHistory, refetch: refetchHealthHistory } = useQuery<HealthHistoryResponse>({
@@ -810,12 +810,11 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
                 option={{
                   animation: false,
                   tooltip: {
-                    trigger: 'axis',
+                    trigger: 'item',
                     backgroundColor: isDark ? '#1a2535' : '#fff',
                     borderColor: isDark ? '#2a3a4a' : '#e0e0e0',
                     borderWidth: 1,
                     textStyle: { fontFamily: 'monospace', fontSize: 11, color: isDark ? '#e8ecf0' : '#212121' },
-                    axisPointer: { type: 'line', lineStyle: { color: isDark ? '#2a3a4a' : '#e0e0e0', type: 'dashed' } },
                   },
                   dataZoom: [
                     { type: 'inside', xAxisIndex: 0 },
