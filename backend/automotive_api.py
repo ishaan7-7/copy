@@ -352,7 +352,7 @@ def get_presentation_mode_status():
 
 @router.get("/api/automotive/fleet-summary")
 def get_automotive_fleet_summary():
-    cached = _cached_response("fleet-summary")
+    cached = _cached_response("fleet-summary", ttl=3.0)
     if cached is not None:
         return cached
     import pandas as pd
@@ -524,7 +524,7 @@ def get_automotive_module_health(vehicle_id: str, module: str):
 @router.get("/api/automotive/vehicle-health-history/{vehicle_id}")
 def get_automotive_vehicle_health_history(vehicle_id: str):
     cache_key = f"vehicle-health-{vehicle_id}"
-    cached = _cached_response(cache_key)
+    cached = _cached_response(cache_key, ttl=3.0)
     if cached is not None:
         return cached
     import pandas as pd
@@ -551,6 +551,17 @@ def get_automotive_vehicle_health_history(vehicle_id: str):
             combined = _attach_mileage(combined, vehicle_id)
             combined = combined.fillna(0)
             if "mileage" in combined.columns:
+                # Odometer readings from multiple modules aggregated into
+                # a Gold window can be non-monotonic (confirmed: 6 backward
+                # jumps in real data e.g. 42300→42048→42006 km) because
+                # the aggregation picks whichever module's reading it saw
+                # last, and different modules report slightly different
+                # values at slightly different moments within the same
+                # window. A real vehicle odometer can only increase.
+                # expanding().max() removes the backward jumps without
+                # changing the forward trend, preventing the line from
+                # doubling back on itself in the mileage plot.
+                combined["mileage"] = combined["mileage"].expanding().max()
                 first_mileage = combined["mileage"].iloc[0]
                 combined["mileage_rel"] = (combined["mileage"] - first_mileage).round(1)
             for col in combined.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:

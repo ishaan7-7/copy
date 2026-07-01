@@ -378,13 +378,13 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
   const { data: summary, refetch: refetchSummary } = useQuery<FleetSummary>({
     queryKey: ['fleet-summary'],
     queryFn: fetchFleet('/api/fleet/summary'),
-    refetchInterval: liveInterval(10000, isActive, autoRefresh),
+    refetchInterval: liveInterval(5000, isActive, autoRefresh),
   });
 
   const { data: positions, refetch: refetchPositions } = useQuery<VehiclePosition[]>({
     queryKey: ['fleet-positions'],
     queryFn: fetchFleet('/api/fleet/positions'),
-    refetchInterval: liveInterval(8000, isActive, autoRefresh),
+    refetchInterval: liveInterval(3000, isActive, autoRefresh),
   });
 
   const activeIds = useMemo(() => (positions || []).filter(v => v.status === 'active').map(v => v.vehicle_id), [positions]);
@@ -407,7 +407,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
     },
     enabled: activeIds.length > 0,
     staleTime: 60000,
-    refetchInterval: liveInterval(20000, isActive, autoRefresh),
+    refetchInterval: liveInterval(8000, isActive, autoRefresh),
   });
 
   const { data: vehicleDetail } = useQuery<VehicleDetail>({
@@ -437,7 +437,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
   const { data: pipelineFleet, refetch: refetchPipelineFleet } = useQuery<PipelineFleetSummary>({
     queryKey: ['pipeline-fleet-summary'],
     queryFn: fetchApi('/api/automotive/fleet-summary'),
-    refetchInterval: liveInterval(8000, isActive, autoRefresh),
+    refetchInterval: liveInterval(5000, isActive, autoRefresh),
     retry: 1,
   });
 
@@ -449,7 +449,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
     queryKey: ['pipeline-health-history', healthTimelineVehicle],
     queryFn: fetchApi(`/api/automotive/vehicle-health-history/${healthTimelineVehicle}`),
     placeholderData: keepPreviousData,
-    refetchInterval: liveInterval(8000, isActive, autoRefresh),
+    refetchInterval: liveInterval(5000, isActive, autoRefresh),
     retry: 1,
   });
 
@@ -469,7 +469,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
     },
     enabled: scatterReady && activeVehicleIds.length > 0,
     placeholderData: keepPreviousData,
-    refetchInterval: liveInterval(8000, isActive, autoRefresh),
+    refetchInterval: liveInterval(5000, isActive, autoRefresh),
     retry: 1,
   });
 
@@ -643,7 +643,8 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
                 itemStyle: { color, opacity: 0.6 },
                 emphasis: { itemStyle: { opacity: 1, borderColor: '#fff', borderWidth: 1 } },
                 large: true,
-                largeThreshold: 500,
+                largeThreshold: 100,
+                animation: false,
               };
             });
 
@@ -662,6 +663,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
               <ReactECharts
                 style={{ height: '100%', width: '100%' }}
                 option={{
+                  animation: false,
                   tooltip: {
                     trigger: 'item',
                     backgroundColor: isDark ? '#1a2535' : '#fff',
@@ -806,6 +808,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
               <ReactECharts
                 style={{ height: '100%', width: '100%' }}
                 option={{
+                  animation: false,
                   tooltip: {
                     trigger: 'axis',
                     backgroundColor: isDark ? '#1a2535' : '#fff',

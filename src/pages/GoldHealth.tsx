@@ -158,7 +158,7 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     select: (d: { data: any[] }) => d.data,
     placeholderData: keepPreviousData,
-    refetchInterval: liveInterval(8000, isActive && activeTab === 'operations', autoRefresh),
+    refetchInterval: liveInterval(4000, isActive && activeTab === 'operations', autoRefresh),
   });
 
   useRefetchOnActivate(isActive && activeTab === 'operations', [refetchMetrics, refetchHistory]);
