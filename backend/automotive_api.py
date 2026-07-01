@@ -1,4 +1,5 @@
 
+import asyncio
 import os
 import sys
 import json
@@ -13,6 +14,28 @@ from common import duck_reader as dr
 
 router = APIRouter()
 
+# ---------------------------------------------------------------------------
+# Background precompute cache — same pattern as WRITER_METRICS_CACHE,
+# GOLD_METRICS_CACHE, ALERTS_METRICS_CACHE in the microservices. A
+# background loop refreshes every LIVE_CACHE_INTERVAL_SEC so every endpoint
+# is a sub-millisecond dict lookup rather than an on-demand DuckDB query.
+# On-demand TTL caching (old approach) meant each poll could trigger a slow
+# cold DuckDB scan; with precompute the data is always ready.
+# ---------------------------------------------------------------------------
+_LIVE_CACHE_INTERVAL_SEC = 3.0
+_LIVE_CACHE: dict = {}
+_LIVE_CACHE_LOCK = Lock()
+
+def _set_live(key: str, value) -> None:
+    with _LIVE_CACHE_LOCK:
+        _LIVE_CACHE[key] = value
+
+def _get_live(key: str):
+    with _LIVE_CACHE_LOCK:
+        return _LIVE_CACHE.get(key)
+
+# Legacy per-request TTL cache kept for endpoints not yet covered by the
+# background loop (sensor-history, decomposition, etc.)
 _response_cache: dict = {}
 _cache_lock = Lock()
 _RESPONSE_TTL = 5.0
@@ -352,6 +375,9 @@ def get_presentation_mode_status():
 
 @router.get("/api/automotive/fleet-summary")
 def get_automotive_fleet_summary():
+    live = _get_live("fleet-summary")
+    if live is not None:
+        return live
     cached = _cached_response("fleet-summary", ttl=3.0)
     if cached is not None:
         return cached
@@ -480,7 +506,7 @@ def get_automotive_sensor_history(vehicle_id: str, module: str):
 @router.get("/api/automotive/module-health/{vehicle_id}/{module}")
 def get_automotive_module_health(vehicle_id: str, module: str):
     cache_key = f"module-health-{vehicle_id}-{module}"
-    cached = _cached_response(cache_key)
+    cached = _cached_response(cache_key, ttl=3.0)
     if cached is not None:
         return cached
     import pandas as pd
@@ -524,6 +550,9 @@ def get_automotive_module_health(vehicle_id: str, module: str):
 @router.get("/api/automotive/vehicle-health-history/{vehicle_id}")
 def get_automotive_vehicle_health_history(vehicle_id: str):
     cache_key = f"vehicle-health-{vehicle_id}"
+    live = _get_live(cache_key)
+    if live is not None:
+        return live
     cached = _cached_response(cache_key, ttl=3.0)
     if cached is not None:
         return cached
@@ -690,6 +719,9 @@ _DTC_HISTORY_FILE = os.path.join(_PROJECT_ROOT, "data", "dtc_history.json")
 
 @router.get("/api/automotive/alerts/{vehicle_id}")
 def get_vehicle_alerts(vehicle_id: str):
+    live = _get_live(f"alerts-{vehicle_id}")
+    if live is not None:
+        return live
     if not os.path.exists(_GOLD_ALERTS_DIR):
         return {"vehicle_id": vehicle_id, "open": [], "closed": []}
     vehicle_df = _query_vehicle_df(_GOLD_ALERTS_DIR, vehicle_id, max_files=100)
@@ -803,7 +835,7 @@ def get_module_fleet_ranking(module: str):
 @router.get("/api/automotive/module-fleet-health/{module}")
 def get_module_fleet_health(module: str):
     cache_key = f"fleet-health-{module}"
-    cached = _cached_response(cache_key, ttl=10.0)
+    cached = _cached_response(cache_key, ttl=3.0)
     if cached is not None:
         return cached
     import pandas as pd
@@ -1123,3 +1155,134 @@ def get_dtc_master_data():
             return json.load(fh)
     except Exception:
         return {"modules": {}}
+
+
+# ---------------------------------------------------------------------------
+# Background precompute loop
+# Runs every LIVE_CACHE_INTERVAL_SEC, reads Gold + Alerts ONCE per cycle,
+# precomputes all fleet-summary, per-vehicle health histories, and per-vehicle
+# alerts. Endpoints below serve from _LIVE_CACHE — always sub-ms, always fresh.
+# Mirrors exactly how WRITER_METRICS_CACHE / GOLD_METRICS_CACHE work.
+# ---------------------------------------------------------------------------
+
+def _sync_refresh_automotive_cache() -> None:
+    import pandas as pd
+    try:
+        # ── Gold: read once, shared across all vehicle computations ──────────
+        gold_df = pd.DataFrame()
+        if os.path.exists(_GOLD_ROOT):
+            gfiles = dr.list_files(_GOLD_ROOT, max_files=_GOLD_MAX_FILES)
+            if gfiles:
+                gold_df = dr.query_df("SELECT * FROM read_parquet(?)", gfiles)
+                if not gold_df.empty and "gold_window_ts" in gold_df.columns:
+                    gold_df["gold_window_ts"] = pd.to_datetime(gold_df["gold_window_ts"])
+                    sort_col = "gold_write_ts" if "gold_write_ts" in gold_df.columns else "gold_window_ts"
+                    gold_df = (
+                        gold_df.sort_values(sort_col)
+                        .drop_duplicates(subset=["source_id", "gold_window_ts"], keep="last")
+                    )
+
+        # ── Fleet summary ─────────────────────────────────────────────────────
+        vehicles_out: list = []
+        if not gold_df.empty and "source_id" in gold_df.columns:
+            sort_cols = ["gold_window_ts"]
+            if "gold_write_ts" in gold_df.columns:
+                sort_cols.append("gold_write_ts")
+            latest = gold_df.sort_values(sort_cols).groupby("source_id").last().reset_index()
+            for _, row in latest.iterrows():
+                h = float(row.get("vehicle_health_score", 0))
+                for col in latest.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
+                    pass
+                vehicles_out.append({
+                    "vehicle_id": str(row.get("source_id", "")),
+                    "health_score": round(h, 1),
+                    "status": "CRITICAL" if h < 60 else ("WARNING" if h < 80 else "OK"),
+                    "engine_contrib": round(float(row.get("engine_contrib", 0)), 1),
+                    "battery_contrib": round(float(row.get("battery_contrib", 0)), 1),
+                    "body_contrib": round(float(row.get("body_contrib", 0)), 1),
+                    "transmission_contrib": round(float(row.get("transmission_contrib", 0)), 1),
+                    "tyre_contrib": round(float(row.get("tyre_contrib", 0)), 1),
+                })
+        health_scores = [v["health_score"] for v in vehicles_out]
+        fleet_summary = {
+            "vehicles": vehicles_out,
+            "fleet_stats": {
+                "total_vehicles": len(vehicles_out),
+                "avg_health": round(sum(health_scores) / max(len(health_scores), 1), 1),
+                "critical_count": sum(1 for h in health_scores if h < 60),
+                "warning_count": sum(1 for h in health_scores if 60 <= h < 80),
+                "demo_active": _PRESENTATION_MODE_ACTIVE,
+            },
+        }
+        _set_live("fleet-summary", fleet_summary)
+
+        # ── Per-vehicle health history ─────────────────────────────────────────
+        vehicle_ids = [v["vehicle_id"] for v in vehicles_out]
+        for vid in vehicle_ids:
+            try:
+                if not gold_df.empty and "source_id" in gold_df.columns:
+                    vdf = gold_df[gold_df["source_id"] == vid].copy()
+                    if not vdf.empty:
+                        vdf = vdf.sort_values("gold_window_ts")
+                        vdf["ts"] = vdf["gold_window_ts"].dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+                        vdf["timestamp"] = vdf["ts"]
+                        vdf = _attach_mileage(vdf, vid)
+                        vdf = vdf.fillna(0)
+                        if "mileage" in vdf.columns:
+                            first_m = vdf["mileage"].iloc[0]
+                            vdf["mileage_rel"] = (vdf["mileage"] - first_m).round(1)
+                        for col in vdf.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
+                            vdf[col] = vdf[col].astype(str)
+                        keep = [c for c in ("ts", "vehicle_health_score", "mileage", "mileage_rel") if c in vdf.columns]
+                        keep += [c for c in vdf.columns if c.endswith("_contrib")]
+                        out = vdf[keep].tail(2000).rename(columns={"vehicle_health_score": "health"})
+                        _set_live(f"vehicle-health-{vid}", {
+                            "data": out.to_dict(orient="records"),
+                            "data_source": "live",
+                            "vehicle_id": vid,
+                            "count": len(out),
+                        })
+            except Exception:
+                pass
+
+        # ── Per-vehicle alerts ────────────────────────────────────────────────
+        if os.path.exists(_GOLD_ALERTS_DIR):
+            afiles = dr.list_files(_GOLD_ALERTS_DIR, max_files=100)
+            if afiles:
+                try:
+                    adf_all = dr.query_df("SELECT * FROM read_parquet(?)", afiles)
+                    if not adf_all.empty and "alert_id" in adf_all.columns and "last_updated_ts" in adf_all.columns:
+                        adf_all = (
+                            adf_all.sort_values("last_updated_ts")
+                            .drop_duplicates(subset=["alert_id"], keep="last")
+                        )
+                    for vid in vehicle_ids:
+                        try:
+                            if not adf_all.empty and "source_id" in adf_all.columns:
+                                vdf = adf_all[adf_all["source_id"] == vid].copy()
+                                obj_cols = vdf.select_dtypes(include=["object"]).columns
+                                vdf[obj_cols] = vdf[obj_cols].fillna("")
+                                num_cols = vdf.select_dtypes(include=["number"]).columns
+                                vdf[num_cols] = vdf[num_cols].fillna(0)
+                                for col in vdf.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
+                                    vdf[col] = vdf[col].astype(str)
+                                open_df = vdf[vdf["status"] == "OPEN"].sort_values("peak_anomaly_ts", ascending=False)
+                                closed_df = vdf[vdf["status"] == "CLOSED"].sort_values("alert_end_ts", ascending=False)
+                                _set_live(f"alerts-{vid}", {
+                                    "vehicle_id": vid,
+                                    "open": open_df.head(50).to_dict(orient="records"),
+                                    "closed": closed_df.head(50).to_dict(orient="records"),
+                                })
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+    except Exception:
+        pass
+
+
+async def automotive_live_loop() -> None:
+    while True:
+        await asyncio.to_thread(_sync_refresh_automotive_cache)
+        await asyncio.sleep(_LIVE_CACHE_INTERVAL_SEC)

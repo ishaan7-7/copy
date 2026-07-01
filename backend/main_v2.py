@@ -218,12 +218,18 @@ async def get_dtc_latest(request: Request):
 
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+_automotive_loop_fn = None
 try:
-    from automotive_api import router as automotive_router
+    from automotive_api import router as automotive_router, automotive_live_loop as _automotive_loop_fn
     app.include_router(automotive_router)
 except Exception as _import_err:
     import logging as _log
     _log.getLogger(__name__).warning(f"Automotive endpoints not loaded: {_import_err}")
+
+@app.on_event("startup")
+async def _start_background_tasks():
+    if _automotive_loop_fn is not None:
+        asyncio.create_task(_automotive_loop_fn())
 
 if __name__ == "__main__":
     import uvicorn
