@@ -266,42 +266,53 @@ function createEventIcon(type: string): L.DivIcon {
 function MapController({
   selectedVehicle,
   tripData,
+  isActive,
 }: {
   selectedVehicle: string | null;
   tripData: TripData | null;
+  isActive: boolean;
 }) {
   const map = useMap();
   const lastFittedVehicle = useRef<string | null>(null);
+  const wasActiveRef = useRef(isActive);
+  const didMountRef = useRef(false);
 
   useEffect(() => {
+    if (isActive && !wasActiveRef.current) {
+      const id = setTimeout(() => map.invalidateSize({ animate: false }), 150);
+      return () => clearTimeout(id);
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive, map]);
+
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+
     if (
       selectedVehicle &&
       tripData?.route?.length > 0 &&
       lastFittedVehicle.current !== selectedVehicle
     ) {
       lastFittedVehicle.current = selectedVehicle;
-
+      map.stop();
       const bounds = L.latLngBounds(tripData.route.map((p) => [p.lat, p.lng]));
-
       map.fitBounds(bounds, {
         paddingTopLeft: [40, 40],
         paddingBottomRight: [40, 40],
         maxZoom: 7,
         animate: true,
-        duration: 1.2,
+        duration: 0.6,
       });
+      return;
     }
 
     if (!selectedVehicle) {
       lastFittedVehicle.current = null;
-
-      map.flyTo(
-        [22.9937, 78.9629], // India center
-        4,
-        {
-          duration: 0.8,
-        }
-      );
+      map.stop();
+      map.flyTo([22.9937, 78.9629], 4, { duration: 0.6 });
     }
   }, [selectedVehicle, tripData, map]);
 
@@ -1447,10 +1458,13 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
                     keepBuffer={6}
                     updateWhenZooming={false}
                     updateWhenIdle={true}
+                    maxNativeZoom={19}
+                    maxZoom={19}
                   />
                   <MapController
                     selectedVehicle={selectedVehicle}
                     tripData={tripData ?? null}
+                    isActive={isActive}
                   />
 
                   {positions?.map((v) => {
