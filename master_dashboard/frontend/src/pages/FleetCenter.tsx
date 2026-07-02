@@ -196,6 +196,12 @@ interface BehaviorData {
 const DRAWER_W = 420;
 
 const _iconCache: Record<string, L.DivIcon> = {};
+const _eventIconCache: Record<string, L.DivIcon> = {};
+const SCATTER_CAP = 300;
+const VEHICLE_COLORS = [
+  "#e57373", "#ffb74d", "#81c784", "#ba68c8", "#4dd0e1",
+  "#42a5f5", "#ff8a65", "#90a4ae", "#f48fb1", "#aed581",
+];
 
 function createVehicleIcon(
   status: string,
@@ -251,9 +257,10 @@ const EVENT_COLORS: Record<string, string> = {
 };
 
 function createEventIcon(type: string): L.DivIcon {
+  if (_eventIconCache[type]) return _eventIconCache[type];
   const c = EVENT_COLORS[type] || "#888";
   const label = EVENT_LABELS[type] || "?";
-  return L.divIcon({
+  _eventIconCache[type] = L.divIcon({
     className: "",
     iconSize: [22, 22],
     iconAnchor: [11, 11],
@@ -261,6 +268,7 @@ function createEventIcon(type: string): L.DivIcon {
       <span style="color:white;font-size:11px;font-weight:700;font-family:Roboto,sans-serif;">${label}</span>
     </div>`,
   });
+  return _eventIconCache[type];
 }
 
 function MapController({
@@ -1062,7 +1070,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
       window.removeEventListener("mousemove", handleDragMove);
       window.removeEventListener("mouseup", handleDragEnd);
     };
-  }, [dragPos]);
+  }, []);
 
   const handleOpenVehicle = (event, vehicle) => {
     setVehiclePopoverAnchor(event.currentTarget);
@@ -1180,6 +1188,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
           `${PIPELINE_API}/api/automotive/vehicle-health-history/${healthTimelineVehicle}`
         )
         .then((r) => r.data),
+    enabled: !!healthTimelineVehicle,
     refetchInterval: isActive && autoRefresh ? 8000 : false,
     retry: 1,
     placeholderData: undefined,
@@ -1205,10 +1214,15 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
   });
 
   const fleetHealthScatter = useMemo(() => {
+    const cap = (arr: { ts: string; health: number; mileage: number }[]) => {
+      if (arr.length <= SCATTER_CAP) return arr;
+      const step = Math.floor(arr.length / SCATTER_CAP);
+      return arr.filter((_, i) => i % step === 0).slice(-SCATTER_CAP);
+    };
     if (sseVehicles.length > 0) {
       return sseVehicles.map(v => ({
         vehicle_id: v.vehicle_id,
-        data: ringBuffer.get(v.vehicle_id) ?? [],
+        data: cap(ringBuffer.get(v.vehicle_id) ?? []),
       }));
     }
     return healthScatterBatch ?? [];
@@ -1442,8 +1456,8 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
                 }}
               >
                 <MapContainer
-                  center={[20, 0]}
-                  zoom={2}
+                  center={[22.9937, 78.9629]}
+                  zoom={4}
                   minZoom={2}
                   maxBounds={bounds}
                   maxBoundsViscosity={1.0}
@@ -1609,19 +1623,6 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
       <Grid container spacing={1} alignItems="stretch">
         <Grid item xs={12} md={6}>
           {(() => {
-            const VEHICLE_COLORS = [
-              "#e57373",
-              "#ffb74d",
-              "#81c784",
-              "#ba68c8",
-              "#4dd0e1",
-              "#42a5f5",
-              "#ff8a65",
-              "#90a4ae",
-              "#f48fb1",
-              "#aed581",
-            ];
-
             const hasData =
               fleetHealthScatter &&
               fleetHealthScatter.some((v) => v.data.length > 0);
@@ -1639,38 +1640,23 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
 
               const series = fleetHealthScatter.map((vehicle, idx) => ({
                 name: vehicle.vehicle_id,
-
                 type: "scatter",
-
+                large: true,
                 symbol: "circle",
-
                 z: 1,
                 zlevel: 1,
-
                 data: vehicle.data.map((r) => [
                   r.ts || r.timestamp,
                   r.health ?? 0,
                 ]),
-
                 symbolSize: (val) => Math.max(8, (val[1] / 100) * 14),
-
                 itemStyle: {
                   color: VEHICLE_COLORS[idx % VEHICLE_COLORS.length],
-
                   opacity: 0.72,
-
                   borderWidth: 1,
-
                   borderColor: "#fff",
-
-                  shadowBlur: 3,
-
-                  shadowColor: VEHICLE_COLORS[idx % VEHICLE_COLORS.length],
                 },
-
-                emphasis: {
-                  scale: 1.15,
-                },
+                emphasis: { scale: 1.15 },
               }));
 
               fleetScatterOption = {
@@ -1949,7 +1935,7 @@ export default function FleetCenter({ isActive = true }: { isActive?: boolean })
                       height: "85vh",
                     }}
                   >
-                    {hasData && (
+                    {openFleetScatter && hasData && (
                       <ReactECharts
                         option={fleetScatterOption}
                         style={{

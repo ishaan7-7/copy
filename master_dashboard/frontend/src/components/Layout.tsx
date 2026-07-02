@@ -28,7 +28,7 @@ import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import { useStore } from "../store";
 import exlLogo from "../images/exl-logo.png";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import FleetCenter from "../pages/FleetCenter";
 import WriterOps from "../pages/WriterOps";
 import DashboardInference from "../pages/DashboardInference";
@@ -87,9 +87,18 @@ export default function Layout() {
   } = useStore();
 
   const [everVisited, setEverVisited] = useState<Set<string>>(new Set(['/']));
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setEverVisited(prev => new Set([...prev, location.pathname]));
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+      resizeTimerRef.current = null;
+    }, 120);
+    return () => {
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    };
   }, [location.pathname]);
 
   const isFleet = location.pathname === '/';
@@ -102,7 +111,7 @@ export default function Layout() {
 
   const visited = (path: string) => everVisited.has(path);
 
-  const hide = (active: boolean) => ({ display: active ? 'contents' : 'none' });
+  const hide = (active: boolean) => (active ? {} : { display: 'none' });
 
   const handleNavigation = (path: string, index: number) => {
     setActiveTab(index);
