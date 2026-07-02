@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src import config
 
@@ -196,7 +196,9 @@ class MLEngine:
                     top_k = {expected_cols[k]: float(row_feats[k]) for k in np.argsort(row_feats)[-8:][::-1]}
                     
                     original_idx = df_batch.index[i+j]
-                    
+                    health_score = self._rescale_health((1.0 - comp) * 100, sim_id)
+                    severity = self._classify_severity(health_score)
+
                     out_rows.append({
                         "row_hash": df_batch.at[original_idx, "row_hash"],
                         "source_id": df_batch.at[original_idx, "source_id"] if "source_id" in df_batch.columns else sim_id,
@@ -204,13 +206,13 @@ class MLEngine:
                         "timestamp": df_batch.at[original_idx, "timestamp"],
                         "ingest_ts": df_batch.at[original_idx, "ingest_ts"] if "ingest_ts" in df_batch.columns else None,
                         "writer_ts": df_batch.at[original_idx, "writer_ts"] if "writer_ts" in df_batch.columns else None,
-                        "inference_ts": datetime.utcnow().isoformat(),
+                        "inference_ts": datetime.now(timezone.utc).isoformat(),
                         "lstm_raw_error": raw_err,
                         "lstm_smoothed": ema_err,
                         "composite_score": comp,
-                        "health_score": self._rescale_health((1.0 - comp) * 100, sim_id),
-                        "severity": self._classify_severity(self._rescale_health((1.0 - comp) * 100, sim_id)),
-                        "severity_code": {"NORMAL": 0, "WARNING": 1, "CRITICAL": 2}[self._classify_severity(self._rescale_health((1.0 - comp) * 100, sim_id))],
+                        "health_score": health_score,
+                        "severity": severity,
+                        "severity_code": {"NORMAL": 0, "WARNING": 1, "CRITICAL": 2}[severity],
                         "top_features": json.dumps(top_k)
                     })
 

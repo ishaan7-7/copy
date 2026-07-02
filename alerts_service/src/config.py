@@ -14,7 +14,7 @@ os.makedirs(os.path.join(ROOT_DIR, "data", "delta", "gold"), exist_ok=True)
 CHECKPOINT_FILE = os.path.join(STATE_DIR, "checkpoints.json")
 CACHE_FILE = os.path.join(STATE_DIR, "alert_state_cache.pkl")
 
-POLL_INTERVAL = 5.0
+POLL_INTERVAL = 2.0
 BATCH_SIZE = 500              
 import json as _json, pathlib as _pl
 _cfg = _json.loads((_pl.Path(__file__).resolve().parents[2] / "config" / "pipeline_config.json").read_text())

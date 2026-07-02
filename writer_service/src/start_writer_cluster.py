@@ -21,12 +21,17 @@ def start_writers():
 
     print("Cluster Active. Press Ctrl+C to stop.")
 
+    backoff = 5
     try:
         while True:
             time.sleep(1)
             if p.poll() is not None:
-                print("Writer process crashed!")
-                break
+                print(f"Writer process exited. Restarting in {backoff}s...")
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+                p = subprocess.Popen([python_exe, script_path, "all"])
+                PROCESSES.append(p)
+                print("Writer process restarted.")
     except KeyboardInterrupt:
         print("Stopping...")
         p.terminate()

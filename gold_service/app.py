@@ -1,6 +1,7 @@
 import time
 import os
 import sys
+import threading
 import pandas as pd
 from src.state_manager import GoldStateManager
 from src.aggregator import HealthAggregator
@@ -24,6 +25,7 @@ def main():
     aggregator = HealthAggregator(state)
     last_silver_mtime = 0.0
     last_compact = 0.0
+    _compact_thread: threading.Thread | None = None
 
     os.makedirs(config.GOLD_TABLE_DIR, exist_ok=True)
 
@@ -66,7 +68,7 @@ def main():
                 if not files:
                     continue
                 combined = dr.query_df(
-                    "SELECT * FROM read_parquet(?) WHERE CAST(inference_ts AS VARCHAR) > ?",
+                    "SELECT inference_ts, source_id, health_score, top_features, timestamp FROM read_parquet(?) WHERE CAST(inference_ts AS VARCHAR) > ?",
                     files, params=[last_ts],
                 )
                 if combined.empty:
@@ -135,15 +137,19 @@ def main():
         # per window instead of accumulating every intermediate version.
         if time.time() - last_compact >= 90:
             last_compact = time.time()
-            try:
-                merged = dr.compact_flat_dir(
-                    config.GOLD_TABLE_DIR, min_files_to_compact=5,
-                    dedup_subset=["source_id", "gold_window_ts"], dedup_sort_col="gold_write_ts",
-                )
-                if merged:
-                    print(f"Compacted {merged} Gold files.")
-            except Exception as e:
-                print(f"Gold compaction failed: {e}")
+            if _compact_thread is None or not _compact_thread.is_alive():
+                def _run_compact():
+                    try:
+                        merged = dr.compact_flat_dir(
+                            config.GOLD_TABLE_DIR, min_files_to_compact=5,
+                            dedup_subset=["source_id", "gold_window_ts"], dedup_sort_col="gold_write_ts",
+                        )
+                        if merged:
+                            print(f"Compacted {merged} Gold files.")
+                    except Exception as e:
+                        print(f"Gold compaction failed: {e}")
+                _compact_thread = threading.Thread(target=_run_compact, daemon=True)
+                _compact_thread.start()
 
         time.sleep(config.POLL_INTERVAL)
 

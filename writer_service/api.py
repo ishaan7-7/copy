@@ -125,12 +125,10 @@ async def compact_bronze_loop():
     # contribute to a system-wide stall. A short initial delay (let Spark's
     # first micro-batch actually land) keeps every pass small instead.
     await asyncio.sleep(20)
-    for module in VEHICLE_MODULES:
-        await asyncio.to_thread(_compact_bronze_module, module)
+    await asyncio.gather(*[asyncio.to_thread(_compact_bronze_module, m) for m in VEHICLE_MODULES])
     while True:
         await asyncio.sleep(_BRONZE_COMPACT_INTERVAL_SEC)
-        for module in VEHICLE_MODULES:
-            await asyncio.to_thread(_compact_bronze_module, module)
+        await asyncio.gather(*[asyncio.to_thread(_compact_bronze_module, m) for m in VEHICLE_MODULES])
 
 @app.on_event("startup")
 async def startup_event():

@@ -41,6 +41,24 @@ class IdempotencyCache:
             if len(self._store) > self.max_entries:
                 self._store.popitem(last=False)
 
+    def seen_before_or_mark(self, row_hash: str) -> bool:
+        now = time.monotonic()
+
+        with self._lock:
+            self._evict_expired(now)
+
+            if row_hash in self._store:
+                self._store.move_to_end(row_hash)
+                return True
+
+            self._store[row_hash] = now
+            self._store.move_to_end(row_hash)
+
+            if len(self._store) > self.max_entries:
+                self._store.popitem(last=False)
+
+            return False
+
     def _evict_expired(self, now: float) -> None:
         cutoff = now - self.ttl_seconds
 

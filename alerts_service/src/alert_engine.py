@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from src import config
 
 _MODULE_DELTA_SCALE = {
@@ -113,5 +113,5 @@ class AlertEngine:
             "peak_anomaly_ts": state["peak_ts"],
             "max_composite_score": round(state["max_score"], 4),
             "top_10_features": json.dumps(top_10),
-            "last_updated_ts": datetime.utcnow().isoformat()
+            "last_updated_ts": datetime.now(timezone.utc).isoformat()
         }

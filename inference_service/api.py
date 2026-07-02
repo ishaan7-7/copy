@@ -195,7 +195,8 @@ def get_inference_tail(module: str):
         files = dr.list_files(str(path), max_files=5)
         if not files:
             return {"data": []}
-        df = dr.query_df("SELECT * FROM read_parquet(?)", files)
+        _tail_cols = "row_hash, source_id, module, timestamp, inference_ts, ingest_ts, writer_ts, health_score, severity, severity_code, composite_score, lstm_smoothed, top_features"
+        df = dr.query_df(f"SELECT {_tail_cols} FROM read_parquet(?)", files)
         if df.empty:
             return {"data": []}
         if "inference_ts" in df.columns:

@@ -54,8 +54,9 @@ def run_writer_pipeline():
         topic_name = f"telemetry.{module_name}"
         logger.info(f"🚀 Initializing Stream for: {topic_name}")
         
-        checkpoint_path = f"C:/streaming_emulator/data/checkpoints/writer/{module_name}"
-        output_path = f"C:/streaming_emulator/data/delta/bronze/{module_name}"
+        project_root = Path(__file__).resolve().parents[2]
+        checkpoint_path = str(project_root / "data" / "checkpoints" / "writer" / module_name)
+        output_path = str(project_root / "data" / "delta" / "bronze" / module_name)
         
         # A. Read
         raw_stream = (
@@ -105,8 +106,7 @@ def run_writer_pipeline():
             .partitionBy("source_id")
             .queryName(module_name)
             
-            # SPEED OPTIMIZATION: 1 second trigger = fast updates, low latency
-            .trigger(processingTime='5 seconds') 
+            .trigger(processingTime='2 seconds')
             
             .option("checkpointLocation", checkpoint_path)
             .option("mergeSchema", "true")

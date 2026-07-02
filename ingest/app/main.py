@@ -47,7 +47,10 @@ idempotency = IdempotencyCache(
 )
 
 producer = AIOKafkaProducer(
-    bootstrap_servers=config.kafka_bootstrap_servers
+    bootstrap_servers=config.kafka_bootstrap_servers,
+    compression_type="lz4",
+    linger_ms=5,
+    max_batch_size=262144,
 )
 
 producer_wrapper = KafkaProducerWrapper(
@@ -106,9 +109,9 @@ async def ingest_event(payload: IngestRequest):
             )
 
         # -------------------------
-        # Idempotency
+        # Idempotency (atomic check-and-mark)
         # -------------------------
-        if idempotency.seen_before(payload.metadata.row_hash):
+        if idempotency.seen_before_or_mark(payload.metadata.row_hash):
             ingest_rows_rejected_total.inc()
             return JSONResponse(
                 status_code=status.HTTP_202_ACCEPTED,
@@ -131,8 +134,6 @@ async def ingest_event(payload: IngestRequest):
         event["metadata"]["ingest_ts"] = now_ts  # ✅ ADDED
 
         await producer_wrapper.send(event=event)
-
-        idempotency.mark_seen(payload.metadata.row_hash)
         ingest_rows_accepted_total.inc()
 
         return JSONResponse(
@@ -142,12 +143,15 @@ async def ingest_event(payload: IngestRequest):
 
     except IngestValidationError as e:
         ingest_rows_rejected_total.inc()
-        dlq_writer.write(
-            error_type="validation_error",
-            error_message=e.message,
-            error_details=e.details,
-            event=payload.model_dump(),
-        )
+        try:
+            dlq_writer.write(
+                error_type="validation_error",
+                error_message=e.message,
+                error_details=e.details,
+                event=payload.model_dump(),
+            )
+        except Exception:
+            pass
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": "validation_failed"},
@@ -155,11 +159,14 @@ async def ingest_event(payload: IngestRequest):
 
     except KafkaProduceError as e:
         ingest_rows_rejected_total.inc()
-        dlq_writer.write(
-            error_type="kafka_error",
-            error_message=str(e),
-            event=payload.model_dump(),
-        )
+        try:
+            dlq_writer.write(
+                error_type="kafka_error",
+                error_message=str(e),
+                event=payload.model_dump(),
+            )
+        except Exception:
+            pass
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"error": "kafka_unavailable"},
@@ -167,11 +174,14 @@ async def ingest_event(payload: IngestRequest):
 
     except Exception as e:
         ingest_rows_rejected_total.inc()
-        dlq_writer.write(
-            error_type="internal_error",
-            error_message=str(e),
-            event=payload.model_dump(),
-        )
+        try:
+            dlq_writer.write(
+                error_type="internal_error",
+                error_message=str(e),
+                event=payload.model_dump(),
+            )
+        except Exception:
+            pass
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": "internal_error"},

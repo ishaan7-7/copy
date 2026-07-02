@@ -10,21 +10,35 @@ class GoldStateManager:
 
     def _load_json(self, path, default):
         if os.path.exists(path):
-            with open(path, 'r') as f: return json.load(f)
+            with open(path, 'r') as f:
+                try:
+                    return json.load(f)
+                except Exception:
+                    return default
         return default
 
     def _load_pkl(self, path, default):
         if os.path.exists(path):
-            with open(path, 'rb') as f: return pickle.load(f)
+            with open(path, 'rb') as f:
+                try:
+                    return pickle.load(f)
+                except Exception:
+                    return default
         return default
 
     def save_state(self):
-        with open(config.CHECKPOINT_FILE, 'w') as f: json.dump(self.checkpoints, f, indent=4)
-        with open(config.CACHE_FILE, 'wb') as f: pickle.dump(self.vehicle_cache, f)
+        ckpt_tmp = config.CHECKPOINT_FILE + ".tmp"
+        with open(ckpt_tmp, 'w') as f:
+            json.dump(self.checkpoints, f)
+        os.replace(ckpt_tmp, config.CHECKPOINT_FILE)
+
+        cache_tmp = config.CACHE_FILE + ".tmp"
+        with open(cache_tmp, 'wb') as f:
+            pickle.dump(self.vehicle_cache, f)
+        os.replace(cache_tmp, config.CACHE_FILE)
 
     def get_vehicle_state(self, sim_id):
         if sim_id not in self.vehicle_cache:
-            # Cold start initialization strictly for enabled modules
             self.vehicle_cache[sim_id] = {
                 mod: {"health": 100.0, "feats": "{}"} for mod in config.ENABLED_MODULES
             }

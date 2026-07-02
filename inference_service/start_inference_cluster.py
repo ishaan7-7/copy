@@ -13,16 +13,20 @@ def start_cluster():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     app_script = os.path.join(base_dir, "app.py")
 
-    p = subprocess.Popen([sys.executable, app_script, "all"])
-
-    print("Inference active. Press Ctrl+C to stop.")
-
-    try:
-        p.wait()
-    except KeyboardInterrupt:
-        print("Stopping Inference...")
-        p.terminate()
-        print("Stopped.")
+    backoff = 5
+    while True:
+        p = subprocess.Popen([sys.executable, app_script, "all"])
+        print("Inference active. Press Ctrl+C to stop.")
+        try:
+            p.wait()
+        except KeyboardInterrupt:
+            print("Stopping Inference...")
+            p.terminate()
+            print("Stopped.")
+            break
+        print(f"Inference process exited. Restarting in {backoff}s...")
+        time.sleep(backoff)
+        backoff = min(backoff * 2, 60)
 
 if __name__ == "__main__":
     start_cluster()

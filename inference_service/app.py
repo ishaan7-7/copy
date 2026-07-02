@@ -1,6 +1,7 @@
 import time
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.state_manager import StateManager
 from src.ml_engine import MLEngine
 from src.reader import BronzeReader
@@ -73,14 +74,24 @@ def main():
     print(f"Polling Bronze every {config.POLL_INTERVAL}s...")
 
     while True:
-        processed_any = False
-        for mod in modules:
-            e = engines[mod]
-            try:
-                if run_module(mod, e["state"], e["ml"], e["reader"], writer):
-                    processed_any = True
-            except Exception as ex:
-                print(f"Error in {mod}: {ex}")
+        with ThreadPoolExecutor(max_workers=len(modules)) as executor:
+            futures = {
+                executor.submit(
+                    run_module,
+                    mod,
+                    engines[mod]["state"],
+                    engines[mod]["ml"],
+                    engines[mod]["reader"],
+                    writer,
+                ): mod
+                for mod in modules
+            }
+            for future in as_completed(futures):
+                mod = futures[future]
+                try:
+                    future.result()
+                except Exception as ex:
+                    print(f"Error in {mod}: {ex}")
 
         time.sleep(config.POLL_INTERVAL)
 

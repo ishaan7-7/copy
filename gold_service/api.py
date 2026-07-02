@@ -81,22 +81,26 @@ def _sync_update_metrics():
         gold_count = 0
         active_sims = set()
         if gold_path.exists():
-            gfiles = []
-            try:
-                for entry in os.scandir(str(gold_path)):
-                    if entry.is_file() and entry.name.endswith(".parquet"):
-                        gfiles.append((entry.path, entry.stat().st_mtime))
-            except Exception:
-                pass
-            gfiles.sort(key=lambda x: x[1], reverse=True)
-            gfiles = [f for f, _ in gfiles]
+            gfiles = dr.list_files(str(gold_path))
             if gfiles:
                 try:
-                    latest_df = pd.read_parquet(gfiles[0])
-                    gold_count = len(gfiles) * max(len(latest_df), 1)
-                    if "source_id" in latest_df.columns:
-                        active_sims = set(latest_df["source_id"].unique().tolist())
-                    del latest_df
+                    # Count deduplicated records (same window can appear in
+                    # multiple files before compaction runs; show the
+                    # meaningful count, not physical row count which swings
+                    # dramatically on every compaction cycle).
+                    count_df = dr.query_df(
+                        "SELECT COUNT(*) AS n, COUNT(DISTINCT source_id) AS sims FROM read_parquet(?)",
+                        gfiles,
+                    )
+                    if not count_df.empty:
+                        gold_count = int(count_df.iloc[0]["n"])
+                        # Pull unique source_ids without loading all rows
+                        sid_df = dr.query_df(
+                            "SELECT DISTINCT source_id FROM read_parquet(?)",
+                            gfiles,
+                        )
+                        if not sid_df.empty and "source_id" in sid_df.columns:
+                            active_sims = set(sid_df["source_id"].dropna().astype(str).tolist())
                 except Exception:
                     gold_count = len(gfiles) * 7
 
@@ -137,8 +141,6 @@ def get_gold_history(sim_id: str):
             return {"data": []}
         if sim_id.upper() != "ALL":
             df = dr.query_df("SELECT * FROM read_parquet(?) WHERE source_id = ?", files, params=[sim_id])
-            if not df.empty and "source_id" in df.columns:
-                df = df[df["source_id"] == sim_id]
         else:
             df = dr.query_df("SELECT * FROM read_parquet(?)", files)
         if df.empty or "source_id" not in df.columns:

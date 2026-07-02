@@ -5,6 +5,7 @@ import os
 from pyspark.sql import SparkSession
 from pathlib import Path
 import logging
+from infrastructure import get_spark_conf_defaults
 
 logger = logging.getLogger("SparkFactory")
 
@@ -72,10 +73,13 @@ def get_spark_session(app_name="WriterService"):
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") 
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") 
         .config("spark.databricks.delta.schema.autoMerge.enabled", "true") 
-        .config("spark.sql.shuffle.partitions", "2") 
+        .config("spark.sql.shuffle.partitions", "2")
         .config("spark.default.parallelism", "2")
-        .config("spark.sql.streaming.fileSink.log.cleanupDelay", "10m") 
-        
+        .config("spark.sql.streaming.fileSink.log.cleanupDelay", "10m")
+        .config("spark.python.use.daemon", "false")
+        .config("spark.python.worker.reuse", "false")
+        .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+
         .getOrCreate()
     )
         

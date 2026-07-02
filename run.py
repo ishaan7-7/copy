@@ -61,11 +61,11 @@ SERVICE_MAP = {
     "api_writer":       ([VENV_PYTHON, r"writer_service\api.py"],                              False, ROOT_DIR),
     "api_dtc":          ([VENV_PYTHON, r"dtc_service\api.py"],                                 False, ROOT_DIR),
     # "api_analytics":    ([VENV_PYTHON, r"analytics_service\api.py"],                           False, ROOT_DIR),
-    "engine_alerts":    ([VENV_PYTHON, r"alerts_service\app.py"],                              False, ROOT_DIR),
-    "engine_gold":      ([VENV_PYTHON, r"gold_service\app.py"],                                False, ROOT_DIR),
+    "engine_alerts":    ([VENV_PYTHON, r"alerts_service\start_alerts.py"],                      False, ROOT_DIR),
+    "engine_gold":      ([VENV_PYTHON, r"gold_service\start_gold.py"],                        False, ROOT_DIR),
     "engine_inference": ([VENV_PYTHON, r"inference_service\start_inference_cluster.py"],       False, ROOT_DIR),
     "engine_writer":    ([VENV_PYTHON, r"writer_service\src\start_writer_cluster.py"],         False, ROOT_DIR),
-    "fleet_simulator":  ([VENV_PYTHON, "fleet_sim_server.py"],                                 False, FLEET_SIM_DIR),
+    "fleet_simulator":  ([VENV_PYTHON, "start_fleet_sim.py"],                                  False, FLEET_SIM_DIR),
     # Ingest remains detached so its FastAPI logs are always visible in a cmd window
     "ingest": (f"{VENV_PYTHON} -m uvicorn ingest.app.main:app --port 8000 --reload", True, ROOT_DIR),
 }
@@ -151,7 +151,13 @@ def launch_master_frontend():
     print("--- Starting Master Dashboard Frontend (React/Vite) ---")
     frontend_dir = os.path.join(ROOT_DIR, "master_dashboard", "frontend")
     npm_cmd      = os.path.join(NODE_DIR, "npm.cmd")
+    node_exe     = os.path.join(NODE_DIR, "node.exe")
     node_modules = os.path.join(frontend_dir, "node_modules")
+
+    if not os.path.exists(node_exe):
+        print(f"   ERROR: Node.js not found at {NODE_DIR}")
+        print("   Run setup.bat first to extract Node.js.")
+        return
 
     env = _make_env()
     env["PATH"] = NODE_DIR + os.pathsep + env["PATH"]
@@ -164,7 +170,7 @@ def launch_master_frontend():
     if not os.path.exists(node_modules):
         print("   node_modules not found — running npm install (this takes ~1 min on first run)...")
         result = subprocess.run(
-            f'"{npm_cmd}" install',
+            f'"{npm_cmd}" install --legacy-peer-deps',
             shell=True, cwd=frontend_dir,
             stdout=log_file, stderr=subprocess.STDOUT,
             env=env,
@@ -174,7 +180,6 @@ def launch_master_frontend():
             return
         print("   npm install complete.")
 
-    node_exe = os.path.join(NODE_DIR, "node.exe")
     vite_js  = os.path.join(frontend_dir, "node_modules", "vite", "bin", "vite.js")
     if os.path.exists(vite_js) and os.path.exists(node_exe):
         vite_cmd = f'"{node_exe}" "{vite_js}" --port 5173 --strictPort'
@@ -237,7 +242,11 @@ def kill_process(p_info):
 
 
 def hunt_and_kill_port(port, name):
-    for conn in psutil.net_connections(kind="inet"):
+    try:
+        connections = psutil.net_connections(kind="inet")
+    except Exception:
+        return
+    for conn in connections:
         if conn.pid is None:
             continue
         if conn.laddr.port == port and conn.status == "LISTEN":
@@ -400,7 +409,12 @@ def cleanup():
 # --- Flow Phases ---
 
 def _check_api_liveness():
-    listening_ports = {c.laddr.port for c in psutil.net_connections(kind="inet") if c.status == "LISTEN"}
+    try:
+        conns = psutil.net_connections(kind="inet")
+    except Exception:
+        print("   ⚠️  Could not enumerate network connections (consider running as Administrator).")
+        return
+    listening_ports = {c.laddr.port for c in conns if c.status == "LISTEN"}
     running_api_ports = API_PORTS & listening_ports
     if not running_api_ports:
         print("\n⚠️  WARNING: No backend API services detected on ports 8001-8008.")
@@ -501,7 +515,12 @@ def main(args):
 
     # Infra state detection
     print("\nChecking Infrastructure State...")
-    listening_ports = {c.laddr.port for c in psutil.net_connections(kind="inet") if c.status == "LISTEN"}
+    try:
+        _infra_conns = psutil.net_connections(kind="inet")
+        listening_ports = {c.laddr.port for c in _infra_conns if c.status == "LISTEN"}
+    except Exception:
+        print("   ⚠️  Could not enumerate network connections (consider running as Administrator).")
+        listening_ports = set()
     infra_is_running = bool({2181, 9092} & listening_ports)
 
     if interactive and infra_is_running:

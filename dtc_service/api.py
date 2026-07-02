@@ -133,14 +133,14 @@ def _smart_attribution(
 
 
 def _append_dtc_history(module: str, source_id: str, peak_ts: str, triggers: list) -> None:
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone as _tz
     DTC_HISTORY.parent.mkdir(parents=True, exist_ok=True)
     try:
         entries = json.loads(DTC_HISTORY.read_text()) if DTC_HISTORY.exists() else []
     except Exception:
         entries = []
     entries.append({
-        "run_ts":    _dt.utcnow().isoformat(),
+        "run_ts":    _dt.now(_tz.utc).isoformat(),
         "module":    module,
         "source_id": source_id,
         "peak_ts":   peak_ts,
@@ -148,7 +148,9 @@ def _append_dtc_history(module: str, source_id: str, peak_ts: str, triggers: lis
     })
     if len(entries) > _DTC_HISTORY_MAX:
         entries = entries[-_DTC_HISTORY_MAX:]
-    DTC_HISTORY.write_text(json.dumps(entries, indent=2))
+    tmp = DTC_HISTORY.with_suffix(".tmp")
+    tmp.write_text(json.dumps(entries, indent=2))
+    tmp.replace(DTC_HISTORY)
 
 
 def _run_dtc_pipeline(module: str, source_id: str, peak_ts: str) -> dict:

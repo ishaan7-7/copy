@@ -11,32 +11,42 @@ class AlertStateManager:
     def _load_json(self, path, default):
         if os.path.exists(path) and os.path.getsize(path) > 0:
             try:
-                with open(path, 'r') as f: 
+                with open(path, 'r') as f:
                     return json.load(f)
-            except json.JSONDecodeError:
+            except Exception:
                 pass
         return default
 
     def _load_pkl(self, path, default):
         if os.path.exists(path):
-            with open(path, 'rb') as f: 
-                return pickle.load(f)
+            with open(path, 'rb') as f:
+                try:
+                    return pickle.load(f)
+                except Exception:
+                    return default
         return default
 
     def save_state(self):
-        with open(config.CHECKPOINT_FILE, 'w') as f: json.dump(self.checkpoints, f, indent=4)
-        with open(config.CACHE_FILE, 'wb') as f: pickle.dump(self.alert_cache, f)
+        ckpt_tmp = config.CHECKPOINT_FILE + ".tmp"
+        with open(ckpt_tmp, 'w') as f:
+            json.dump(self.checkpoints, f)
+        os.replace(ckpt_tmp, config.CHECKPOINT_FILE)
+
+        cache_tmp = config.CACHE_FILE + ".tmp"
+        with open(cache_tmp, 'wb') as f:
+            pickle.dump(self.alert_cache, f)
+        os.replace(cache_tmp, config.CACHE_FILE)
 
     def get_state(self, sim_id, module):
         key = f"{sim_id}_{module}"
         if key not in self.alert_cache:
             self.alert_cache[key] = {
-                "phase": "IDLE", 
-                "fault_score": 0, 
-                "alert_id": None, 
-                "start_ts": None, 
+                "phase": "IDLE",
+                "fault_score": 0,
+                "alert_id": None,
+                "start_ts": None,
                 "accumulated_features": {},
-                "max_score": 0.0, 
+                "max_score": 0.0,
                 "peak_ts": None
             }
         return self.alert_cache[key], key

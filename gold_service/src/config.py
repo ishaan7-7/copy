@@ -15,9 +15,9 @@ CHECKPOINT_FILE = os.path.join(STATE_DIR, "checkpoints.json")
 CACHE_FILE = os.path.join(STATE_DIR, "vehicle_cache.pkl")
 
 # --- PROCESSING PARAMETERS ---
-POLL_INTERVAL = 5.0
+POLL_INTERVAL = 2.0
 BATCH_SIZE = 50
-AGGREGATION_WINDOW_SEC = 10
+AGGREGATION_WINDOW_SEC = 1
 
 import json as _json, pathlib as _pl
 _pipeline_cfg = _json.loads((_pl.Path(__file__).resolve().parents[2] / "config" / "pipeline_config.json").read_text())

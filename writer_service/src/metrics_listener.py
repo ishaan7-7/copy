@@ -81,8 +81,7 @@ class WriterMetricsListener(StreamingQueryListener):
         
         self.state["streams"][name] = metrics
         self.state["last_updated"] = time.time()
-        if p.numInputRows > 0:
-            self._flush()
+        self._flush()
 
     def onQueryTerminated(self, event):
         print(f"🛑 STREAM STOPPED: {event.runId}")
@@ -103,12 +102,12 @@ class WriterMetricsListener(StreamingQueryListener):
                     mod_file = self.state_dir / f"writer_metrics_{stream_name}.json"
                     temp_file = mod_file.with_suffix(".tmp")
                     with open(temp_file, "w") as f:
-                        json.dump(per_module_state, f, indent=2)
+                        json.dump(per_module_state, f)
                     temp_file.replace(mod_file)
             else:
                 temp_file = self.metrics_file.with_suffix(".tmp")
                 with open(temp_file, "w") as f:
-                    json.dump(self.state, f, indent=2)
+                    json.dump(self.state, f)
                 temp_file.replace(self.metrics_file)
         except Exception as e:
             logger.error(f"Write failed: {e}")

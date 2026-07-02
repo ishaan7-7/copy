@@ -67,16 +67,21 @@ def _root_connection() -> "duckdb.DuckDBPyConnection":
         with _lock:
             if _con is None:
                 con = duckdb.connect(":memory:")
-                # Queries here are small and file-capped (<=200 files, well
-                # under a second either way) — not OLAP scans that benefit
-                # from parallelism. Six separate processes import this
-                # module, so threads=4 each meant 24 DuckDB threads competing
-                # with Spark (which grabs all cores by default) and everything
-                # else. Confirmed live: this oversubscription contributed to
-                # a 24-minute system-wide stall under sustained replay load on
-                # a 12-core box. threads=1 removes DuckDB from that contention
-                # with no measurable latency cost at this data volume.
+                # threads=1: 6 processes each import this, so threads=4 was
+                # 24 DuckDB threads fighting Spark for CPU on a 12-core box —
+                # confirmed caused a 24-min system-wide stall. Queries here
+                # are small (<=200 file-capped) and don't benefit from
+                # parallelism at this scale.
                 con.execute("SET threads TO 1")
+                # memory_limit: DuckDB's default auto-sizes its buffer pool
+                # to ~80% of detected system RAM. On a memory-constrained
+                # machine that means DuckDB's 6 instances each see e.g.
+                # 7.4GB × 80% = 5.9GB as their theoretical limit, adding
+                # meaningless RSS overhead even though actual query working
+                # sets are tiny. 128MB per process is generous for these
+                # small parquet reads and eliminates the proactive
+                # reservation.
+                con.execute("SET memory_limit TO '128MB'")
                 _con = con
     return _con
 

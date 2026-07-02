@@ -2,6 +2,7 @@
 import time
 import os
 import sys
+import threading
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -26,6 +27,7 @@ def main():
     engine = AlertEngine(state)
     last_silver_mtime = 0.0
     last_compact = 0.0
+    _compact_thread: threading.Thread | None = None
 
     ALERT_SCHEMA = pa.schema([
         ("alert_id", pa.string()),
@@ -82,7 +84,7 @@ def main():
                 if not files:
                     continue
                 combined = dr.query_df(
-                    "SELECT * FROM read_parquet(?) WHERE CAST(inference_ts AS VARCHAR) > ?",
+                    "SELECT inference_ts, source_id, composite_score, severity, top_features, timestamp FROM read_parquet(?) WHERE CAST(inference_ts AS VARCHAR) > ?",
                     files, params=[last_ts],
                 )
                 if combined.empty:
@@ -129,8 +131,10 @@ def main():
             print(f"Wrote {len(alert_updates)} alert states.")
         elif new_checkpoints:
             import json
-            with open(config.CHECKPOINT_FILE, "w") as f:
-                json.dump(state.checkpoints, f, indent=4)
+            ckpt_tmp = config.CHECKPOINT_FILE + ".tmp"
+            with open(ckpt_tmp, "w") as f:
+                json.dump(state.checkpoints, f)
+            os.replace(ckpt_tmp, config.CHECKPOINT_FILE)
 
         # Alerts writes plain parquet (no _delta_log) with upsert-style
         # semantics — the same alert_id is rewritten on every status
@@ -142,15 +146,19 @@ def main():
         # per alert_id.
         if time.time() - last_compact >= 90:
             last_compact = time.time()
-            try:
-                merged = dr.compact_flat_dir(
-                    config.GOLD_ALERTS_DIR, min_files_to_compact=5,
-                    dedup_subset=["alert_id"], dedup_sort_col="last_updated_ts",
-                )
-                if merged:
-                    print(f"Compacted {merged} Alert files.")
-            except Exception as e:
-                print(f"Alert compaction failed: {e}")
+            if _compact_thread is None or not _compact_thread.is_alive():
+                def _run_compact():
+                    try:
+                        merged = dr.compact_flat_dir(
+                            config.GOLD_ALERTS_DIR, min_files_to_compact=5,
+                            dedup_subset=["alert_id"], dedup_sort_col="last_updated_ts",
+                        )
+                        if merged:
+                            print(f"Compacted {merged} Alert files.")
+                    except Exception as e:
+                        print(f"Alert compaction failed: {e}")
+                _compact_thread = threading.Thread(target=_run_compact, daemon=True)
+                _compact_thread.start()
 
         time.sleep(config.POLL_INTERVAL)
 

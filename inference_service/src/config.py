@@ -24,6 +24,6 @@ ALERTS_FILE = os.path.join(STATE_DIR, "system_alerts.json")
 import json as _json, pathlib as _pl
 MODULES = _json.loads((_pl.Path(__file__).resolve().parents[2] / "config" / "pipeline_config.json").read_text())["enabled_modules"]
 BATCH_SIZE = 60
-POLL_INTERVAL = 5.0
+POLL_INTERVAL = 2.0
 EMA_ALPHA = 0.2
 PERSISTENCE_LIMIT = 5

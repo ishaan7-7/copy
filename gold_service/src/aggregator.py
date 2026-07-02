@@ -1,6 +1,6 @@
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from src import config
 
 class HealthAggregator:
@@ -44,5 +44,5 @@ class HealthAggregator:
             "vehicle_health_score": round(scaled_health, 2),
             **contribs,
             "top_5_features": json.dumps(top_5),
-            "gold_write_ts": datetime.utcnow().isoformat()
+            "gold_write_ts": datetime.now(timezone.utc).isoformat()
         }

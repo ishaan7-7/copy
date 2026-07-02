@@ -21,7 +21,7 @@ _ready = False
 
 async def _init_and_run():
     global _ready
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, engine.initialize)
     _ready = True
     while True:
@@ -87,5 +87,22 @@ async def vehicle_behavior(vehicle_id: str):
     return data
 
 
+@app.get("/api/fleet/all")
+async def fleet_all():
+    """Batch endpoint — returns detail+trip+behavior for every active vehicle
+    in one response. Replaces the 21-request fan-out (3 per vehicle × 7
+    vehicles) that FleetCenter fired every 20 s via Promise.all."""
+    if not _ready:
+        return {"vehicles": {}}
+    result: dict = {}
+    for vid in list(engine.active_vehicles.keys()):
+        result[vid] = {
+            "detail":   engine.get_vehicle_detail(vid),
+            "trip":     engine.get_trip_data(vid),
+            "behavior": engine.get_behavior_data(vid),
+        }
+    return {"vehicles": result}
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8009)
+    uvicorn.run(app, host="127.0.0.1", port=8009)

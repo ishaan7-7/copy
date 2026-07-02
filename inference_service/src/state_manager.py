@@ -1,7 +1,7 @@
 import os
 import json
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from src import config
 
 class StateManager:
@@ -31,7 +31,10 @@ class StateManager:
         return default
 
     def _save_json(self, data, path):
-        with open(path, 'w') as f: json.dump(data, f, indent=4)
+        tmp = path + ".tmp"
+        with open(tmp, 'w') as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
 
     def _save_pkl(self, data, path):
         with open(path, 'wb') as f: pickle.dump(data, f)
@@ -69,7 +72,7 @@ class StateManager:
 
     def log_alert(self, sim_id, level, message):
         alert = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "sim_id": sim_id,
             "module": self.module,
             "level": level,
