@@ -161,6 +161,7 @@ class HybridObserver:
                         if ts.tzinfo is None: ts = ts.replace(tzinfo=timezone.utc)
                         latency_ms = (now_utc - ts).total_seconds() * 1000
                         if latency_ms < 0: latency_ms = 0
+                        if latency_ms > 30000: latency_ms = 30000
 
                     if v_id:
                         async with self.lock:
