@@ -463,113 +463,35 @@ function createVehicleIcon(
   health: number,
   heading: number
 ): L.DivIcon {
-  // Vehicle Status (Outer Ring)
-  let outerColor = "#6B7280";
-
-  switch (status) {
-    case "active":
-      outerColor = "#16A34A";
-      break;
-
-    case "parked":
-      outerColor = "#2563EB";
-      break;
-
-    case "in_service":
-      outerColor = "#7C3AED";
-      break;
-
-    default:
-      outerColor = "#6B7280";
-  }
-
-  // Health Severity (Inner Circle)
-  let innerColor = "#10B981";
-
-  if (health < 50) {
-    innerColor = "#DC2626";
+  let color = "#3b82f6";
+  if (status === "active") {
+    color = "#22c55e";
+  } else if (status === "in_service") {
+    color = "#f59e0b";
+  } else if (health < 60) {
+    color = "#ef4444";
   } else if (health < 80) {
-    innerColor = "#F59E0B";
+    color = "#eab308";
   }
 
   const hdgBucket = status === "active" ? Math.round(heading / 15) * 15 : 0;
+  const cacheKey = `${status}_${color}_${hdgBucket}`;
+  if (_iconCache[cacheKey]) return _iconCache[cacheKey];
 
-  const cacheKey = `${status}_${outerColor}_${innerColor}_${hdgBucket}`;
-
-  if (_iconCache[cacheKey]) {
-    return _iconCache[cacheKey];
-  }
-
-  // Increased sizes
-  const outerSize = status === "active" ? 22 : 20;
-  const innerSize = 11;
-
+  const size = status === "active" ? 14 : 10;
   const arrow =
     status === "active"
-      ? `
-        <div
-          style="
-            position:absolute;
-            top:-11px;
-            left:50%;
-            transform:translateX(-50%) rotate(${hdgBucket}deg);
-            font-size:11px;
-            color:${outerColor};
-            font-weight:bold;
-            line-height:1;
-          "
-        >
-          ▲
-        </div>`
+      ? `<div style="position:absolute;top:-7px;left:50%;transform:translateX(-50%) rotate(${hdgBucket}deg);font-size:9px;color:${color};">▲</div>`
       : "";
 
   const icon = L.divIcon({
     className: "",
-    iconSize: [outerSize + 10, outerSize + 10],
-    iconAnchor: [(outerSize + 10) / 2, (outerSize + 10) / 2],
-
-    html: `
-        <div
-          style="
-            position:relative;
-            width:${outerSize + 10}px;
-            height:${outerSize + 10}px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-          "
-        >
-          ${arrow}
-  
-          <div
-            style="
-              width:${outerSize}px;
-              height:${outerSize}px;
-              border-radius:50%;
-              background:${outerColor};
-              border:3px solid white;
-              display:flex;
-              align-items:center;
-              justify-content:center;
-              box-shadow:0 3px 8px rgba(0,0,0,.45);
-            "
-          >
-            <div
-              style="
-                width:${innerSize}px;
-                height:${innerSize}px;
-                border-radius:50%;
-                background:${innerColor};
-                border:2px solid white;
-              "
-            ></div>
-          </div>
-        </div>
-      `,
+    iconSize: [size + 6, size + 6],
+    iconAnchor: [(size + 6) / 2, (size + 6) / 2],
+    html: `<div style="position:relative;width:${size + 6}px;height:${size + 6}px;display:flex;align-items:center;justify-content:center;">${arrow}<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div></div>`,
   });
 
   _iconCache[cacheKey] = icon;
-
   return icon;
 }
 
@@ -2048,43 +1970,50 @@ function MapController({
 }) {
   const map = useMap();
   const lastFittedVehicle = useRef<string | null>(null);
+  const wasActiveRef = useRef(isActive);
   const didMountRef = useRef(false);
-  const wasActiveMapRef = useRef(false);
 
   useEffect(() => {
-    if (isActive && !wasActiveMapRef.current) {
-      setTimeout(() => map.invalidateSize(), 150);
+    if (isActive && !wasActiveRef.current) {
+      const id = setTimeout(() => map.invalidateSize({ animate: false }), 150);
+      return () => clearTimeout(id);
     }
-    wasActiveMapRef.current = isActive;
+    wasActiveRef.current = isActive;
   }, [isActive, map]);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
     if (
       selectedVehicle &&
       tripData?.route?.length > 0 &&
       lastFittedVehicle.current !== selectedVehicle
     ) {
       lastFittedVehicle.current = selectedVehicle;
-      map.stop();
-      const bounds = L.latLngBounds(tripData.route.map((p) => [p.lat, p.lng]));
-      map.fitBounds(bounds, {
-        paddingTopLeft: [40, 40],
-        paddingBottomRight: [40, 40],
-        maxZoom: 7,
-        animate: true,
-        duration: 0.6,
-      });
+      const validRoute = tripData.route.filter(
+        (p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)
+      );
+      if (validRoute.length > 1) {
+        map.stop();
+        const bounds = L.latLngBounds(validRoute.map((p) => [p.lat, p.lng]));
+        map.fitBounds(bounds, {
+          paddingTopLeft: [40, 40],
+          paddingBottomRight: [40, 40],
+          maxZoom: 7,
+          animate: true,
+          duration: 0.6,
+        });
+      }
+      return;
     }
     if (!selectedVehicle) {
-      if (didMountRef.current) {
-        lastFittedVehicle.current = null;
-        map.stop();
-        map.flyTo([22.9937, 78.9629], 4, { duration: 0.6 });
-      }
+      lastFittedVehicle.current = null;
+      map.stop();
+      map.flyTo([22.9937, 78.9629], 4, { duration: 0.6 });
     }
-    didMountRef.current = true;
-  }, [selectedVehicle, tripData, map, isActive]);
+  }, [selectedVehicle, tripData, map]);
 
   return null;
 }
@@ -3099,8 +3028,8 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                     }}
                   >
                     <MapContainer
-                      center={[20, 0]}
-                      zoom={2}
+                      center={[22.9937, 78.9629]}
+                      zoom={4}
                       minZoom={2}
                       maxBounds={bounds}
                       maxBoundsViscosity={1.0}
@@ -3116,6 +3045,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                         updateWhenZooming={false}
                         updateWhenIdle={true}
                         maxNativeZoom={19}
+                        maxZoom={19}
                       />
                       <MapController
                         selectedVehicle={selectedVehicle}
@@ -3123,7 +3053,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                         isActive={isActive}
                       />
 
-                      {filteredPositions?.map((v) => {
+                      {positions?.filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng)).map((v) => {
                         const liveH =
                           v.status === "active"
                             ? getVehicleHealth(v.vehicle_id, v.health)
