@@ -25,6 +25,7 @@ VEHICLE_MODULES   = ["engine", "transmission", "battery", "body", "tyre"]
 
 _dtc_services: dict[str, DTCInferenceService] = {}
 _msg_maps:     dict[str, dict[str, str]]       = {}
+_dtc_cache:    dict[tuple, dict]               = {}
 
 app = FastAPI(title="DTC Analysis Service")
 
@@ -42,7 +43,9 @@ _models_lock = asyncio.Lock()
 
 @app.on_event("startup")
 async def startup_event():
-    pass
+    await asyncio.to_thread(_load_all_models)
+    global _models_loaded
+    _models_loaded = True
 
 
 def _load_all_models() -> None:
@@ -224,13 +227,14 @@ def health() -> dict:
 
 @app.get("/api/dtc/analyze")
 async def analyze_dtc(module: str, source_id: str, peak_ts: str) -> dict:
-    global _models_loaded
+    cache_key = (source_id, module, peak_ts)
+    if cache_key in _dtc_cache:
+        return _dtc_cache[cache_key]
     try:
-        async with _models_lock:
-            if not _models_loaded:
-                await asyncio.to_thread(_load_all_models)
-                _models_loaded = True
-        return await asyncio.to_thread(_run_dtc_pipeline, module, source_id, peak_ts)
+        result = await asyncio.to_thread(_run_dtc_pipeline, module, source_id, peak_ts)
+        if result.get("success"):
+            _dtc_cache[cache_key] = result
+        return result
     except Exception as e:
         return {"error": f"DTC pipeline failed: {str(e)}"}
 

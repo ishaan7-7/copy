@@ -1,8 +1,0 @@
-{
-  "replay_metrics_url": "http://127.0.0.1:9001/metrics",
-  "ingest_metrics_url": "http://127.0.0.1:8000/metrics",
-  "kafka_metrics_url": "http://127.0.0.1:9201/metrics",
-  "http": {
-    "port": 9300
-  }
-}
