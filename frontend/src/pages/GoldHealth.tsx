@@ -9,6 +9,7 @@ import {
   InputLabel,
   ToggleButton,
   ToggleButtonGroup,
+  Divider,
   Checkbox,
   FormControlLabel,
   Slider,
@@ -17,41 +18,45 @@ import {
   Chip,
   TextField,
   IconButton,
-  Stack,
-  Tooltip,
+  Grid,
 } from "@mui/material";
-import { useTheme, alpha } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
+import PlayCircleRoundedIcon from "@mui/icons-material/PlayCircleRounded";
+import DatasetRoundedIcon from "@mui/icons-material/DatasetRounded";
+import HourglassTopRoundedIcon from "@mui/icons-material/HourglassTopRounded";
+import HealthAndSafetyRoundedIcon from "@mui/icons-material/HealthAndSafetyRounded";
 import { ModuleRegistry, ClientSideRowModelModule } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-balham.css";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useStore } from "../store";
+import { useChartTheme } from "../hooks/useChartTheme";
 import { MODULE_COLORS } from "../constants/chartColors";
+import DeviceThermostatRoundedIcon from "@mui/icons-material/DeviceThermostatRounded";
+import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+import SpeedRoundedIcon from "@mui/icons-material/SpeedRounded";
+import SensorsRoundedIcon from "@mui/icons-material/SensorsRounded";
+import SettingsInputComponentRoundedIcon from "@mui/icons-material/SettingsInputComponentRounded";
+import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
+import { alpha } from "@mui/material/styles";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip as RechartsTooltip,
+  Tooltip,
   Legend,
   ResponsiveContainer,
 } from "recharts";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
-import DirectionsCarOutlinedIcon from "@mui/icons-material/DirectionsCarOutlined";
-import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
-import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
-import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
-import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
-
-const CHART_FONT = '"Inter", "Segoe UI", Roboto, Arial, sans-serif';
 
 const ALL_MODULES = ["engine", "transmission", "battery", "body", "tyre"];
 
@@ -125,9 +130,10 @@ function WeightPanel({
   onDeletePreset,
 }: WeightPanelProps) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const [selectedPreset, setSelectedPreset] = useState("");
   const [saveAsName, setSaveAsName] = useState("");
-
+  const { autoRefresh } = useStore();
   return (
     <Box
       sx={{
@@ -135,370 +141,335 @@ function WeightPanel({
         flexDirection: "column",
         height: "100%",
         overflowY: "auto",
-        p: 1.5,
+        p: 1,
         gap: 1,
-        "& .MuiTypography-root": { fontSize: "10px" },
-        "& .MuiInputLabel-root": { fontSize: "10px" },
-        "& .MuiSelect-select": { fontSize: "10px" },
-        "& .MuiMenuItem-root": { fontSize: "10px" },
-        "& .MuiInputBase-input": { fontSize: "10px" },
-        "& .MuiButton-root": { fontSize: "10px" },
+
+        "& .MuiInputLabel-root": {
+          fontSize: "10px",
+        },
+
+        "& .MuiSelect-select": {
+          fontSize: "10px",
+        },
+
+        "& .MuiMenuItem-root": {
+          fontSize: "10px",
+        },
+
+        "& .MuiInputBase-input": {
+          fontSize: "10px",
+        },
+
+        "& .MuiButton-root": {
+          fontSize: "10px",
+        },
       }}
     >
       <Typography
+        variant="caption"
         sx={{
+          fontSize: "12px",
+          lineHeight: 2,
           fontWeight: 700,
-          color: "text.secondary",
-          mb: 0.5,
-          fontSize: "10px !important",
+          color: isDark ? "text.primary" : "#005071",
+          // mb: 1,
         }}
       >
-        {label}
+        {label}:
       </Typography>
 
-      <Box sx={{ display: "flex", gap: 0.75, mb: 1, alignItems: "center" }}>
-        <FormControl size="small" sx={{ flex: 1 }}>
-          <Select
-            value={selectedPreset}
-            onChange={(e) => setSelectedPreset(e.target.value)}
-            displayEmpty
-            sx={{ borderRadius: 1, fontSize: "10px", height: 30 }}
-            MenuProps={{
-              PaperProps: {
-                sx: { "& .MuiMenuItem-root": { fontSize: "10px" } },
-              },
-            }}
-          >
-            <MenuItem value="">
-              <em>— Select Preset —</em>
-            </MenuItem>
-            {Object.keys(allPresets).map((name) => (
-              <MenuItem key={name} value={name}>
-                {name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <Button
-          size="small"
-          variant="outlined"
-          onClick={() => {
-            if (selectedPreset) onApplyPreset(selectedPreset, profile);
-          }}
-          disabled={!selectedPreset}
+      {/* Preset */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          overflow: "hidden",
+        }}
+      >
+        <Box
           sx={{
-            borderRadius: 1,
-            fontWeight: 700,
-            fontSize: "10px",
-            minWidth: 55,
-            height: 30,
-            px: 1,
-          }}
-        >
-          APPLY
-        </Button>
-
-        {selectedPreset && savedPresets[selectedPreset] && (
-          <IconButton
-            size="small"
-            onClick={() => {
-              onDeletePreset(selectedPreset);
-              setSelectedPreset("");
-            }}
-            sx={{ p: 0.5 }}
-          >
-            <DeleteIcon sx={{ fontSize: 14 }} />
-          </IconButton>
-        )}
-      </Box>
-
-      {isImbalanced && (
-        <Alert
-          severity="warning"
-          icon={false}
-          sx={{
-            borderRadius: 1,
+            display: "flex",
+            gap: 0.75,
             mb: 1,
-            "& .MuiAlert-message": { p: 0 },
+            alignItems: "center",
           }}
-          action={
-            <Button
-              size="small"
-              color="inherit"
-              onClick={onAutoBalance}
-              startIcon={<AutoFixHighIcon sx={{ fontSize: 12 }} />}
-              sx={{ fontSize: "10px", borderRadius: 1 }}
-            >
-              RECALIBRATE
-            </Button>
-          }
         >
-          <Typography sx={{ fontWeight: 700, fontSize: "10px" }}>
-            Sum: {weightSum.toFixed(3)} (Target: 1.0)
-          </Typography>
-        </Alert>
-      )}
+          <FormControl size="small" sx={{ flex: 1 }}>
+            <Select
+              value={selectedPreset}
+              onChange={(e) => setSelectedPreset(e.target.value)}
+              displayEmpty
+              sx={{
+                borderRadius: 0,
+                fontSize: "10px",
+                height: 30,
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    "& .MuiMenuItem-root": {
+                      fontSize: "10px",
+                    },
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">
+                <em>— Select Preset —</em>
+              </MenuItem>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-        {ALL_MODULES.map((mod) => {
-          const isActive = modules.includes(mod);
-          return (
-            <Box key={mod} sx={{ opacity: isActive ? 1 : 0.5, px: 0.5 }}>
-              <Box
+              {Object.keys(allPresets).map((name) => (
+                <MenuItem key={name} value={name}>
+                  {name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              if (selectedPreset) onApplyPreset(selectedPreset, profile);
+            }}
+            disabled={!selectedPreset}
+            sx={{
+              borderRadius: 0,
+              fontWeight: 700,
+              fontSize: "10px",
+              minWidth: 55,
+              height: 30,
+              px: 1,
+            }}
+          >
+            APPLY
+          </Button>
+
+          {selectedPreset && savedPresets[selectedPreset] && (
+            <IconButton
+              size="small"
+              onClick={() => {
+                onDeletePreset(selectedPreset);
+                setSelectedPreset("");
+              }}
+              sx={{
+                borderRadius: 0,
+                p: 0.5,
+              }}
+            >
+              <DeleteIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          )}
+        </Box>
+
+        {/* Warning */}
+        {isImbalanced && (
+          <Box
+            sx={{
+              flexShrink: 0,
+              mb: 0.8,
+            }}
+          >
+            <Alert
+              severity="warning"
+              icon={false}
+              sx={{
+                borderRadius: 0,
+                alignItems: "center",
+                height: "30px",
+                "& .MuiAlert-message": {
+                  p: 0,
+                },
+              }}
+              action={
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={onAutoBalance}
+                  startIcon={<AutoFixHighIcon sx={{ fontSize: "6px" }} />}
+                  sx={{
+                    fontSize: "10px",
+                  }}
+                >
+                  RECALIBRATE
+                </Button>
+              }
+            >
+              <Typography
                 sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
+                  fontSize: "10px",
+                  fontWeight: 700,
                 }}
               >
-                <FormControlLabel
-                  sx={{ m: 0 }}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={isActive}
-                      onChange={() => onToggleModule(mod)}
-                      sx={{ color: MODULE_COLORS[mod], p: 0.5 }}
-                    />
-                  }
-                  label={
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        fontSize: "10px",
-                      }}
-                    >
-                      {mod}
-                    </Typography>
-                  }
-                />
-                <Chip
-                  size="small"
-                  label={isActive ? (weights[mod] || 0).toFixed(2) : "OFF"}
+                Sum: {weightSum.toFixed(3)} (Target: 1.0)
+              </Typography>
+            </Alert>
+          </Box>
+        )}
+
+        {/* Modules */}
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            pr: 0.5,
+
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+          }}
+        >
+          {ALL_MODULES.map((mod) => {
+            const isActive = modules.includes(mod);
+
+            return (
+              <Box
+                key={mod}
+                sx={{
+                  opacity: isActive ? 1 : 0.5,
+                  px: 0.5,
+                }}
+              >
+                <Box
                   sx={{
-                    borderRadius: "4px",
-                    height: 18,
-                    fontSize: "10px",
-                    fontWeight: 700,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <FormControlLabel
+                    sx={{ m: 0 }}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={isActive}
+                        onChange={() => onToggleModule(mod)}
+                        sx={{
+                          color: MODULE_COLORS[mod],
+                          p: 0.5,
+                        }}
+                      />
+                    }
+                    label={
+                      <Typography
+                        sx={{
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          fontSize: "10px",
+                        }}
+                      >
+                        {mod}
+                      </Typography>
+                    }
+                  />
+
+                  <Chip
+                    size="small"
+                    label={isActive ? (weights[mod] || 0).toFixed(2) : "OFF"}
+                    sx={{
+                      borderRadius: 0,
+                      height: 18,
+                      fontSize: "10px",
+                      fontWeight: 700,
+                    }}
+                  />
+                </Box>
+
+                <Slider
+                  size="small"
+                  value={weights[mod] || 0}
+                  onChange={(_, val) => onWeightChange(mod, val as number)}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  disabled={!isActive}
+                  sx={{
+                    color: MODULE_COLORS[mod],
+                    ml: 3,
+                    width: "calc(100% - 24px)",
+                    mt: -0.5,
+
+                    "& .MuiSlider-markLabel": {
+                      fontSize: "10px",
+                    },
+
+                    "& .MuiSlider-valueLabel": {
+                      fontSize: "10px",
+                    },
                   }}
                 />
               </Box>
-              <Slider
-                size="small"
-                value={weights[mod] || 0}
-                onChange={(_, val) => onWeightChange(mod, val as number)}
-                min={0}
-                max={1}
-                step={0.01}
-                disabled={!isActive}
-                sx={{
-                  color: MODULE_COLORS[mod],
-                  ml: 3,
-                  width: "calc(100% - 24px)",
-                  mt: -0.5,
-                  "& .MuiSlider-markLabel": { fontSize: "10px" },
-                  "& .MuiSlider-valueLabel": { fontSize: "10px" },
-                }}
-              />
-            </Box>
-          );
-        })}
-      </Box>
+            );
+          })}
+        </Box>
 
-      <Box
-        sx={{
-          mt: 1.5,
-          pt: 1,
-          borderTop: `1px solid ${theme.palette.divider}`,
-          display: "flex",
-          gap: 0.75,
-        }}
-      >
-        <TextField
-          size="small"
-          label="Save as preset..."
-          value={saveAsName}
-          onChange={(e) => setSaveAsName(e.target.value)}
+        {/* Save */}
+        <Box
           sx={{
-            flex: 1,
-            "& .MuiOutlinedInput-root": { borderRadius: 1, height: 30 },
-            "& .MuiInputBase-input": { fontSize: "10px" },
-          }}
-        />
-        <Button
-          size="small"
-          variant="contained"
-          disableElevation
-          onClick={() => {
-            onSavePreset(saveAsName, weights, modules);
-            setSaveAsName("");
-          }}
-          disabled={!saveAsName.trim()}
-          sx={{
-            borderRadius: 1,
-            fontWeight: 700,
-            fontSize: "10px",
-            px: 2,
-            height: 30,
+            flexShrink: 0,
+            mt: 1,
+            pt: 1,
+            borderTop: `1px solid ${theme.palette.divider}`,
+            display: "flex",
+            gap: 0.75,
           }}
         >
-          SAVE
-        </Button>
+          <TextField
+            size="small"
+            label="Save as preset..."
+            value={saveAsName}
+            onChange={(e) => setSaveAsName(e.target.value)}
+            sx={{
+              flex: 1,
+
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 0,
+                height: 30,
+              },
+
+              "& .MuiInputBase-input": {
+                fontSize: "10px",
+              },
+            }}
+          />
+
+          <Button
+            size="small"
+            variant="contained"
+            disableElevation
+            onClick={() => {
+              onSavePreset(saveAsName, weights, modules);
+              setSaveAsName("");
+            }}
+            disabled={!saveAsName.trim()}
+            sx={{
+              borderRadius: 0,
+              fontWeight: 700,
+              fontSize: "10px",
+              px: 2,
+              height: 30,
+            }}
+          >
+            SAVE
+          </Button>
+        </Box>
       </Box>
     </Box>
   );
 }
 
-// ── Inline design-system components ──────────────────────────────────────────
-
-const Card = ({ children, sx }: { children: React.ReactNode; sx?: object }) => {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        borderRadius: 2,
-        overflow: "hidden",
-        bgcolor: isDark ? alpha("#0b1724", 0.9) : "#ffffff",
-        border: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.1)}`,
-        boxShadow: isDark
-          ? `0 18px 42px ${alpha("#000", 0.22)}`
-          : `0 12px 30px ${alpha("#334155", 0.08)}`,
-        ...sx,
-      }}
-    >
-      {children}
-    </Paper>
-  );
-};
-
-const SectionTitle = ({
-  title,
-  action,
+export default function GoldHealth({
+  isActive = true,
 }: {
-  title: string;
-  action?: React.ReactNode;
-}) => (
-  <Box
-    sx={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 1,
-      mb: 1,
-    }}
-  >
-    <Typography sx={{ fontSize: "12px", fontWeight: 800 }}>{title}</Typography>
-    {action}
-  </Box>
-);
-
-const MetricTile = ({
-  label,
-  value,
-  icon,
-  color,
-  delta,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: string;
-  delta?: string;
-}) => {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  return (
-    <Box
-      sx={{
-        p: 1,
-        borderRadius: 1.5,
-        border: `1px solid ${alpha(color, isDark ? 0.22 : 0.18)}`,
-        bgcolor: alpha(color, isDark ? 0.07 : 0.05),
-        display: "flex",
-        flexDirection: "column",
-        gap: 0.35,
-        position: "relative",
-        overflow: "hidden",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "3px",
-          height: "100%",
-          bgcolor: color,
-        },
-      }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-        }}
-      >
-        <Typography
-          sx={{
-            fontSize: "16px",
-            fontWeight: 800,
-            lineHeight: 1,
-            pl: 0.5,
-            color: isDark ? "#f1f5f9" : "#0f172a",
-          }}
-        >
-          {value}
-        </Typography>
-        <Box
-          sx={{
-            width: 24,
-            height: 24,
-            borderRadius: "6px",
-            bgcolor: alpha(color, isDark ? 0.2 : 0.12),
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color,
-            flexShrink: 0,
-          }}
-        >
-          {icon}
-        </Box>
-      </Box>
-      <Typography
-        sx={{
-          fontSize: "10px",
-          fontWeight: 600,
-          color: "text.secondary",
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-          pl: 0.5,
-          lineHeight: 1,
-        }}
-      >
-        {label}
-      </Typography>
-      {delta && (
-        <Typography
-          sx={{ fontSize: "9px", color, fontWeight: 700, pl: 0.5, lineHeight: 1 }}
-        >
-          {delta}
-        </Typography>
-      )}
-    </Box>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-export default function GoldHealth({ isActive = true }: { isActive?: boolean }) {
+  isActive?: boolean;
+}) {
   const { autoRefresh } = useStore();
   const wasActiveRef = useRef(isActive);
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const ct = useChartTheme();
 
   const [activeTab, setActiveTab] = useState<"operations" | "experiment">(
     "operations"
@@ -615,8 +586,7 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
     setExpWeightsB((prev) => ({ ...prev, [mod]: val }));
   };
   const currentWeightSumB = useMemo(
-    () =>
-      activeModulesB.reduce((sum, mod) => sum + (expWeightsB[mod] || 0), 0),
+    () => activeModulesB.reduce((sum, mod) => sum + (expWeightsB[mod] || 0), 0),
     [activeModulesB, expWeightsB]
   );
   const isUnbalancedB = Math.abs(currentWeightSumB - 1.0) > 0.001;
@@ -669,6 +639,7 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
     [activeModules, expWeights]
   );
   const isUnbalanced = Math.abs(currentWeightSum - 1.0) > 0.001;
+
   const autoBalanceWeights = () => {
     if (currentWeightSum === 0) return;
     const balanced: Record<string, number> = {};
@@ -713,6 +684,7 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
           (m) => (grouped[row.ts_short][`${m}_raw`] += row[`${m}_raw`])
         );
       });
+
       return Object.keys(grouped)
         .map((ts) => {
           const g = grouped[ts];
@@ -733,6 +705,7 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
         })
         .sort((a, b) => a.ts_short.localeCompare(b.ts_short));
     }
+
     return processedRows;
   }, [history, config, activeModules, expWeights, filterSim]);
 
@@ -829,60 +802,52 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
         width: key.includes("ts") ? 200 : 140,
         cellStyle:
           key === "vehicle_health_score"
-            ? (params: any): any => {
-                const color =
-                  params.value >= 80
-                    ? "#22c55e"
-                    : params.value >= 60
+            ? (params: any) => ({
+                fontWeight: "bold",
+                color:
+                  params.value < 50
+                    ? "#ef4444"
+                    : params.value < 80
                     ? "#eab308"
-                    : "#ef4444";
-                return {
-                  fontWeight: "bold",
-                  color,
-                  backgroundColor:
-                    params.value < 60
-                      ? isDark
-                        ? "rgba(239,68,68,0.15)"
-                        : "#fee2e2"
-                      : "transparent",
-                };
-              }
+                    : "#22c55e",
+              })
             : undefined,
       });
     });
     return cols;
-  }, [history, isDark]);
+  }, [history]);
 
   const agTheme = isDark ? "ag-theme-balham-dark" : "ag-theme-balham";
-
-  const agGridContainerSx: object = {
+  const gridStroke = isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.06);
+  const axisStroke = isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1);
+  const chartAxisStyle = {
+    fontSize: "11px",
+    fill: isDark ? "#94a3b8" : "#64748b",
+    fontWeight: 600,
+  };
+  const tooltipStyle = {
+    borderRadius: 8,
+    fontSize: "11px",
+    padding: "10px 14px",
+    backgroundColor: isDark ? alpha("#0b1724", 0.97) : "#ffffff",
+    border: `1px solid ${isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.15)}`,
+    color: isDark ? "#e2e8f0" : "#0f172a",
+    boxShadow: isDark ? `0 8px 24px ${alpha("#000", 0.4)}` : `0 4px 16px ${alpha("#334155", 0.12)}`,
+  };
+  const agGridContainerSx = {
     "--ag-background-color": "transparent",
     "--ag-odd-row-background-color": isDark ? alpha("#7dd3fc", 0.04) : "#f8fafc",
-    "--ag-row-hover-color": isDark
-      ? alpha("#7dd3fc", 0.09)
-      : alpha("#3b82f6", 0.05),
-    "--ag-selected-row-background-color": isDark
-      ? alpha("#3b82f6", 0.22)
-      : alpha("#3b82f6", 0.1),
+    "--ag-row-hover-color": isDark ? alpha("#7dd3fc", 0.09) : alpha("#3b82f6", 0.05),
+    "--ag-selected-row-background-color": isDark ? alpha("#3b82f6", 0.22) : alpha("#3b82f6", 0.1),
     "--ag-foreground-color": isDark ? "#e2e8f0" : "#0f172a",
     "--ag-data-color": isDark ? "#e2e8f0" : "#1f2937",
     "--ag-secondary-foreground-color": isDark ? "#94a3b8" : "#64748b",
     "--ag-border-color": isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1),
-    "--ag-row-border-color": isDark
-      ? alpha("#7dd3fc", 0.07)
-      : alpha("#1f2937", 0.07),
-    "--ag-input-focus-border-color": isDark
-      ? alpha("#7dd3fc", 0.5)
-      : alpha("#3b82f6", 0.5),
-    "& .ag-header": {
-      backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important`,
-    },
+    "--ag-row-border-color": isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.07),
+    "& .ag-header": { backgroundColor: `${isDark ? "#0d2137" : "#005071"} !important` },
     "& .ag-header-cell": {
-      backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important`,
-      color: "#fff !important",
-      fontSize: "11px !important",
-      fontWeight: "700 !important",
-      letterSpacing: "0.04em !important",
+      backgroundColor: `${isDark ? "#0d2137" : "#005071"} !important`,
+      color: "#fff !important", fontSize: "10px !important", fontWeight: "700 !important",
     },
     "& .ag-header-cell-label": { color: "#fff !important" },
     "& .ag-icon": { color: "#fff !important" },
@@ -891,631 +856,1005 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
     "& .ag-sort-descending-icon": { color: "#fff !important" },
     "& .ag-sort-none-icon": { color: "#fff !important" },
     "& .ag-cell": { fontSize: "10px !important" },
-    "& .ag-row": {
-      fontSize: "10px !important",
-      borderColor: `${
-        isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.08)
-      } !important`,
-    },
-    "& .ag-root-wrapper": { borderRadius: "6px", border: "none !important" },
-    "& .ag-root-wrapper-body": { borderRadius: "6px" },
+    "& .ag-row": { fontSize: "10px !important" },
+    "& .ag-root-wrapper": { border: "none !important" },
   };
 
-  const chartAxisStyle = {
-    fontSize: "10px",
-    fill: isDark ? "#94a3b8" : "#64748b",
-    fontFamily: CHART_FONT,
+  const getFeatureIcon = (feature: string) => {
+    const name = feature.toLowerCase();
+
+    if (name.includes("temp"))
+      return <DeviceThermostatRoundedIcon fontSize="small" />;
+
+    if (name.includes("voltage") || name.includes("power"))
+      return <BoltRoundedIcon fontSize="small" />;
+
+    if (name.includes("speed") || name.includes("rpm"))
+      return <SpeedRoundedIcon fontSize="small" />;
+
+    if (name.includes("sensor") || name.includes("o2"))
+      return <SensorsRoundedIcon fontSize="small" />;
+
+    if (name.includes("pedal"))
+      return <SettingsInputComponentRoundedIcon fontSize="small" />;
+
+    return <MemoryRoundedIcon fontSize="small" />;
   };
 
-  const tooltipStyle = {
-    backgroundColor: isDark ? alpha("#0b1724", 0.97) : "#ffffff",
-    border: `1px solid ${
-      isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.15)
-    }`,
-    borderRadius: 8,
-    fontSize: "11px",
-    padding: "10px 14px",
-    color: isDark ? "#e2e8f0" : "#0f172a",
-    boxShadow: isDark
-      ? `0 8px 20px ${alpha("#000", 0.35)}`
-      : `0 4px 12px ${alpha("#334155", 0.12)}`,
-  };
+  const getCardGradient = (bg: string, color: string, isDark: boolean) => {
+    if (isDark) {
+      return `
+        linear-gradient(
+          135deg,
+          ${alpha(color, 0.18)} 0%,
+          ${alpha("#1E293B", 0.95)} 45%,
+          ${alpha("#0F172A", 1)} 100%
+        )
+      `;
+    }
 
-  const selectSx = {
-    borderRadius: 1,
-    fontSize: "10px",
-    height: 28,
-    bgcolor: isDark ? alpha("#0b1724", 0.6) : "#ffffff",
-    "& .MuiSelect-select": { fontSize: "10px", py: 0.5 },
-    "& .MuiOutlinedInput-notchedOutline": {
-      borderColor: isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.18),
-    },
-    "&:hover .MuiOutlinedInput-notchedOutline": {
-      borderColor: isDark ? alpha("#7dd3fc", 0.4) : alpha("#1f2937", 0.35),
-    },
-  };
-
-  const menuPropsSx = {
-    PaperProps: {
-      sx: {
-        bgcolor: isDark ? "#0b1724" : "#ffffff",
-        border: `1px solid ${
-          isDark ? alpha("#7dd3fc", 0.15) : alpha("#1f2937", 0.1)
-        }`,
-        "& .MuiMenuItem-root": {
-          fontSize: "10px",
-          "&:hover": {
-            bgcolor: isDark
-              ? alpha("#7dd3fc", 0.06)
-              : alpha("#3b82f6", 0.05),
-          },
-        },
-      },
-    },
-  };
-
-  const healthValue =
-    filterSim === "ALL"
-      ? fleetHealthKpi
-      : latestRow?.vehicle_health_score || 0;
-  const healthColor =
-    healthValue >= 80 ? "#22c55e" : healthValue >= 60 ? "#eab308" : "#ef4444";
-
-  const tabSwitcherSx = {
-    bgcolor: isDark ? alpha("#020c16", 0.7) : alpha("#dde6ef", 0.6),
-    borderRadius: "10px",
-    border: `1px solid ${
-      isDark ? alpha("#7dd3fc", 0.08) : alpha("#94a3b8", 0.2)
-    }`,
-    p: "3px",
-    "& .MuiToggleButtonGroup-grouped": {
-      border: "none !important",
-      borderRadius: "7px !important",
-    },
-    "& .MuiToggleButton-root": {
-      py: "5px",
-      px: "14px",
-      fontSize: "10px",
-      fontWeight: 600,
-      lineHeight: 1,
-      textTransform: "none",
-      letterSpacing: "0.015em",
-      whiteSpace: "nowrap",
-      color: isDark ? alpha("#94a3b8", 0.8) : "#64748b",
-      transition: "background-color 0.15s, color 0.15s, box-shadow 0.15s",
-      "&.Mui-selected": {
-        color: isDark ? "#f1f5f9" : "#0f172a",
-        fontWeight: 700,
-        bgcolor: isDark ? "#0d2137" : "#ffffff",
-        boxShadow: isDark
-          ? `0 1px 4px ${alpha("#000", 0.45)}, 0 0 0 1px ${alpha(
-              "#7dd3fc",
-              0.06
-            )}`
-          : `0 1px 3px ${alpha("#334155", 0.16)}, 0 1px 2px ${alpha(
-              "#334155",
-              0.1
-            )}`,
-      },
-      "&:hover:not(.Mui-selected)": {
-        bgcolor: isDark ? alpha("#7dd3fc", 0.05) : alpha("#94a3b8", 0.12),
-        color: isDark ? "#cbd5e1" : "#374151",
-      },
-    },
+    return `
+      linear-gradient(
+        135deg,
+        ${bg} 0%,
+        #FFFFFF 65%,
+        ${alpha(color, 0.1)} 100%
+      )
+    `;
   };
 
   return (
-    <Box
-      sx={{
-        height: "calc(100vh - 64px)",
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-        gap: 1,
-        p: 1,
-        background: isDark
-          ? "linear-gradient(145deg, #06111d 0%, #0b1724 52%, #0d1b2a 100%)"
-          : "linear-gradient(145deg, #f8fafc 0%, #eef6ff 52%, #f7fbff 100%)",
-      }}
-    >
-      {/* Page Header */}
+    <>
       <Box
         sx={{
+          height: "calc(100vh - 80px)", // slightly more available space
+          minHeight: 0, // prevents flex children from shrinking
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          pb: 1,
-          borderBottom: `1px solid ${
-            isDark ? alpha("#7dd3fc", 0.12) : alpha("#1f2937", 0.1)
-          }`,
-          gap: 2,
-          flexWrap: "wrap",
+          flexDirection: "column",
+          gap: 1,
+          padding: "0 8px",
+          bgcolor: "background.default",
+          // pb: 10,
+          // overflow: "hidden", // avoids nested overflow issues
         }}
       >
-        <Typography
+        <Box
           sx={{
-            fontWeight: 700,
-            fontSize: "16px",
-            letterSpacing: "-0.3px",
-            whiteSpace: "nowrap",
-            background: isDark
-              ? "linear-gradient(135deg, #e2e8f0, #7dd3fc)"
-              : "linear-gradient(135deg, #0f172a, #1e40af)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center", // changed from flex-end
+            borderBottom: `2px solid ${theme.palette.divider}`,
+            pb: 1,
           }}
         >
-          GOLD LAYER: FUSED VEHICLE HEALTH
-        </Typography>
-
-        <Stack direction="row" alignItems="center" spacing={1}>
           <Typography
+            variant="h5"
             sx={{
-              fontSize: "10px",
-              fontWeight: 600,
-              color: "text.secondary",
+              fontWeight: 700,
+              color: isDark ? "text.primary" : "#005071",
+              letterSpacing: "-0.3px",
+              fontSize: "14px !important",
               whiteSpace: "nowrap",
             }}
           >
-            FILTER CONTEXT:
+            GOLD LAYER: FUSED VEHICLE HEALTH
           </Typography>
-          <FormControl size="small" sx={{ minWidth: 220 }}>
-            <InputLabel sx={{ fontSize: "10px" }}>
-              Active Vehicle (Sim)
-            </InputLabel>
-            <Select
-              value={filterSim}
-              onChange={(e) => setFilterSim(e.target.value)}
-              label="Active Vehicle (Sim)"
-              sx={selectSx}
-              MenuProps={menuPropsSx}
-            >
-              <MenuItem value="ALL" sx={{ fontWeight: 700, fontSize: "10px" }}>
-                ALL VEHICLES (FLEET)
-              </MenuItem>
-              {availableSims.map((sim: string) => (
-                <MenuItem key={sim} value={sim} sx={{ fontSize: "10px" }}>
-                  {sim}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Stack>
 
-        <ToggleButtonGroup
-          value={activeTab}
-          exclusive
-          onChange={(_e, val) => val && setActiveTab(val)}
-          size="small"
-          sx={tabSwitcherSx}
-        >
-          <ToggleButton value="operations">Live Operations</ToggleButton>
-          <ToggleButton value="experiment">Weight Lab</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
+          {/* RIGHT TOGGLE */}
 
-      {/* ── OPERATIONS TAB ──────────────────────────────────────────────────── */}
-      {activeTab === "operations" && (
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            gap: 1,
-            minHeight: 0,
-          }}
-        >
-          {/* KPI Tiles */}
-          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-            <Box sx={{ flex: 1 }}>
-              <MetricTile
-                label="Active Simulations"
-                value={availableSims.length}
-                color="#3b82f6"
-                icon={<DirectionsCarOutlinedIcon sx={{ fontSize: 14 }} />}
-              />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <MetricTile
-                label="Total Gold Rows"
-                value={metrics?.total_gold_rows?.toLocaleString() || "0"}
-                color="#8b5cf6"
-                icon={<StorageOutlinedIcon sx={{ fontSize: 14 }} />}
-              />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <MetricTile
-                label="Global Max Lag"
-                value={displayLag.toLocaleString()}
-                color={displayLag > 1000 ? "#ef4444" : "#f59e0b"}
-                icon={<TimerOutlinedIcon sx={{ fontSize: 14 }} />}
-                delta={
-                  displayLag > 1000 ? "High lag — check pipeline" : undefined
-                }
-              />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <MetricTile
-                label={
-                  filterSim === "ALL"
-                    ? "Fleet Avg Health"
-                    : "Vehicle Health"
-                }
-                value={`${healthValue}%`}
-                color={healthColor}
-                icon={<HealthAndSafetyOutlinedIcon sx={{ fontSize: 14 }} />}
-                delta={
-                  healthValue < 60 ? "Critical threshold" : undefined
-                }
-              />
-            </Box>
-          </Stack>
-
-          {/* Main content row */}
           <Box
             sx={{
               display: "flex",
+              alignItems: "center",
               gap: 1,
-              flex: 1,
-              minHeight: 0,
             }}
           >
-            {/* Degradation Drivers */}
-            <Card
+            <ToggleButtonGroup
+              value={activeTab}
+              exclusive
+              onChange={(_e, val) => val && setActiveTab(val)}
+              size="small"
               sx={{
-                width: 280,
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-                p: 1.25,
-                overflowY: "auto",
+                height: 34,
+                bgcolor: "transparent",
+
+                "& .MuiToggleButtonGroup-grouped": {
+                  border: `1px solid ${isDark ? alpha("#7dd3fc", 0.15) : "#D0D7DE"} !important`,
+                  borderRadius: "8px !important",
+                  marginRight: "8px !important",
+                  padding: "0 16px",
+                  minHeight: 34,
+                  textTransform: "none",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: isDark ? alpha("#94a3b8", 0.8) : "#64748B",
+                  transition: "all .2s ease",
+
+                  "&:last-of-type": {
+                    marginRight: 0,
+                  },
+
+                  "&:hover": {
+                    backgroundColor: isDark ? alpha("#7dd3fc", 0.05) : "#005071cc",
+                    borderColor: isDark ? alpha("#7dd3fc", 0.3) : "#ffffff",
+                    color: isDark ? "#cbd5e1" : "#ffffff",
+                  },
+
+                  "&.Mui-selected": {
+                    backgroundColor: isDark ? "#0d2137" : "#005071",
+                    color: isDark ? "#f1f5f9" : "#ffffff",
+                    border: `1px solid ${isDark ? alpha("#7dd3fc", 0.2) : "#005071"} !important`,
+                    boxShadow: isDark
+                      ? `0 1px 4px ${alpha("#000", 0.45)}, 0 0 0 1px ${alpha("#7dd3fc", 0.06)}`
+                      : "0 2px 8px rgba(0,80,113,0.18)",
+                  },
+
+                  "&.Mui-selected:hover": {
+                    backgroundColor: isDark ? "#0d2137" : "#005071",
+                  },
+                },
               }}
             >
-              <SectionTitle
-                title={
-                  filterSim === "ALL"
-                    ? "Degradation Drivers (Fleet)"
-                    : "Degradation Drivers"
-                }
-              />
-              {topFeatures.length > 0 ? (
-                topFeatures.map((f: any, i) => (
-                  <Box key={i} sx={{ mb: 1.5 }}>
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      sx={{ mb: 0.4 }}
-                    >
-                      <Typography
-                        sx={{ fontSize: "10px", fontWeight: 700 }}
-                      >
-                        {f.feature}
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "9px",
-                          color: "text.secondary",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {parseFloat(f.impact).toFixed(2)}
-                      </Typography>
-                    </Stack>
-                    <Box
+              <ToggleButton value="operations">LIVE OPERATIONS</ToggleButton>
+
+              <ToggleButton value="experiment">
+                WEIGHT EXPERIMENTATION LAB
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        </Box>
+
+        {activeTab === "operations" && (
+          <>
+            <Grid container spacing={1} alignItems="stretch">
+              <Grid item xs={12} sm={4}>
+                <Paper
+                  sx={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    p: 1,
+                    borderRadius: 2,
+                    mb: 1,
+                  }}
+                >
+                  {/* Header */}
+                  <Box
+                    sx={{
+                      p: 0,
+                      // bgcolor: "#005071",
+                      // borderBottom: `1px solid ${theme.palette.divider}`,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography
                       sx={{
-                        height: 5,
-                        borderRadius: "3px",
-                        bgcolor: isDark ? "#1e293b" : "#e2e8f0",
-                        overflow: "hidden",
+                        fontSize: "12px",
+                        lineHeight: 2,
+                        fontWeight: 700,
+                        color: isDark ? "text.primary" : "#005071",
+                        // mb: 1,
                       }}
                     >
-                      <Box
+                      FILTER CONTEXT:
+                    </Typography>
+
+                    <FormControl
+                      size="small"
+                      sx={{
+                        minWidth: 220,
+
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 0,
+                          height: 30,
+                          fontSize: "10px",
+                        },
+                      }}
+                    >
+                      <InputLabel sx={{ fontSize: "10px" }}>
+                        Active Vehicle (Sim)
+                      </InputLabel>
+
+                      <Select
+                        value={filterSim}
+                        onChange={(e) => setFilterSim(e.target.value)}
+                        label="Active Vehicle (Sim)"
                         sx={{
-                          width: `${Math.min(
-                            100,
-                            (f.impact as number) * 10
-                          )}%`,
-                          height: "100%",
-                          bgcolor: "#ef4444",
-                          borderRadius: "3px",
-                          transition: "width 0.3s ease",
+                          fontSize: "10px",
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              "& .MuiMenuItem-root": {
+                                fontSize: "10px",
+                              },
+                            },
+                          },
+                        }}
+                      >
+                        <MenuItem
+                          value="ALL"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: "10px",
+                          }}
+                        >
+                          ALL VEHICLES (FLEET)
+                        </MenuItem>
+
+                        {availableSims.map((sim: string) => (
+                          <MenuItem
+                            key={sim}
+                            value={sim}
+                            sx={{ fontSize: "10px" }}
+                          >
+                            {sim}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                </Paper>
+                <Paper
+                  sx={{
+                    // width: "300px",
+                    p: 1,
+                    borderRadius: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    overflowY: "auto",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: "12px",
+                      lineHeight: 2,
+                      fontWeight: 700,
+                      color: isDark ? "text.primary" : "#005071",
+                      // mb: 1,
+                    }}
+                  >
+                    {filterSim === "ALL"
+                      ? "LATEST DEGRADATION DRIVERS (FLEET)"
+                      : "LATEST DEGRADATION DRIVERS"}
+                  </Typography>
+                  {topFeatures.length > 0 ? (
+                    topFeatures.map((f: any, i) => (
+                      <Box
+                        key={i}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1.2,
+                          p: 1,
+                          mb: 0.8,
+                          borderRadius: 1.5,
+                          border: `1px solid ${isDark ? alpha("#7dd3fc", 0.12) : alpha("#1f2937", 0.1)}`,
+                          background: isDark ? alpha("#fff", 0.02) : "#fff",
+                          transition: ".2s",
+                          my: 1.6,
+                          "&:hover": {
+                            boxShadow: "0 3px 8px rgba(0,0,0,.08)",
+                            transform: "translateY(-1px)",
+                          },
+                        }}
+                      >
+                        {/* Icon */}
+
+                        <Box
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 1.5,
+                            bgcolor: alpha(theme.palette.error.main, 0.08),
+                            color: theme.palette.error.main,
+
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+
+                            flexShrink: 0,
+
+                            "& svg": {
+                              fontSize: 16,
+                            },
+                          }}
+                        >
+                          {getFeatureIcon(f.feature)}
+                        </Box>
+
+                        {/* Center */}
+
+                        <Box flex={1}>
+                          <Typography
+                            sx={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              mb: 0.5,
+                              lineHeight: 1.2,
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {f.feature}
+                          </Typography>
+
+                          <Box
+                            sx={{
+                              height: 6,
+                              bgcolor: isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08),
+                              borderRadius: 10,
+                              overflow: "hidden",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: `${Math.min(
+                                  100,
+                                  Number(f.impact) * 30
+                                )}%`,
+                                height: "100%",
+                                borderRadius: 10,
+                                background: `linear-gradient(
+        90deg,
+        ${theme.palette.error.light},
+        ${theme.palette.error.main}
+      )`,
+                              }}
+                            />
+                          </Box>
+                        </Box>
+
+                        {/* Score */}
+
+                        <Box
+                          sx={{
+                            minWidth: 42,
+                            height: 30,
+                            borderRadius: 1.5,
+                            bgcolor: alpha(theme.palette.error.main, 0.08),
+
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            px: 0.5,
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              color: theme.palette.error.main,
+                              fontWeight: 700,
+                              fontSize: "10px",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {Number(f.impact).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      Awaiting anomaly data...
+                    </Typography>
+                  )}
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={8} sx={{ display: "flex" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: 1,
+                    gap: 1,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 1,
+                      width: "100%",
+
+                      // mb: 1.5,
+                    }}
+                  >
+                    {[
+                      {
+                        label: "ACTIVE SIMULATIONS",
+                        value: availableSims.length,
+                        bg: "#EEF6FF",
+                        color: "#1976D2",
+                        border: "#1976D2",
+                        icon: <PlayCircleRoundedIcon />,
+                      },
+                      {
+                        label: "TOTAL GOLD ROWS",
+                        value: metrics?.total_gold_rows?.toLocaleString() || 0,
+                        bg: "#F3F0FF",
+                        color: "#6D5BD0",
+                        border: "#6D5BD0",
+                        icon: <DatasetRoundedIcon />,
+                      },
+                      {
+                        label: "GLOBAL MAX LAG",
+                        value: displayLag.toLocaleString(),
+                        color: displayLag > 1000 ? "#D32F2F" : "#E67E22",
+                        bg: displayLag > 1000 ? "#FFF1F1" : "#FFF4E8",
+                        border: displayLag > 1000 ? "#D32F2F" : "#E67E22",
+                        icon: <HourglassTopRoundedIcon />,
+                      },
+                      {
+                        label:
+                          filterSim === "ALL"
+                            ? "FLEET AVG VEHICLE HEALTH"
+                            : "CURRENT VEHICLE HEALTH",
+                        value: `${
+                          filterSim === "ALL"
+                            ? fleetHealthKpi
+                            : latestRow?.vehicle_health_score || 0
+                        }%`,
+                        color:
+                          (filterSim === "ALL"
+                            ? fleetHealthKpi
+                            : latestRow?.vehicle_health_score ?? 100) < 60
+                            ? "#D32F2F"
+                            : "#2E7D32",
+                        bg:
+                          (filterSim === "ALL"
+                            ? fleetHealthKpi
+                            : latestRow?.vehicle_health_score ?? 100) < 60
+                            ? "#FFF1F1"
+                            : "#EEFCEF",
+                        border:
+                          (filterSim === "ALL"
+                            ? fleetHealthKpi
+                            : latestRow?.vehicle_health_score ?? 100) < 60
+                            ? "#D32F2F"
+                            : "#2E7D32",
+                        icon: <HealthAndSafetyRoundedIcon />,
+                      },
+                    ].map((kpi, idx) => (
+                      <Paper
+                        key={idx}
+                        elevation={3}
+                        sx={{
+                          flex: 1,
+                          p: 2,
+                          borderRadius: 3,
+                          overflow: "hidden",
+                          position: "relative",
+                          minHeight: 90,
+
+                          background: getCardGradient(
+                            kpi.bg,
+                            kpi.color,
+                            isDark
+                          ),
+
+                          border: `1px solid ${alpha(kpi.border, 0.18)}`,
+
+                          boxShadow: isDark
+                            ? "0 8px 24px rgba(0,0,0,.35)"
+                            : `0 8px 20px ${alpha(kpi.border, 0.1)}`,
+
+                          transition: ".25s",
+
+                          "&:hover": {
+                            transform: "translateY(-2px)",
+                            boxShadow: isDark
+                              ? "0 12px 28px rgba(0,0,0,.45)"
+                              : `0 14px 30px ${alpha(kpi.border, 0.18)}`,
+                          },
+
+                          "&:before": {
+                            content: '""',
+                            position: "absolute",
+                            left: 0,
+                            top: 0,
+                            width: 5,
+                            height: "100%",
+                            background: kpi.border,
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              mr: 1.5,
+                              borderRadius: "50%",
+
+                              background: `linear-gradient(
+          135deg,
+          ${alpha(kpi.border, 0.15)},
+          ${alpha(kpi.border, 0.3)}
+      )`,
+
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+
+                              color: kpi.border,
+
+                              "& svg": {
+                                fontSize: 22,
+                              },
+                            }}
+                          >
+                            {kpi.icon}
+                          </Box>
+
+                          <Box flex={1}>
+                            <Typography
+                              sx={{
+                                fontSize: "18px",
+                                fontWeight: 700,
+                                color: kpi.color || "text.primary",
+                                lineHeight: 1,
+                              }}
+                            >
+                              {kpi.value}
+                            </Typography>
+
+                            <Typography
+                              sx={{
+                                mt: 0.8,
+                                fontSize: "10px",
+                                fontWeight: 600,
+                                color: isDark ? "#CBD5E1" : "#475569",
+                              }}
+                            >
+                              {kpi.label}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    ))}
+                  </Box>
+
+                  <Paper
+                    sx={{
+                      p: 0.5,
+                      bgcolor: "background.paper",
+                      borderRadius: 0,
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <Box
+                      className={agTheme}
+                      sx={{
+                        ...agGridContainerSx,
+                        flex: 1,
+                        minHeight: 0,
+                        width: "100%",
+                      }}
+                    >
+                      <AgGridReact
+                        rowData={reversedHistory}
+                        columnDefs={tableColDefs}
+                        defaultColDef={{
+                          resizable: true,
+                          sortable: true,
                         }}
                       />
                     </Box>
-                  </Box>
-                ))
-              ) : (
-                <Typography
-                  sx={{ fontSize: "10px", color: "text.secondary" }}
+                  </Paper>
+                </Box>
+              </Grid>
+            </Grid>
+          </>
+        )}
+
+        {activeTab === "experiment" && (
+          <>
+            <Grid container spacing={1} alignItems="stretch">
+              <Grid item xs={12} sm={4}>
+                <Paper
+                  sx={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    p: 1,
+                    borderRadius: 2,
+                    mb: 1,
+                  }}
                 >
-                  Awaiting anomaly data...
-                </Typography>
-              )}
-            </Card>
-
-            {/* Vehicle Health History Table */}
-            <Card
-              sx={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                p: 1.25,
-                minHeight: 0,
-              }}
-            >
-              <SectionTitle
-                title="Vehicle Health History"
-                action={
-                  <Tooltip title="Refresh history">
-                    <IconButton
-                      size="small"
-                      onClick={() => refetchHistory()}
-                      sx={{ p: 0.4 }}
-                    >
-                      <RestartAltOutlinedIcon sx={{ fontSize: 15 }} />
-                    </IconButton>
-                  </Tooltip>
-                }
-              />
-              <Box
-                className={agTheme}
-                sx={{ flex: 1, minHeight: 0, width: "100%", ...agGridContainerSx }}
-              >
-                <AgGridReact
-                  rowData={reversedHistory}
-                  columnDefs={tableColDefs}
-                  defaultColDef={{ resizable: true, sortable: true }}
-                  rowHeight={28}
-                  headerHeight={30}
-                />
-              </Box>
-            </Card>
-          </Box>
-        </Box>
-      )}
-
-      {/* ── EXPERIMENT TAB ──────────────────────────────────────────────────── */}
-      {activeTab === "experiment" && (
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            minHeight: 0,
-            gap: 1,
-          }}
-        >
-          {/* Mode switcher */}
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Typography
-              sx={{
-                fontSize: "10px",
-                fontWeight: 700,
-                color: "text.secondary",
-                whiteSpace: "nowrap",
-              }}
-            >
-              SIMULATION MODE:
-            </Typography>
-            <ToggleButtonGroup
-              value={profileMode}
-              exclusive
-              onChange={(_, val) => val && setProfileMode(val)}
-              size="small"
-              sx={tabSwitcherSx}
-            >
-              <ToggleButton value="single">Single Profile</ToggleButton>
-              <ToggleButton value="ab">
-                <CompareArrowsIcon sx={{ fontSize: 12, mr: 0.5 }} />
-                A/B Comparison
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
-
-          {/* Panels + Chart */}
-          <Box sx={{ display: "flex", gap: 1, flex: 1, minHeight: 0 }}>
-            {/* Profile A */}
-            <Card
-              sx={{
-                width: profileMode === "ab" ? 280 : 320,
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-                p: 0,
-                borderTop: `3px solid ${
-                  isDark ? alpha("#3b82f6", 0.9) : "#3b82f6"
-                }`,
-              }}
-            >
-              <WeightPanel
-                label={
-                  profileMode === "ab" ? "PROFILE A" : "DYNAMIC WEIGHT CONFIG"
-                }
-                profile="A"
-                weights={expWeights}
-                modules={activeModules}
-                weightSum={currentWeightSum}
-                isImbalanced={isUnbalanced}
-                allPresets={allPresets}
-                savedPresets={savedPresets}
-                onWeightChange={handleWeightChange}
-                onToggleModule={handleToggleModule}
-                onAutoBalance={autoBalanceWeights}
-                onApplyPreset={applyPreset}
-                onSavePreset={savePreset}
-                onDeletePreset={deletePreset}
-              />
-            </Card>
-
-            {/* Profile B */}
-            {profileMode === "ab" && (
-              <Card
-                sx={{
-                  width: 280,
-                  flexShrink: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  p: 0,
-                  borderTop: `3px solid ${
-                    isDark ? alpha("#8b5cf6", 0.9) : "#7b1fa2"
-                  }`,
-                }}
-              >
-                <WeightPanel
-                  label="PROFILE B"
-                  profile="B"
-                  weights={expWeightsB}
-                  modules={activeModulesB}
-                  weightSum={currentWeightSumB}
-                  isImbalanced={isUnbalancedB}
-                  allPresets={allPresets}
-                  savedPresets={savedPresets}
-                  onWeightChange={handleWeightChangeB}
-                  onToggleModule={handleToggleModuleB}
-                  onAutoBalance={autoBalanceWeightsB}
-                  onApplyPreset={applyPreset}
-                  onSavePreset={savePreset}
-                  onDeletePreset={deletePreset}
-                />
-              </Card>
-            )}
-
-            {/* Chart */}
-            <Card
-              sx={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                p: 1.25,
-                minHeight: 0,
-              }}
-            >
-              <SectionTitle
-                title={
-                  (filterSim === "ALL"
-                    ? "Fleet-Wide Averaged Health Trajectory"
-                    : `Recalculated Health Trajectory: ${filterSim}`) +
-                  (profileMode === "ab" ? " — A/B Comparison" : "")
-                }
-              />
-              <Box sx={{ flex: 1, minHeight: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={mergedChartData}
-                    margin={{ top: 10, right: 30, left: -20, bottom: 0 }}
+                  {/* Header */}
+                  <Box
+                    sx={{
+                      p: 0,
+                      // bgcolor: "#005071",
+                      // borderBottom: `1px solid ${theme.palette.divider}`,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
                   >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke={
-                        isDark
-                          ? alpha("#7dd3fc", 0.08)
-                          : alpha("#1f2937", 0.06)
-                      }
-                    />
-                    <XAxis
-                      dataKey="ts_short"
-                      tick={chartAxisStyle}
-                      axisLine={{
-                        stroke: isDark
-                          ? alpha("#7dd3fc", 0.15)
-                          : alpha("#1f2937", 0.12),
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        lineHeight: 2,
+                        fontWeight: 700,
+                        color: isDark ? "text.primary" : "#005071",
+                        // mb: 1,
                       }}
-                      tickLine={false}
-                      minTickGap={30}
-                    />
-                    <YAxis
-                      domain={[0, 100]}
-                      tick={chartAxisStyle}
-                      axisLine={{
-                        stroke: isDark
-                          ? alpha("#7dd3fc", 0.15)
-                          : alpha("#1f2937", 0.12),
+                    >
+                      FILTER CONTEXT:
+                    </Typography>
+
+                    <FormControl
+                      size="small"
+                      sx={{
+                        minWidth: 220,
+
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 0,
+                          height: 30,
+                          fontSize: "10px",
+                        },
                       }}
-                      tickLine={false}
-                    />
-                    <RechartsTooltip
-                      cursor={{
-                        stroke: isDark
-                          ? alpha("#7dd3fc", 0.3)
-                          : alpha("#3b82f6", 0.2),
-                        strokeWidth: 1,
-                      }}
-                      contentStyle={tooltipStyle}
-                    />
-                    <Legend
-                      wrapperStyle={{ fontSize: "10px" }}
-                      formatter={(value) => (
-                        <span
-                          style={{
-                            fontSize: "8px",
-                            fontWeight: 600,
-                            color: isDark ? "#94a3b8" : "#64748b",
-                            fontFamily: CHART_FONT,
+                    >
+                      <InputLabel sx={{ fontSize: "10px" }}>
+                        Active Vehicle (Sim)
+                      </InputLabel>
+
+                      <Select
+                        value={filterSim}
+                        onChange={(e) => setFilterSim(e.target.value)}
+                        label="Active Vehicle (Sim)"
+                        sx={{
+                          fontSize: "10px",
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              "& .MuiMenuItem-root": {
+                                fontSize: "10px",
+                              },
+                            },
+                          },
+                        }}
+                      >
+                        <MenuItem
+                          value="ALL"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: "10px",
                           }}
                         >
-                          {value}
-                        </span>
-                      )}
-                    />
+                          ALL VEHICLES (FLEET)
+                        </MenuItem>
 
-                    {profileMode === "single" &&
-                      activeModules.map((mod) => (
+                        {availableSims.map((sim: string) => (
+                          <MenuItem
+                            key={sim}
+                            value={sim}
+                            sx={{ fontSize: "10px" }}
+                          >
+                            {sim}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={8}>
+                <Paper
+                  sx={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    p: 1,
+                    borderRadius: 2,
+                    mb: 1,
+                  }}
+                >
+                  {/* Header */}
+                  <Box
+                    sx={{
+                      p: 0,
+                      // bgcolor: "#005071",
+                      // borderBottom: `1px solid ${theme.palette.divider}`,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        lineHeight: 2,
+                        fontWeight: 700,
+                        color: isDark ? "text.primary" : "#005071",
+                        // mb: 1,
+                      }}
+                    >
+                      SIMULATION MODE:
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={profileMode}
+                      exclusive
+                      onChange={(_, val) => val && setProfileMode(val)}
+                      size="small"
+                      // sx={{ bgcolor: "background.paper" }}
+                      sx={{
+                        height: 25,
+                        bgcolor: "transparent",
+
+                        "& .MuiToggleButtonGroup-grouped": {
+                          border: "1px solid #D0D7DE !important",
+                          borderRadius: "8px !important",
+                          marginRight: "8px !important",
+                          padding: "0 16px",
+                          minHeight: 25,
+                          textTransform: "none",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          color: isDark ? "#ffffff" : "#64748B",
+                          transition: "all .2s ease",
+
+                          "&:last-of-type": {
+                            marginRight: 0,
+                          },
+
+                          "&:hover": {
+                            backgroundColor: isDark ? "#F2F8FA" : "#005071cc",
+                            borderColor: isDark ? "#005071" : "#ffffff",
+                            color: isDark ? "#005071" : "#ffffff",
+                          },
+
+                          "&.Mui-selected": {
+                            backgroundColor: isDark ? "#E6F4F9" : "#005071",
+                            color: isDark ? "#005071" : "#ffffff",
+                            border: "1px solid #005071 !important",
+                            boxShadow: "0 2px 8px rgba(0,80,113,0.18)",
+                          },
+
+                          "&.Mui-selected:hover": {
+                            backgroundColor: isDark ? "#E6F4F9" : "#005071",
+                          },
+                        },
+                      }}
+                    >
+                      <ToggleButton
+                        value="single"
+                        sx={{
+                          fontWeight: "bold",
+                          px: 2,
+                          borderRadius: 0,
+                          fontSize: "12px",
+                        }}
+                      >
+                        SINGLE PROFILE
+                      </ToggleButton>
+                      <ToggleButton
+                        value="ab"
+                        sx={{
+                          fontWeight: "bold",
+                          px: 2,
+                          borderRadius: 0,
+                          fontSize: "12px",
+                        }}
+                      >
+                        <CompareArrowsIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                        A/B COMPARISON
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+                gap: 2,
+              }}
+            >
+              <Box sx={{ display: "flex", gap: 2, flex: 1, minHeight: 0 }}>
+                <Paper
+                  sx={{
+                    width: profileMode === "ab" ? "280px" : "320px",
+                    p: 0,
+                    borderRadius: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    borderTop: "3px solid #1976d2",
+                  }}
+                >
+                  <WeightPanel
+                    label={
+                      profileMode === "ab"
+                        ? "PROFILE A"
+                        : "DYNAMIC WEIGHT CONFIG"
+                    }
+                    profile="A"
+                    weights={expWeights}
+                    modules={activeModules}
+                    weightSum={currentWeightSum}
+                    isImbalanced={isUnbalanced}
+                    allPresets={allPresets}
+                    savedPresets={savedPresets}
+                    onWeightChange={handleWeightChange}
+                    onToggleModule={handleToggleModule}
+                    onAutoBalance={autoBalanceWeights}
+                    onApplyPreset={applyPreset}
+                    onSavePreset={savePreset}
+                    onDeletePreset={deletePreset}
+                  />
+                </Paper>
+
+                {profileMode === "ab" && (
+                  <Paper
+                    sx={{
+                      width: "280px",
+                      p: 0,
+                      borderRadius: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      borderTop: "3px solid #7b1fa2",
+                    }}
+                  >
+                    <WeightPanel
+                      label="PROFILE B"
+                      profile="B"
+                      weights={expWeightsB}
+                      modules={activeModulesB}
+                      weightSum={currentWeightSumB}
+                      isImbalanced={isUnbalancedB}
+                      allPresets={allPresets}
+                      savedPresets={savedPresets}
+                      onWeightChange={handleWeightChangeB}
+                      onToggleModule={handleToggleModuleB}
+                      onAutoBalance={autoBalanceWeightsB}
+                      onApplyPreset={applyPreset}
+                      onSavePreset={savePreset}
+                      onDeletePreset={deletePreset}
+                    />
+                  </Paper>
+                )}
+
+                <Paper
+                  sx={{
+                    flex: 1,
+                    p: 1,
+                    borderRadius: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: "12px",
+                      lineHeight: 2,
+                      fontWeight: 700,
+                      color: isDark ? "text.primary" : "#005071",
+                      // mb: 1,
+                    }}
+                  >
+                    {filterSim === "ALL"
+                      ? "FLEET-WIDE AVERAGED HEALTH TRAJECTORY:"
+                      : `RECALCULATED HEALTH TRAJECTORY: ${filterSim}:`}
+                    {profileMode === "ab" && " — A/B COMPARISON:"}
+                  </Typography>
+
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={mergedChartData}
+                      margin={{ top: 10, right: 30, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke={gridStroke}
+                      />
+                      <XAxis
+                        dataKey="ts_short"
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: axisStroke }}
+                        tickLine={false}
+                        minTickGap={30}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: axisStroke }}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        cursor={{ stroke: isDark ? alpha("#7dd3fc", 0.3) : alpha("#3b82f6", 0.2), strokeWidth: 1 }}
+                        contentStyle={tooltipStyle}
+                      />
+                      <Legend
+                        wrapperStyle={{
+                          fontSize: "10px",
+                        }}
+                        formatter={(value) => (
+                          <span
+                            style={{
+                              fontSize: "8px",
+                              fontWeight: 600,
+                              color: isDark ? "#94a3b8" : "#64748b",
+                            }}
+                          >
+                            {value}
+                          </span>
+                        )}
+                      />
+
+                      {profileMode === "single" &&
+                        activeModules.map((mod) => (
+                          <Line
+                            key={`${mod}_raw`}
+                            type="monotone"
+                            dataKey={`${mod}_raw`}
+                            name={`${mod.toUpperCase()} MODULE HEALTH`}
+                            stroke={MODULE_COLORS[mod]}
+                            strokeWidth={1}
+                            strokeDasharray="5 5"
+                            dot={false}
+                          />
+                        ))}
+
+                      {profileMode === "ab" && (
                         <Line
-                          key={`${mod}_raw`}
                           type="monotone"
-                          dataKey={`${mod}_raw`}
-                          name={`${mod.toUpperCase()} MODULE HEALTH`}
-                          stroke={MODULE_COLORS[mod]}
-                          strokeWidth={1}
-                          strokeDasharray="5 5"
+                          dataKey="actual_gold"
+                          name="ACTUAL GOLD"
+                          stroke={isDark ? "#94a3b8" : "#64748b"}
+                          strokeWidth={1.5}
+                          strokeDasharray="4 4"
                           dot={false}
                         />
-                      ))}
+                      )}
 
-                    {profileMode === "ab" && (
                       <Line
                         type="monotone"
-                        dataKey="actual_gold"
-                        name="ACTUAL GOLD"
-                        stroke={isDark ? "#94a3b8" : "#475569"}
-                        strokeWidth={1.5}
-                        strokeDasharray="4 4"
-                        dot={false}
-                      />
-                    )}
-
-                    <Line
-                      type="monotone"
-                      dataKey="experimental_health"
-                      name={
-                        profileMode === "ab" ? "PROFILE A" : "FUSED VEHICLE HEALTH"
-                      }
-                      stroke="#3b82f6"
-                      strokeWidth={4}
-                      dot={false}
-                      activeDot={{ r: 8 }}
-                    />
-
-                    {profileMode === "ab" && (
-                      <Line
-                        type="monotone"
-                        dataKey="profile_b_health"
-                        name="PROFILE B"
-                        stroke="#8b5cf6"
+                        dataKey="experimental_health"
+                        name={
+                          profileMode === "ab"
+                            ? "PROFILE A"
+                            : "FUSED VEHICLE HEALTH"
+                        }
+                        stroke="#1976d2"
                         strokeWidth={4}
                         dot={false}
                         activeDot={{ r: 8 }}
                       />
-                    )}
-                  </LineChart>
-                </ResponsiveContainer>
+
+                      {profileMode === "ab" && (
+                        <Line
+                          type="monotone"
+                          dataKey="profile_b_health"
+                          name="PROFILE B"
+                          stroke="#7b1fa2"
+                          strokeWidth={4}
+                          dot={false}
+                          activeDot={{ r: 8 }}
+                        />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Paper>
               </Box>
-            </Card>
-          </Box>
-        </Box>
-      )}
-    </Box>
+            </Box>
+          </>
+        )}
+      </Box>
+    </>
   );
 }

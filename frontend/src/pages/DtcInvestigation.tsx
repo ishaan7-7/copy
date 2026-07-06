@@ -24,7 +24,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Plot from "react-plotly.js";
 import { useStore } from "../store";
-import type { AlertCandidate } from "../store";
 import { useChartTheme } from "../hooks/useChartTheme";
 import {
   MODULE_COLORS,
@@ -161,7 +160,7 @@ interface BatchResult {
 }
 
 export default function DtcInvestigation() {
-  const { autoRefresh, darkMode, setDtcResult, setAlertCandidates } = useStore();
+  const { autoRefresh, darkMode } = useStore();
   const theme = useTheme();
   const ct = useChartTheme();
   const [searchParams] = useSearchParams();
@@ -317,7 +316,6 @@ export default function DtcInvestigation() {
 
   useEffect(() => {
     if (dtcAnalysisQuery.isSuccess && (dtcAnalysisQuery.data as any)?.success) {
-      setDtcResult(selectedVehicle, selectedModule, peakTs, (dtcAnalysisQuery.data as any)?.triggers ?? []);
       queryClient.invalidateQueries({
         queryKey: ["dtcVehicleHistory", selectedVehicle, selectedModule],
       });
@@ -497,13 +495,11 @@ export default function DtcInvestigation() {
           !analyzedKeys.has(`${a.source_id}|${a.module}|${a.peak_anomaly_ts}`)
       )
       .sort(
-        (a, b) => b.peak_anomaly_ts.localeCompare(a.peak_anomaly_ts)
+        (a, b) => (b.max_composite_score || 0) - (a.max_composite_score || 0)
       );
 
     const queued = toAnalyze.slice(0, BATCH_CAP);
     const leftAfterCap = toAnalyze.length - queued.length;
-
-    setAlertCandidates(active as AlertCandidate[], active.length);
 
     if (queued.length === 0) {
       setBatchResult({ analyzed: 0, failed: 0, leftAfterCap: 0 });
@@ -528,7 +524,7 @@ export default function DtcInvestigation() {
         leftAfterCap,
       });
       try {
-        const res = await axios.get(`${API}/api/dtc/analyze`, {
+        await axios.get(`${API}/api/dtc/analyze`, {
           params: {
             source_id: alert.source_id,
             module: alert.module,
@@ -537,9 +533,6 @@ export default function DtcInvestigation() {
           timeout: 70000,
           signal: controller.signal,
         });
-        if (res.data?.success) {
-          setDtcResult(alert.source_id, alert.module, alert.peak_anomaly_ts, res.data.triggers ?? []);
-        }
         analyzed++;
       } catch (_err: unknown) {
         if (!controller.signal.aborted) failed++;
