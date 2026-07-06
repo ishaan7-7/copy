@@ -87,7 +87,9 @@ import ExploreIcon from "@mui/icons-material/Explore";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import Draggable from "react-draggable";
-import { useStore } from "../store";
+import { useStore, type AlertCandidate } from "../store";
+import { pickFour } from "../utils/alertPicker";
+import type { DisplayAlert } from "../utils/alertPicker";
 import { useGoldStream } from "../contexts/GoldStreamContext";
 const FLEET_API = "http://127.0.0.1:8009/api/fleet";
 const PIPELINE_API = "http://127.0.0.1:8005";
@@ -1679,143 +1681,52 @@ function TimelineChart({ history }: { history: HealthHistoryRow[] }) {
   return <ReactECharts option={option} style={{ height: 190 }} />;
 }
 
-interface DisplayAlert {
-  source_id: string;
-  module: string;
-  peak_anomaly_ts: string;
-  severity: string;
-  dtcMessage: string | null;
-  relativeTime: string;
-}
-
-type OpenAlert = { source_id: string; module: string; peak_anomaly_ts: string; last_updated_ts?: string; max_composite_score?: number; severity?: string };
-
-function alertRelativeTime(ts: string): string {
-  if (!ts) return "—";
-  const diffMs = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
 function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void }) {
   const navigate = useNavigate();
-  const [displayed, setDisplayed] = useState<DisplayAlert[]>([]);
+  const { alertPool, alertTotal, setAlertCandidates, setDtcResult } = useStore();
   const [loading, setLoading] = useState(false);
-  const [phase, setPhase] = useState("");
-  const [total, setTotal] = useState<number>(0);
+
+  const displayed = useMemo<DisplayAlert[]>(() => pickFour(alertPool), [alertPool]);
+
+  useEffect(() => { onTotalChange(alertTotal); }, [alertTotal, onTotalChange]);
 
   const handleRefresh = async () => {
     if (loading) return;
     setLoading(true);
-    setPhase("Fetching alerts…");
     try {
       const { data } = await axios.get(`${PIPELINE_API}/api/alerts/metrics`);
       const total: number = data.active_alerts_count ?? 0;
-      onTotalChange(total);
-      setTotal(total);
+      const open: AlertCandidate[] = data.open_alerts ?? [];
 
-      const open: OpenAlert[] = data.open_alerts ?? [];
-      if (!open.length) { setDisplayed([]); return; }
+      setAlertCandidates(open, total);
+      if (!open.length) return;
 
-      const moduleLatestPeak = new Map<string, string>();
+      const pairLatest = new Map<string, AlertCandidate>();
       for (const a of open) {
-        const mod = a.module.toLowerCase();
-        const prev = moduleLatestPeak.get(mod);
-        if (!prev || a.peak_anomaly_ts > prev) moduleLatestPeak.set(mod, a.peak_anomaly_ts);
+        const key = `${a.source_id}|${a.module}`;
+        const existing = pairLatest.get(key);
+        if (!existing || a.peak_anomaly_ts > existing.peak_anomaly_ts) pairLatest.set(key, a);
       }
+      const candidates = Array.from(pairLatest.values()).sort(
+        (a, b) => b.peak_anomaly_ts.localeCompare(a.peak_anomaly_ts)
+      );
 
-      const sorted = [...open].sort((a, b) => (b.max_composite_score ?? 0) - (a.max_composite_score ?? 0));
-      const vehicleBest = new Map<string, OpenAlert>();
-      for (const a of sorted) {
-        if (!vehicleBest.has(a.source_id)) vehicleBest.set(a.source_id, a);
-      }
-      const candidates = Array.from(vehicleBest.values());
-
-      type PoolItem = { source_id: string; module: string; msg: string; alert: OpenAlert };
-
-      const pickFour = (p: PoolItem[]): DisplayAlert[] => {
-        const out: DisplayAlert[] = [];
-        const usedSimMod = new Set<string>();
-        const usedSims = new Set<string>();
-        const usedMods = new Set<string>();
-        const usedMsgs = new Set<string>();
-        const add = (item: PoolItem) => {
-          out.push({
-            source_id: item.alert.source_id, module: item.alert.module,
-            peak_anomaly_ts: item.alert.peak_anomaly_ts,
-            severity: (item.alert.severity ?? "warning").toLowerCase(),
-            dtcMessage: item.msg,
-            relativeTime: alertRelativeTime(item.alert.last_updated_ts ?? item.alert.peak_anomaly_ts),
-          });
-          usedSimMod.add(`${item.source_id}|${item.module}`);
-          usedSims.add(item.source_id); usedMods.add(item.module); usedMsgs.add(item.msg);
-        };
-        for (const item of p) {
-          if (out.length >= 4) break;
-          if (!usedSims.has(item.source_id) && !usedMods.has(item.module) && !usedMsgs.has(item.msg)) add(item);
-        }
-        if (out.length < 4) {
-          for (const item of p) {
-            if (out.length >= 4) break;
-            if (!usedSims.has(item.source_id) && !usedMods.has(item.module) && !usedSimMod.has(`${item.source_id}|${item.module}`)) add(item);
-          }
-        }
-        if (out.length < 4) {
-          for (const item of p) {
-            if (out.length >= 4) break;
-            if (!usedSims.has(item.source_id) && !usedSimMod.has(`${item.source_id}|${item.module}`)) add(item);
-          }
-        }
-        if (out.length < 4) {
-          const full = new Set(out.map((r) => `${r.source_id}|${r.module}|${r.dtcMessage}`));
-          for (const item of p) {
-            if (out.length >= 4) break;
-            const key = `${item.source_id}|${item.module}|${item.msg}`;
-            if (!full.has(key)) { out.push({ source_id: item.alert.source_id, module: item.alert.module, peak_anomaly_ts: item.alert.peak_anomaly_ts, severity: (item.alert.severity ?? "warning").toLowerCase(), dtcMessage: item.msg, relativeTime: alertRelativeTime(item.alert.last_updated_ts ?? item.alert.peak_anomaly_ts) }); full.add(key); }
-          }
-        }
-        return out;
-      };
-
-      const DTC_PER_CALL_TIMEOUT_MS = 15_000;
-
-      const pool: PoolItem[] = [];
-      for (let i = 0; i < candidates.length; i++) {
-        const a = candidates[i];
-        setPhase(`DTC ${i + 1}/${candidates.length}…`);
+      for (const a of candidates) {
         try {
           const r = await axios.get(`${PIPELINE_API}/api/dtc/analyze`, {
-            params: {
-              source_id: a.source_id,
-              module: a.module,
-              peak_ts: moduleLatestPeak.get(a.module.toLowerCase()) ?? a.peak_anomaly_ts,
-            },
-            timeout: DTC_PER_CALL_TIMEOUT_MS,
+            params: { source_id: a.source_id, module: a.module, peak_ts: a.peak_anomaly_ts },
+            timeout: 15_000,
           });
-          const data = r.data as { success?: boolean; error?: string; triggers?: { message?: string }[] };
-          if (!data?.success || data.error) continue;
-          const triggers = data.triggers ?? [];
-          const usable = triggers.filter((t) => t.message);
-          if (!usable.length) continue;
-          for (const t of usable) {
-            pool.push({ source_id: a.source_id, module: a.module.toLowerCase(), msg: t.message!, alert: a });
-          }
+          const res = r.data as { success?: boolean; triggers?: { message?: string; code?: string; severity?: string }[] };
+          if (res?.success) setDtcResult(a.source_id, a.module, a.peak_anomaly_ts, res.triggers ?? []);
         } catch {
           continue;
         }
-        if (pickFour(pool).length >= 4) break;
       }
-
-      setDisplayed(pickFour(pool));
     } catch {
       // Retain previous displayed on error
     } finally {
       setLoading(false);
-      setPhase("");
     }
   };
 
@@ -1843,9 +1754,8 @@ function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void })
       />
 
       {loading ? (
-        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.5 }}>
-          <CircularProgress size={12} />
-          <Typography sx={{ fontSize: "9px", color: "text.secondary" }}>{phase}</Typography>
+        <Stack alignItems="center" justifyContent="center" flex={1}>
+          <CircularProgress size={18} />
         </Stack>
       ) : displayed.length === 0 ? (
         <Stack alignItems="center" justifyContent="center" flex={1}>
@@ -1853,13 +1763,13 @@ function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void })
         </Stack>
       ) : (
         <Stack spacing={0.2} sx={{ mt: 0.3, overflow: "hidden" }}>
-          {displayed.map((a) => {
+          {displayed.map((a, i) => {
             const sevColor =
               a.severity === "critical" ? "#ef4444" :
               a.severity === "active"   ? "#22c55e" : "#f59e0b";
             return (
               <Stack
-                key={`${a.source_id}-${a.module}`}
+                key={`alert-${i}`}
                 direction="row"
                 alignItems="center"
                 spacing={0.75}
@@ -1885,8 +1795,8 @@ function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void })
                       </Typography>
                     </Box>
                   </Stack>
-                  <Typography sx={{ fontSize: "9px", color: "text.secondary", lineHeight: "11px" }} noWrap title={a.dtcMessage ?? ""}>
-                    {a.dtcMessage ?? "—"}
+                  <Typography sx={{ fontSize: "9px", color: "text.secondary", lineHeight: "11px" }} noWrap title={a.dtcMessage}>
+                    {a.dtcMessage}
                   </Typography>
                 </Box>
                 <Typography sx={{ fontSize: "9px", color: "text.secondary", whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -1897,13 +1807,13 @@ function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void })
           })}
         </Stack>
       )}
-      {!loading && total > displayed.length && displayed.length > 0 && (
+      {!loading && alertTotal > displayed.length && displayed.length > 0 && (
         <Box
           onClick={() => navigate("/alerts")}
           sx={{ mt: 0.4, textAlign: "center", cursor: "pointer", flexShrink: 0 }}
         >
           <Typography sx={{ fontSize: "8px", color: "text.secondary", fontWeight: 600, "&:hover": { color: "text.primary" } }}>
-            +{total - displayed.length} more unread alerts
+            +{alertTotal - displayed.length} more unread alerts
           </Typography>
         </Box>
       )}

@@ -13,8 +13,9 @@ import {
   ToggleButtonGroup,
   Chip,
   Grid,
+  Stack,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, alpha } from "@mui/material/styles";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { ClientSideRowModelModule, ModuleRegistry } from "ag-grid-community";
@@ -58,6 +59,8 @@ import {
 } from "../constants/chartColors";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
+
+const CHART_FONT = '"Inter", "Segoe UI", Roboto, Arial, sans-serif';
 
 const API = "http://127.0.0.1:8005";
 const ALL_MODULES = ["engine", "transmission", "battery", "body", "tyre"];
@@ -393,6 +396,140 @@ const MODULE_KPI_FIELDS: Record<
   ],
 };
 
+function Card({
+  children,
+  sx = {},
+}: {
+  children: React.ReactNode;
+  sx?: object;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <Box
+      sx={{
+        borderRadius: 2,
+        bgcolor: isDark ? alpha("#0b1724", 0.9) : "#ffffff",
+        border: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.1)}`,
+        boxShadow: isDark
+          ? `0 18px 42px ${alpha("#000", 0.22)}`
+          : `0 12px 30px ${alpha("#334155", 0.08)}`,
+        overflow: "hidden",
+        ...sx,
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function SectionTitle({
+  children,
+  sx = {},
+}: {
+  children: React.ReactNode;
+  sx?: object;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <Typography
+      sx={{
+        fontSize: "11px",
+        fontWeight: 700,
+        color: isDark ? "#94a3b8" : "#64748b",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        mb: 1,
+        ...sx,
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
+function MetricTile({
+  label,
+  value,
+  accent,
+  sub,
+}: {
+  label: string;
+  value: string | number;
+  accent: string;
+  sub?: string;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <Box
+      sx={{
+        p: 1.5,
+        height: "100%",
+        flex: 1,
+        borderRadius: 1.5,
+        bgcolor: isDark ? alpha("#0b1724", 0.9) : "#ffffff",
+        border: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.1)}`,
+        boxShadow: isDark
+          ? `0 18px 42px ${alpha("#000", 0.22)}`
+          : `0 12px 30px ${alpha("#334155", 0.08)}`,
+        position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "3px",
+          bgcolor: accent,
+          borderRadius: "4px 4px 0 0",
+        },
+        transition: "transform 0.18s ease, box-shadow 0.18s ease",
+        "&:hover": { transform: "translateY(-2px)" },
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: "10px",
+          fontWeight: 700,
+          color: accent,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: "16px",
+          fontWeight: 800,
+          color: isDark ? "#e2e8f0" : "#0f172a",
+          lineHeight: 1.1,
+          mt: 0.5,
+        }}
+      >
+        {value}
+      </Typography>
+      {sub && (
+        <Typography
+          sx={{
+            fontSize: "10px",
+            color: isDark ? "#64748b" : "#94a3b8",
+            mt: 0.25,
+          }}
+        >
+          {sub}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 function buildPlotLayout(darkMode: boolean) {
   const textColor = darkMode ? "#e8ecf0" : "#212121";
   const gridColor = darkMode ? "#2a3a4a" : "#e0e0e0";
@@ -464,33 +601,37 @@ function SensorChart({
   xAxisMode: XAxisMode;
   height?: number | string;
 }) {
-  const ct = useChartTheme();
-  const axisStyle = { fontSize: "10px", fill: ct.axisColor, fontWeight: 600 };
-  const tooltipStyle = {
-    borderRadius: 0,
-    fontSize: "11px",
-    padding: "6px 10px",
-    backgroundColor: ct.tooltipBg,
-    border: `1px solid ${ct.tooltipBorder}`,
-    color: ct.tooltipText,
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const scAxisStyle = {
+    fontSize: "10px",
+    fill: isDark ? "#94a3b8" : "#64748b",
+    fontFamily: CHART_FONT,
   };
+  const scTooltipStyle = {
+    borderRadius: 8,
+    fontSize: "11px",
+    padding: "10px 14px",
+    backgroundColor: isDark ? alpha("#0b1724", 0.97) : "#ffffff",
+    border: `1px solid ${isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.15)}`,
+    color: isDark ? "#e2e8f0" : "#0f172a",
+    boxShadow: isDark
+      ? `0 8px 24px ${alpha("#000", 0.4)}`
+      : `0 4px 16px ${alpha("#334155", 0.12)}`,
+  };
+  const gridStroke = isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.06);
+  const axisStroke = isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1);
   const xKey = xAxisMode === "timestamp" ? "timestamp" : "mileage";
   return (
-    <Paper
-      sx={{
-        p: 1.5,
-        borderRadius: 0,
-        height,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <Card sx={{ p: 1.5, height, display: "flex", flexDirection: "column" }}>
       <Typography
         variant="caption"
         sx={{
-          fontWeight: "bold",
-          color: "text.secondary",
-          letterSpacing: "0.5px",
+          fontWeight: 700,
+          color: isDark ? "#94a3b8" : "#64748b",
+          letterSpacing: "0.06em",
+          fontSize: "10px",
+          textTransform: "uppercase",
           mb: 0.5,
         }}
       >
@@ -505,23 +646,24 @@ function SensorChart({
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke={ct.gridColor}
+              stroke={gridStroke}
             />
             <XAxis
               dataKey={xKey}
-              tick={axisStyle}
-              axisLine={{ stroke: ct.tableBorder }}
+              tick={scAxisStyle}
+              axisLine={{ stroke: axisStroke }}
               tickLine={false}
               minTickGap={40}
               tickFormatter={(v) => formatXTick(v, xAxisMode)}
             />
             <YAxis
-              tick={axisStyle}
-              axisLine={{ stroke: ct.tableBorder }}
+              tick={scAxisStyle}
+              axisLine={{ stroke: axisStroke }}
               tickLine={false}
             />
             <Tooltip
-              contentStyle={tooltipStyle}
+              cursor={{ stroke: isDark ? alpha("#7dd3fc", 0.3) : alpha("#3b82f6", 0.2), strokeWidth: 1 }}
+              contentStyle={scTooltipStyle}
               formatter={(v: number) => v.toFixed(2)}
             />
             {group.sensors.length > 1 && (
@@ -530,7 +672,7 @@ function SensorChart({
                   fontSize: "10px",
                   fontWeight: "bold",
                   paddingTop: 2,
-                  color: ct.tooltipText,
+                  color: isDark ? "#e2e8f0" : "#0f172a",
                 }}
               />
             )}
@@ -548,22 +690,26 @@ function SensorChart({
             ))}
             <Brush
               dataKey={xKey}
-              height={18}
-              stroke={ct.tableBorder}
-              travellerWidth={6}
+              height={22}
+              stroke={isDark ? alpha("#7dd3fc", 0.5) : alpha("#3b82f6", 0.5)}
+              fill={isDark ? alpha("#0d2137", 0.85) : alpha("#e2eaf4", 0.9)}
+              travellerWidth={10}
+              tickFormatter={(v) => formatXTick(v, xAxisMode)}
+              style={{ fontSize: "9px", fill: isDark ? "#94a3b8" : "#64748b" }}
             />
           </LineChart>
         </ResponsiveContainer>
       </Box>
-    </Paper>
+    </Card>
   );
 }
 
 export default function AutomotiveDive({ isActive = true }: { isActive?: boolean }) {
-  const { autoRefresh, darkMode } = useStore();
+  const { autoRefresh, setDtcResult: writeDtcCache } = useStore();
   const queryClient = useQueryClient();
   const wasActiveRef = useRef(false);
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const ct = useChartTheme();
   const [searchParams] = useSearchParams();
 
@@ -587,37 +733,80 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
   const [vehicleTimelineSensorKey, setVehicleTimelineSensorKey] =
     useState<string>("");
 
-  const axisStyle = { fontSize: "10px", fill: ct.axisColor, fontWeight: 600 };
-  const agTheme = darkMode ? "ag-theme-balham-dark" : "ag-theme-balham";
+  const axisStyle = { fontSize: "10px", fill: isDark ? "#94a3b8" : "#64748b", fontFamily: CHART_FONT };
+  const agTheme = isDark ? "ag-theme-balham-dark" : "ag-theme-balham";
   const tooltipStyle = {
-    borderRadius: 0,
+    borderRadius: 8,
     fontSize: "11px",
-    padding: "6px 10px",
-    backgroundColor: ct.tooltipBg,
-    border: `1px solid ${ct.tooltipBorder}`,
-    color: ct.tooltipText,
+    padding: "10px 14px",
+    backgroundColor: isDark ? alpha("#0b1724", 0.97) : "#ffffff",
+    border: `1px solid ${isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.15)}`,
+    color: isDark ? "#e2e8f0" : "#0f172a",
+    boxShadow: isDark
+      ? `0 8px 24px ${alpha("#000", 0.4)}`
+      : `0 4px 16px ${alpha("#334155", 0.12)}`,
   };
-  const SHAP_COLORS = darkMode ? SHAP_COLORS_DARK : SHAP_COLORS_LIGHT;
-  const plotLayout = buildPlotLayout(darkMode);
+  const SHAP_COLORS = isDark ? SHAP_COLORS_DARK : SHAP_COLORS_LIGHT;
+  const plotLayout = buildPlotLayout(isDark);
 
+  const agGridContainerSx: object = {
+    "--ag-background-color": "transparent",
+    "--ag-odd-row-background-color": isDark ? alpha("#7dd3fc", 0.04) : "#f8fafc",
+    "--ag-row-hover-color": isDark ? alpha("#7dd3fc", 0.09) : alpha("#3b82f6", 0.05),
+    "--ag-selected-row-background-color": isDark ? alpha("#3b82f6", 0.22) : alpha("#3b82f6", 0.1),
+    "--ag-foreground-color": isDark ? "#e2e8f0" : "#0f172a",
+    "--ag-data-color": isDark ? "#e2e8f0" : "#1f2937",
+    "--ag-secondary-foreground-color": isDark ? "#94a3b8" : "#64748b",
+    "--ag-border-color": isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1),
+    "--ag-row-border-color": isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.07),
+    "--ag-input-focus-border-color": isDark ? alpha("#7dd3fc", 0.5) : alpha("#3b82f6", 0.5),
+    "& .ag-header": { backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important` },
+    "& .ag-header-cell": {
+      backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important`,
+      color: "#fff !important",
+      fontSize: "11px !important",
+      fontWeight: "700 !important",
+      letterSpacing: "0.04em !important",
+    },
+    "& .ag-header-cell-label": { color: "#fff !important" },
+    "& .ag-icon": { color: "#fff !important" },
+    "& .ag-header-icon": { color: "#fff !important" },
+    "& .ag-sort-ascending-icon": { color: "#fff !important" },
+    "& .ag-sort-descending-icon": { color: "#fff !important" },
+    "& .ag-sort-none-icon": { color: "#fff !important" },
+    "& .ag-cell": { fontSize: "10px !important" },
+    "& .ag-row": {
+      fontSize: "10px !important",
+      borderColor: `${isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.08)} !important`,
+    },
+    "& .ag-root-wrapper": { borderRadius: "6px", border: "none !important" },
+    "& .ag-root-wrapper-body": { borderRadius: "6px" },
+  };
+
+  const _tblBorder = isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1);
+  const _tblHdrBg = isDark ? "#0d2137" : "#1e3a5f";
+  const _tblEvenBg = isDark ? "transparent" : "#ffffff";
+  const _tblOddBg = isDark ? alpha("#7dd3fc", 0.04) : "#f8fafc";
+  const _tblText = isDark ? "#e2e8f0" : "#1f2937";
+  const _tblMuted = isDark ? "#94a3b8" : "#64748b";
   const tblHeaders: React.CSSProperties = {
-    textAlign: "left",
+    textAlign: "left" as const,
     padding: "4px 12px",
-    color: ct.tableHeaderText,
+    color: "#ffffff",
     fontWeight: 700,
     whiteSpace: "nowrap",
     position: "sticky",
     top: 0,
-    background: ct.tableHeaderBg,
-    boxShadow: `0 1px 0 ${ct.tableBorder}`,
+    background: _tblHdrBg,
+    boxShadow: `0 1px 0 ${_tblBorder}`,
   };
   const tblRowEvens: React.CSSProperties = {
-    borderBottom: `1px solid ${ct.tableBorder}`,
-    background: ct.tableRowEven,
+    borderBottom: `1px solid ${_tblBorder}`,
+    background: _tblEvenBg,
   };
   const tblRowOdds: React.CSSProperties = {
-    borderBottom: `1px solid ${ct.tableBorder}`,
-    background: ct.tableRowOdd,
+    borderBottom: `1px solid ${_tblBorder}`,
+    background: _tblOddBg,
   };
 
   const fleetQuery = useQuery({
@@ -882,10 +1071,10 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
           fontWeight: "bold",
           color:
             params.value < 60
-              ? "#d32f2f"
+              ? "#ef4444"
               : params.value < 80
-              ? "#f57c00"
-              : "#388e3c",
+              ? "#eab308"
+              : "#22c55e",
         }),
       },
       ...ALL_MODULES.map((mod) => ({
@@ -905,7 +1094,7 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
             size="small"
             label={params.value}
             color={params.value === "live" ? "success" : "default"}
-            sx={{ borderRadius: 0, height: 18, fontSize: "10px" }}
+            sx={{ borderRadius: "4px", height: 18, fontSize: "10px" }}
           />
         ),
       },
@@ -1250,6 +1439,7 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
       });
       setDtcResult(res.data);
       if (res.data?.success) {
+        writeDtcCache(selectedVehicle, selectedModule, peakTs, res.data.triggers ?? []);
         dtcHistoryQuery.refetch();
         queryClient.invalidateQueries({ queryKey: ["dtcVehicleHistory"] });
         queryClient.invalidateQueries({ queryKey: ["dtcAllHistory"] });
@@ -1628,44 +1818,47 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
   };
 
   const tblHeader = {
-    background: ct.tableHeaderBg,
-    color: ct.tableHeaderText,
+    background: _tblHdrBg,
+    color: "#ffffff",
     fontWeight: 700,
     fontSize: "10px",
-    textAlign: "left",
+    textAlign: "left" as const,
     padding: "8px 12px",
-    borderBottom: `1px solid ${ct.tableBorder}`,
-    whiteSpace: "nowrap",
+    borderBottom: `1px solid ${_tblBorder}`,
+    whiteSpace: "nowrap" as const,
   };
 
   const tblCell = {
     padding: "7px 12px",
-    borderBottom: `1px solid ${ct.tableBorder}`,
-    verticalAlign: "middle",
+    borderBottom: `1px solid ${_tblBorder}`,
+    verticalAlign: "middle" as const,
+    color: _tblText,
+    fontSize: "11px",
   };
 
   const tblRowEven = {
-    background: ct.tableBg,
+    background: _tblEvenBg,
     height: 36,
   };
 
   const tblRowOdd = {
-    background: ct.tableAltBg,
+    background: _tblOddBg,
     height: 36,
   };
 
   return (
     <Box
       sx={{
-        height: "calc(100vh - 80px)", // slightly more available space
-        minHeight: 0, // prevents flex children from shrinking
+        height: "calc(100vh - 64px)",
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         gap: 1,
-        padding: "0 8px",
-        bgcolor: "background.default",
-        // pb: 10,
-        // overflow: "hidden", // avoids nested overflow issues
+        p: 1,
+        background: isDark
+          ? "linear-gradient(145deg, #06111d 0%, #0b1724 52%, #0d1b2a 100%)"
+          : "linear-gradient(145deg, #f8fafc 0%, #eef6ff 52%, #f7fbff 100%)",
+        overflow: "hidden",
       }}
     >
       <Box
@@ -1673,35 +1866,23 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          borderBottom: `2px solid ${theme.palette.divider}`,
+          borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.12) : alpha("#1f2937", 0.08)}`,
           pb: 1,
           gap: 2,
           flexWrap: "wrap",
-
-          "& .MuiTypography-root": {
-            fontSize: "10px",
-          },
-
-          "& .MuiInputLabel-root": {
-            fontSize: "10px",
-          },
-
-          "& .MuiSelect-select": {
-            fontSize: "10px",
-          },
-
-          "& .MuiMenuItem-root": {
-            fontSize: "10px",
-          },
+          flexShrink: 0,
         }}
       >
-        {/* LEFT TITLE */}
         <Typography
           sx={{
             fontWeight: 700,
-            color: "text.secondary",
+            background: isDark
+              ? "linear-gradient(90deg, #7dd3fc, #38bdf8)"
+              : "linear-gradient(90deg, #0369a1, #0284c7)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
             letterSpacing: "-0.3px",
-            fontSize: "14px !important",
+            fontSize: "16px",
             whiteSpace: "nowrap",
           }}
         >
@@ -1721,52 +1902,35 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
             onChange={(_e, val) => val && setActiveTab(val)}
             size="small"
             sx={{
-              height: 28,
-              bgcolor: "background.paper",
+              bgcolor: isDark ? alpha("#020c16", 0.7) : alpha("#dde6ef", 0.6),
+              borderRadius: 2,
+              p: 0.3,
+              border: `1px solid ${isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.08)}`,
               "& .MuiToggleButton-root": {
-                px: 2,
-                py: 0,
-                minHeight: 28,
-                borderRadius: 0,
+                px: 1.5,
+                py: 0.3,
+                minHeight: 24,
+                border: "none",
+                borderRadius: "6px !important",
                 fontSize: "10px",
-                fontWeight: 700,
+                fontWeight: 600,
                 lineHeight: 1,
+                color: isDark ? "#94a3b8" : "#475569",
+                textTransform: "none",
+                transition: "all 0.15s ease",
+                "&.Mui-selected": {
+                  bgcolor: isDark ? "#0d2137" : "#ffffff",
+                  color: isDark ? "#7dd3fc" : "#0369a1",
+                  boxShadow: isDark
+                    ? `0 2px 8px ${alpha("#000", 0.4)}`
+                    : `0 2px 6px ${alpha("#334155", 0.12)}`,
+                },
               },
             }}
           >
-            <ToggleButton
-              value="fleet"
-              sx={{
-                fontWeight: "bold",
-                px: 2,
-                borderRadius: 0,
-                fontSize: "12px",
-              }}
-            >
-              FLEET OVERVIEW
-            </ToggleButton>
-            <ToggleButton
-              value="vehicle"
-              sx={{
-                fontWeight: "bold",
-                px: 2,
-                borderRadius: 0,
-                fontSize: "12px",
-              }}
-            >
-              VEHICLE DEEP DIVE
-            </ToggleButton>
-            <ToggleButton
-              value="module"
-              sx={{
-                fontWeight: "bold",
-                px: 2,
-                borderRadius: 0,
-                fontSize: "12px",
-              }}
-            >
-              MODULE ANALYSIS
-            </ToggleButton>
+            <ToggleButton value="fleet">Fleet Overview</ToggleButton>
+            <ToggleButton value="vehicle">Vehicle Deep Dive</ToggleButton>
+            <ToggleButton value="module">Module Analysis</ToggleButton>
           </ToggleButtonGroup>
 
           <ToggleButtonGroup
@@ -1775,41 +1939,34 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
             onChange={(_e, val) => val && setXAxisMode(val)}
             size="small"
             sx={{
-              height: 28,
-              bgcolor: "background.paper",
+              bgcolor: isDark ? alpha("#020c16", 0.7) : alpha("#dde6ef", 0.6),
+              borderRadius: 2,
+              p: 0.3,
+              border: `1px solid ${isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.08)}`,
               "& .MuiToggleButton-root": {
-                px: 2,
-                py: 0,
-                minHeight: 28,
-                borderRadius: 0,
+                px: 1.5,
+                py: 0.3,
+                minHeight: 24,
+                border: "none",
+                borderRadius: "6px !important",
                 fontSize: "10px",
-                fontWeight: 700,
+                fontWeight: 600,
                 lineHeight: 1,
+                color: isDark ? "#94a3b8" : "#475569",
+                textTransform: "none",
+                transition: "all 0.15s ease",
+                "&.Mui-selected": {
+                  bgcolor: isDark ? "#0d2137" : "#ffffff",
+                  color: isDark ? "#7dd3fc" : "#0369a1",
+                  boxShadow: isDark
+                    ? `0 2px 8px ${alpha("#000", 0.4)}`
+                    : `0 2px 6px ${alpha("#334155", 0.12)}`,
+                },
               },
             }}
           >
-            <ToggleButton
-              value="timestamp"
-              sx={{
-                fontWeight: "bold",
-                px: 1.5,
-                borderRadius: 0,
-                fontSize: "11px",
-              }}
-            >
-              TIMESTAMP
-            </ToggleButton>
-            <ToggleButton
-              value="mileage"
-              sx={{
-                fontWeight: "bold",
-                px: 1.5,
-                borderRadius: 0,
-                fontSize: "11px",
-              }}
-            >
-              MILEAGE
-            </ToggleButton>
+            <ToggleButton value="timestamp">Timestamp</ToggleButton>
+            <ToggleButton value="mileage">Mileage</ToggleButton>
           </ToggleButtonGroup>
         </Box>
       </Box>
@@ -1829,141 +1986,82 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
             <Box
               sx={{
                 p: 2,
-                bgcolor: darkMode ? "rgba(230,81,0,0.1)" : "#fff8e1",
-                border: `1px solid ${darkMode ? "#e65100" : "#ffe082"}`,
+                bgcolor: isDark ? alpha("#e65100", 0.1) : "#fff8e1",
+                border: `1px solid ${isDark ? "#e65100" : "#ffe082"}`,
+                borderRadius: 1.5,
               }}
             >
-              <Typography
-                variant="body2"
-                sx={{ color: "#e65100", fontWeight: "bold" }}
-              >
-                No vehicle data. Start the streaming pipeline to populate fleet
-                data.
+              <Typography variant="body2" sx={{ color: "#e65100", fontWeight: "bold" }}>
+                No vehicle data. Start the streaming pipeline to populate fleet data.
               </Typography>
             </Box>
           )}
-          <Box sx={{ display: "flex", gap: 1, width: "100%" }}>
-            {[
-              {
-                label: "TOTAL VEHICLES",
-                value: fleetStats.total_vehicles ?? 0,
-                color: "#005071",
-                bg: "#e6f4f9",
-              },
-              {
-                label: "AVG FLEET HEALTH",
-                value: `${fleetStats.avg_health ?? 0}%`,
-                color:
-                  (fleetStats.avg_health ?? 100) < 60 ? "#d32f2f" : "#2e7d32",
-                bg: (fleetStats.avg_health ?? 100) < 60 ? "#ffebee" : "#e8f5e9",
-              },
-              {
-                label: "CRITICAL ( < 60% )",
-                value: fleetStats.critical_count ?? 0,
-                color:
-                  (fleetStats.critical_count ?? 0) > 0 ? "#d32f2f" : "#e53935",
-                bg:
-                  (fleetStats.critical_count ?? 0) > 0 ? "#ffebee" : "#ffebee",
-              },
-              {
-                label: "WARNING ( 60–80% )",
-                value: fleetStats.warning_count ?? 0,
-                color:
-                  (fleetStats.warning_count ?? 0) > 0 ? "#ed6c02" : "#616161",
-                bg: (fleetStats.warning_count ?? 0) > 0 ? "#fff4e5" : "#f5f5f5",
-              },
-            ].map((kpi, i) => (
-              <Paper
-                key={i}
-                elevation={0}
-                sx={{
-                  flex: 1,
-                  p: 1.5,
-                  borderRadius: 0,
-                  bgcolor: kpi.bg,
-                  borderLeft: `4px solid ${kpi.color}`,
-                  minHeight: 90,
-
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-
-                  transition: "0.2s ease",
-
-                  "&:hover": {
-                    transform: "translateY(-1px)",
-                  },
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    color: kpi.color,
-                    textTransform: "uppercase",
-                    mb: 0.5,
-                    letterSpacing: "0.2px",
-                  }}
-                >
-                  {kpi.label}
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontSize: "20px",
-                    fontWeight: 700,
-                    color: kpi.color,
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {kpi.value}
-                </Typography>
-              </Paper>
-            ))}
-          </Box>
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: "stretch" }}>
+            <Box sx={{ flex: 1, display: "flex" }}>
+              <MetricTile
+                label="Total Vehicles"
+                value={fleetStats.total_vehicles ?? 0}
+                accent="#3b82f6"
+              />
+            </Box>
+            <Box sx={{ flex: 1, display: "flex" }}>
+              <MetricTile
+                label="Avg Fleet Health"
+                value={`${fleetStats.avg_health ?? 0}%`}
+                accent={
+                  (fleetStats.avg_health ?? 100) >= 80
+                    ? "#22c55e"
+                    : (fleetStats.avg_health ?? 100) >= 60
+                    ? "#eab308"
+                    : "#ef4444"
+                }
+              />
+            </Box>
+            <Box sx={{ flex: 1, display: "flex" }}>
+              <MetricTile
+                label="Critical < 60%"
+                value={fleetStats.critical_count ?? 0}
+                accent="#ef4444"
+              />
+            </Box>
+            <Box sx={{ flex: 1, display: "flex" }}>
+              <MetricTile
+                label="Warning 60–80%"
+                value={fleetStats.warning_count ?? 0}
+                accent="#f59e0b"
+              />
+            </Box>
+          </Stack>
 
           <Box sx={{ display: "flex", gap: 2, flex: 1, minHeight: 0 }}>
-            <Paper
-              sx={{
-                width: 320,
-                p: 2,
-                borderRadius: 0,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary", mb: 1 }}
-              >
-                VEHICLE HEALTH COMPARISON
-              </Typography>
+            <Card sx={{ width: 320, p: 2, display: "flex", flexDirection: "column" }}>
+              <SectionTitle>Vehicle Health Comparison</SectionTitle>
               <Box sx={{ flex: 1 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={fleetChartData}
                     layout="vertical"
-                    margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
+                    margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
                       horizontal={false}
-                      stroke={ct.gridColor}
+                      stroke={isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.06)}
                     />
                     <XAxis
                       type="number"
                       domain={[0, 100]}
                       tick={axisStyle}
-                      axisLine={{ stroke: ct.tableBorder }}
+                      axisLine={{ stroke: isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1) }}
                       tickLine={false}
                     />
                     <YAxis
                       type="category"
                       dataKey="vehicle_id"
                       tick={{
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: 600,
-                        fill: ct.tooltipText,
+                        fill: isDark ? "#e2e8f0" : "#0f172a",
                         fontFamily: "monospace",
                       }}
                       axisLine={false}
@@ -1971,102 +2069,46 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                       width={65}
                     />
                     <Tooltip
+                      cursor={{ fill: isDark ? alpha("#7dd3fc", 0.08) : alpha("#3b82f6", 0.06) }}
                       contentStyle={tooltipStyle}
                       formatter={(v: number) => `${v}%`}
                     />
-                    <ReferenceLine
-                      x={60}
-                      stroke="#d32f2f"
-                      strokeDasharray="4 4"
-                    />
-                    <ReferenceLine
-                      x={80}
-                      stroke="#ed6c02"
-                      strokeDasharray="4 4"
-                    />
+                    <ReferenceLine x={60} stroke="#ef4444" strokeDasharray="4 4" />
+                    <ReferenceLine x={80} stroke="#eab308" strokeDasharray="4 4" />
                     <Bar
                       dataKey="health_score"
                       name="Health"
-                      fill={theme.palette.primary.main}
+                      fill={isDark ? "#3b82f6" : "#2563eb"}
                       isAnimationActive={false}
                       label={{
                         position: "right",
                         fontSize: 10,
                         fontWeight: "bold",
-                        fill: ct.tooltipText,
+                        fill: isDark ? "#e2e8f0" : "#0f172a",
+                        fontFamily: "monospace",
+                        formatter: (v: number) => `${v}%`,
                       }}
                     />
                   </BarChart>
                 </ResponsiveContainer>
               </Box>
-            </Paper>
+            </Card>
 
-            <Paper
-              sx={{
-                flex: 1,
-                borderRadius: 0,
-                display: "flex",
-                flexDirection: "column",
-                p: 0,
-              }}
-            >
+            <Card sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
               <Box
                 sx={{
                   p: 1.5,
-                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.08)}`,
                 }}
               >
-                <Typography
-                  variant="caption"
-                  sx={{ fontWeight: "bold", color: "text.secondary" }}
-                >
-                  FLEET HEALTH TABLE — MODULE CONTRIBUTIONS (GOLD)
-                </Typography>
+                <SectionTitle sx={{ mb: 0 }}>Fleet Health Table — Module Contributions (Gold)</SectionTitle>
               </Box>
               <Box
                 className={agTheme}
                 sx={{
                   flexGrow: 1,
                   minHeight: 0,
-
-                  "& .ag-root-wrapper": {
-                    border: "none",
-                    fontSize: "10px",
-                  },
-
-                  "& .ag-header": {
-                    background: "#005071 !important",
-                  },
-
-                  "& .ag-header-cell": {
-                    background: "#005071 !important",
-                    color: "#fff !important",
-                    fontSize: "10px !important",
-                    fontWeight: 600,
-                    borderColor: "rgba(255,255,255,0.12)",
-                  },
-
-                  "& .ag-header-cell-label": {
-                    color: "#fff !important",
-                  },
-
-                  "& .ag-icon": {
-                    color: "#fff !important",
-                  },
-
-                  "& .ag-cell": {
-                    fontSize: "10px !important",
-                    display: "flex",
-                    alignItems: "center",
-                  },
-
-                  "& .ag-row": {
-                    fontSize: "10px",
-                  },
-
-                  "& .ag-row:nth-of-type(even)": {
-                    background: "#fafafa",
-                  },
+                  ...agGridContainerSx,
                 }}
               >
                 <AgGridReact
@@ -2086,7 +2128,7 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                   headerHeight={30}
                 />
               </Box>
-            </Paper>
+            </Card>
           </Box>
         </Box>
       )}
@@ -2104,41 +2146,23 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
           }}
         >
           {/* Controls */}
-          <Paper
+          <Card
             sx={{
               p: 1,
-              borderRadius: 0,
               display: "flex",
               alignItems: "center",
               gap: 1,
               flexWrap: "wrap",
-
-              "& .MuiInputLabel-root": {
-                fontSize: "10px",
-              },
-
-              "& .MuiSelect-select": {
-                fontSize: "10px",
-                py: 0.5,
-              },
-
-              "& .MuiMenuItem-root": {
-                fontSize: "10px",
-              },
-
-              "& .MuiToggleButton-root": {
-                fontSize: "10px",
-              },
-
-              "& .MuiChip-label": {
-                fontSize: "10px",
-              },
+              flexShrink: 0,
             }}
           >
             <Typography
               sx={{
                 fontWeight: 700,
-                fontSize: "12px", // only context
+                fontSize: "11px",
+                color: isDark ? "#94a3b8" : "#64748b",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
               }}
             >
               CONTEXT:
@@ -2152,20 +2176,13 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                 onChange={(e) => setSelectedVehicle(e.target.value)}
                 label="Vehicle"
                 sx={{
-                  borderRadius: 0,
+                  borderRadius: 1,
                   height: 30,
-
-                  "& .MuiSelect-select": {
-                    fontSize: "10px",
-                  },
+                  fontSize: "10px",
                 }}
                 MenuProps={{
                   PaperProps: {
-                    sx: {
-                      "& .MuiMenuItem-root": {
-                        fontSize: "10px",
-                      },
-                    },
+                    sx: { "& .MuiMenuItem-root": { fontSize: "10px" } },
                   },
                 }}
               >
@@ -2187,14 +2204,26 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
               onChange={(_e, val) => val && setSelectedModule(val)}
               size="small"
               sx={{
-                height: 30,
-
+                bgcolor: isDark ? alpha("#020c16", 0.7) : alpha("#dde6ef", 0.6),
+                borderRadius: 2,
+                p: 0.3,
+                border: `1px solid ${isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.08)}`,
                 "& .MuiToggleButton-root": {
-                  fontWeight: 700,
                   px: 1.25,
-                  borderRadius: 0,
+                  py: 0.3,
+                  minHeight: 24,
+                  border: "none",
+                  borderRadius: "6px !important",
                   fontSize: "10px",
-                  minHeight: 30,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  color: isDark ? "#94a3b8" : "#475569",
+                  textTransform: "uppercase",
+                  transition: "all 0.15s ease",
+                  "&.Mui-selected": {
+                    color: "#fff",
+                    boxShadow: `0 2px 8px ${alpha("#000", 0.3)}`,
+                  },
                 },
               }}
             >
@@ -2205,10 +2234,7 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                   sx={{
                     "&.Mui-selected": {
                       bgcolor: MODULE_COLORS[mod],
-                      color: "#fff",
-                      "&:hover": {
-                        bgcolor: MODULE_COLORS[mod],
-                      },
+                      "&:hover": { bgcolor: MODULE_COLORS[mod] },
                     },
                   }}
                 >
@@ -2220,26 +2246,22 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
             <Chip
               size="small"
               label={`${sensorData.length} Bronze pts`}
-              sx={{
-                borderRadius: 0,
-                fontWeight: 700,
-                fontSize: "10px",
-                height: 24,
-              }}
+              sx={{ borderRadius: "4px", fontWeight: 700, fontSize: "10px", height: 24 }}
             />
 
             <Chip
               size="small"
               label={`${moduleHealthQuery.data?.count ?? 0} Silver pts`}
               sx={{
-                borderRadius: 0,
+                borderRadius: "4px",
                 fontWeight: 700,
                 fontSize: "10px",
                 height: 24,
-                bgcolor: darkMode ? "rgba(21,101,192,0.2)" : "#e3f2fd",
+                bgcolor: isDark ? alpha("#3b82f6", 0.18) : "#e3f2fd",
+                color: isDark ? "#7dd3fc" : "#1565c0",
               }}
             />
-          </Paper>
+          </Card>
 
           {/* GOLD + SILVER health charts side by side */}
           <Grid container spacing={2}>
@@ -2265,46 +2287,16 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                     const val = latestBronzeRow
                       ? Number(latestBronzeRow[f.key] ?? 0)
                       : null;
-
-                    const isWarn =
-                      val !== null && f.warnFn ? f.warnFn(val) : false;
-
+                    const isWarn = val !== null && f.warnFn ? f.warnFn(val) : false;
+                    const accent = isWarn ? "#ef4444" : MODULE_COLORS[selectedModule];
                     return (
-                      <Paper
-                        key={f.key}
-                        sx={{
-                          flex: 1,
-                          minWidth: 120,
-                          p: 1.5,
-                          borderRadius: 0,
-                          borderLeft: `4px solid ${
-                            isWarn ? "#d32f2f" : MODULE_COLORS[selectedModule]
-                          }`,
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "text.secondary",
-                            fontWeight: "bold",
-                            fontSize: "10px",
-                          }}
-                        >
-                          {f.label}
-                        </Typography>
-
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: "bold",
-                            color: isWarn ? "#d32f2f" : "text.primary",
-                            fontSize: "1.1rem",
-                            mt: 0.25,
-                          }}
-                        >
-                          {val !== null ? `${val.toFixed(2)} ${f.unit}` : "—"}
-                        </Typography>
-                      </Paper>
+                      <Box key={f.key} sx={{ flex: 1, minWidth: 120, display: "flex" }}>
+                        <MetricTile
+                          label={f.label}
+                          value={val !== null ? `${val.toFixed(2)} ${f.unit}` : "—"}
+                          accent={accent}
+                        />
+                      </Box>
                     );
                   })}
                 </Box>
@@ -2313,67 +2305,26 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                 <Grid container spacing={2}>
                   {/* GOLD */}
                   <Grid item xs={12} md={6}>
-                    <Paper
-                      sx={{
-                        p: 1.5,
-                        borderRadius: 0,
-                        height: 260,
-                        display: "flex",
-                        flexDirection: "column",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          mb: 0.5,
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: "bold",
-                            color: "text.secondary",
-                          }}
-                        >
+                    <Card sx={{ p: 1.5, height: 260, display: "flex", flexDirection: "column" }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px" }}>
                           FUSED VEHICLE HEALTH — {selectedVehicle}
-                          <span style={{ color: ct.axisColor }}> (GOLD)</span>
+                          <span style={{ color: isDark ? "#60a5fa" : "#3b82f6", fontWeight: 400 }}> (GOLD)</span>
                         </Typography>
-
                         <Chip
                           size="small"
                           label={vehicleHealthQuery.data?.data_source || "—"}
-                          sx={{
-                            borderRadius: 0,
-                            fontWeight: "bold",
-                            fontSize: "10px",
-                            height: 18,
-                          }}
+                          sx={{ borderRadius: "4px", fontWeight: "bold", fontSize: "10px", height: 18 }}
                         />
                       </Box>
                       <Box sx={{ flex: 1, minHeight: 0 }}>
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={healthHistory}
-                            margin={{
-                              top: 4,
-                              right: 15,
-                              left: -25,
-                              bottom: 20,
-                            }}
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              vertical={false}
-                              stroke={ct.gridColor}
-                            />
+                          <LineChart data={healthHistory} margin={{ top: 4, right: 15, left: -25, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.06)} />
                             <XAxis
-                              dataKey={
-                                xAxisMode === "mileage" ? "mileage" : "ts"
-                              }
+                              dataKey={xAxisMode === "mileage" ? "mileage" : "ts"}
                               tick={axisStyle}
-                              axisLine={{ stroke: ct.tableBorder }}
+                              axisLine={{ stroke: isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1) }}
                               tickLine={false}
                               minTickGap={40}
                               tickFormatter={(v) => formatXTick(v, xAxisMode)}
@@ -2381,114 +2332,53 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                             <YAxis
                               domain={[0, 100]}
                               tick={axisStyle}
-                              axisLine={{ stroke: ct.tableBorder }}
+                              axisLine={{ stroke: isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1) }}
                               tickLine={false}
                             />
                             <Tooltip
+                              cursor={{ stroke: isDark ? alpha("#7dd3fc", 0.3) : alpha("#3b82f6", 0.2), strokeWidth: 1 }}
                               contentStyle={tooltipStyle}
                               formatter={(v: number) => `${v.toFixed(1)}%`}
                             />
-                            <ReferenceLine
-                              y={60}
-                              stroke="#d32f2f"
-                              strokeDasharray="4 4"
-                            />
-                            <ReferenceLine
-                              y={80}
-                              stroke="#ed6c02"
-                              strokeDasharray="4 4"
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="health"
-                              name="Health %"
-                              stroke="#1976d2"
-                              strokeWidth={2}
-                              dot={false}
-                              isAnimationActive={false}
-                            />
+                            <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="4 4" />
+                            <ReferenceLine y={80} stroke="#eab308" strokeDasharray="4 4" />
+                            <Line type="monotone" dataKey="health" name="Health %" stroke={isDark ? "#3b82f6" : "#2563eb"} strokeWidth={2} dot={false} isAnimationActive={false} />
                             <Brush
-                              dataKey={
-                                xAxisMode === "mileage" ? "mileage" : "ts"
-                              }
-                              height={18}
-                              stroke={ct.tableBorder}
-                              travellerWidth={6}
+                              dataKey={xAxisMode === "mileage" ? "mileage" : "ts"}
+                              height={22}
+                              stroke={isDark ? alpha("#7dd3fc", 0.5) : alpha("#3b82f6", 0.5)}
+                              fill={isDark ? alpha("#0d2137", 0.85) : alpha("#e2eaf4", 0.9)}
+                              travellerWidth={10}
+                              style={{ fontSize: "9px", fill: isDark ? "#94a3b8" : "#64748b" }}
                             />
                           </LineChart>
                         </ResponsiveContainer>
                       </Box>
-                    </Paper>
+                    </Card>
                   </Grid>
 
                   {/* SILVER */}
                   <Grid item xs={12} md={6}>
-                    <Paper
-                      sx={{
-                        p: 1.5,
-                        borderRadius: 0,
-                        height: 260,
-                        display: "flex",
-                        flexDirection: "column",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          mb: 0.5,
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: "bold",
-                            color: "text.secondary",
-                          }}
-                        >
+                    <Card sx={{ p: 1.5, height: 260, display: "flex", flexDirection: "column" }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px" }}>
                           {selectedModule.toUpperCase()} ML HEALTH SCORE
-                          <span style={{ color: ct.axisColor }}> (SILVER)</span>
+                          <span style={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 400 }}> (SILVER)</span>
                         </Typography>
-
                         <Chip
                           size="small"
                           label={latestSeverity}
-                          sx={{
-                            borderRadius: 0,
-                            fontWeight: "bold",
-                            fontSize: "10px",
-                            height: 18,
-                            bgcolor: severityColor,
-                            color: "white",
-                          }}
+                          sx={{ borderRadius: "4px", fontWeight: "bold", fontSize: "10px", height: 18, bgcolor: severityColor, color: "white" }}
                         />
                       </Box>
-
                       <Box sx={{ flex: 1 }}>
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={moduleHealthData}
-                            margin={{
-                              top: 4,
-                              right: 15,
-                              left: -25,
-                              bottom: 20,
-                            }}
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              vertical={false}
-                              stroke={ct.gridColor}
-                            />
+                          <LineChart data={moduleHealthData} margin={{ top: 4, right: 15, left: -25, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.06)} />
                             <XAxis
-                              dataKey={
-                                xAxisMode === "timestamp"
-                                  ? "timestamp"
-                                  : "mileage"
-                              }
+                              dataKey={xAxisMode === "timestamp" ? "timestamp" : "mileage"}
                               tick={axisStyle}
-                              axisLine={{ stroke: ct.tableBorder }}
+                              axisLine={{ stroke: isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1) }}
                               tickLine={false}
                               minTickGap={40}
                               tickFormatter={(v) => formatXTick(v, xAxisMode)}
@@ -2496,56 +2386,29 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                             <YAxis
                               domain={[0, 100]}
                               tick={axisStyle}
-                              axisLine={{ stroke: ct.tableBorder }}
+                              axisLine={{ stroke: isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1) }}
                               tickLine={false}
                             />
                             <Tooltip
+                              cursor={{ stroke: isDark ? alpha("#7dd3fc", 0.3) : alpha("#3b82f6", 0.2), strokeWidth: 1 }}
                               contentStyle={tooltipStyle}
                               formatter={(v: number) => `${v.toFixed(1)}%`}
                             />
-                            <ReferenceLine
-                              y={60}
-                              stroke="#d32f2f"
-                              strokeDasharray="4 4"
-                              label={{
-                                value: "CRIT",
-                                fontSize: 9,
-                                fill: "#d32f2f",
-                              }}
-                            />
-                            <ReferenceLine
-                              y={80}
-                              stroke="#ed6c02"
-                              strokeDasharray="4 4"
-                              label={{
-                                value: "WARN",
-                                fontSize: 9,
-                                fill: "#ed6c02",
-                              }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="health_score"
-                              name="ML Health"
-                              stroke={MODULE_COLORS[selectedModule]}
-                              strokeWidth={2}
-                              dot={false}
-                              isAnimationActive={false}
-                            />
+                            <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="4 4" label={{ value: "CRIT", fontSize: 9, fill: "#ef4444" }} />
+                            <ReferenceLine y={80} stroke="#eab308" strokeDasharray="4 4" label={{ value: "WARN", fontSize: 9, fill: "#eab308" }} />
+                            <Line type="monotone" dataKey="health_score" name="ML Health" stroke={MODULE_COLORS[selectedModule]} strokeWidth={2} dot={false} isAnimationActive={false} />
                             <Brush
-                              dataKey={
-                                xAxisMode === "timestamp"
-                                  ? "timestamp"
-                                  : "mileage"
-                              }
-                              height={18}
-                              stroke={ct.tableBorder}
-                              travellerWidth={6}
+                              dataKey={xAxisMode === "timestamp" ? "timestamp" : "mileage"}
+                              height={22}
+                              stroke={isDark ? alpha("#7dd3fc", 0.5) : alpha("#3b82f6", 0.5)}
+                              fill={isDark ? alpha("#0d2137", 0.85) : alpha("#e2eaf4", 0.9)}
+                              travellerWidth={10}
+                              style={{ fontSize: "9px", fill: isDark ? "#94a3b8" : "#64748b" }}
                             />
                           </LineChart>
                         </ResponsiveContainer>
                       </Box>
-                    </Paper>
+                    </Card>
                   </Grid>
                 </Grid>
               </Box>
@@ -2553,87 +2416,32 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
 
             {/* RIGHT SECTION → 3 columns */}
             <Grid item xs={12} md={3}>
-              <Paper
-                sx={{
-                  p: 1.5,
-                  borderRadius: 0,
-                  height: "100%",
-                  minHeight: 360,
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: "bold",
-                    color: "text.secondary",
-                    mb: 1,
-                  }}
-                >
-                  TOP ANOMALY DRIVERS
-                </Typography>
-
-                <Box sx={{ flex: 1 }}>
+              <Card sx={{ p: 1.5, height: 260, display: "flex", flexDirection: "column" }}>
+                <SectionTitle sx={{ mb: 1 }}>Top Anomaly Drivers</SectionTitle>
+                <Box sx={{ flex: 1, overflowY: "auto" }}>
                   {topFeatures.length > 0 ? (
                     topFeatures.map((f) => (
                       <Box key={f.feature} sx={{ mb: 1.25 }}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontSize: "10px",
-                            fontWeight: 600,
-                          }}
-                        >
+                        <Typography variant="caption" sx={{ fontSize: "10px", fontWeight: 600, color: isDark ? "#e2e8f0" : "#1f2937" }}>
                           {f.feature.replace(/_/g, " ")}
                         </Typography>
-
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              flex: 1,
-                              height: 6,
-                              bgcolor: ct.gridColor,
-                              overflow: "hidden",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: `${Math.min(100, f.score * 200)}%`,
-                                height: "100%",
-                                bgcolor: "#d32f2f",
-                              }}
-                            />
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Box sx={{ flex: 1, height: 6, bgcolor: isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08), borderRadius: 1, overflow: "hidden" }}>
+                            <Box sx={{ width: `${Math.min(100, f.score * 200)}%`, height: "100%", bgcolor: "#ef4444", borderRadius: 1 }} />
                           </Box>
-
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              minWidth: 32,
-                              fontWeight: "bold",
-                            }}
-                          >
+                          <Typography variant="caption" sx={{ minWidth: 32, fontWeight: "bold", color: isDark ? "#94a3b8" : "#64748b" }}>
                             {f.score.toFixed(2)}
                           </Typography>
                         </Box>
                       </Box>
                     ))
                   ) : (
-                    <Typography
-                      variant="caption"
-                      sx={{ color: "text.secondary" }}
-                    >
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
                       No Silver data yet
                     </Typography>
                   )}
                 </Box>
-              </Paper>
+              </Card>
             </Grid>
           </Grid>
 
@@ -2676,23 +2484,11 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
           </Box>
 
           {/* ── ROW A: Health decomposition stacked area ── */}
-          <Paper sx={{ p: 1.5, borderRadius: 0 }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 0.5,
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary" }}
-              >
-                HEALTH DECOMPOSITION — ALL MODULE CONTRIBUTIONS OVER TIME &nbsp;
-                <span style={{ color: ct.axisColor, fontWeight: "normal" }}>
-                  (SILVER)
-                </span>
+          <Card sx={{ p: 1.5 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px" }}>
+                HEALTH DECOMPOSITION — ALL MODULE CONTRIBUTIONS OVER TIME
+                <span style={{ color: isDark ? "#60a5fa" : "#3b82f6", fontWeight: 400 }}> (SILVER)</span>
               </Typography>
               <Chip
                 size="small"
@@ -2706,12 +2502,12 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                     : "no data"
                 }
                 sx={{
-                  borderRadius: 0,
+                  borderRadius: "4px",
                   fontWeight: "bold",
                   fontSize: "10px",
                   height: 18,
-                  bgcolor: vehicleDecompQuery.isError ? "#ffebee" : "default",
-                  color: vehicleDecompQuery.isError ? "#d32f2f" : "default",
+                  bgcolor: vehicleDecompQuery.isError ? (isDark ? alpha("#ef4444", 0.12) : "#ffebee") : undefined,
+                  color: vehicleDecompQuery.isError ? "#ef4444" : undefined,
                 }}
               />
             </Box>
@@ -2743,101 +2539,39 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                 </Box>
               )}
             </Box>
-          </Paper>
+          </Card>
 
           {/* ── ROW B: Module health radar + Severity transition strip ── */}
           <Box sx={{ display: "flex", gap: 2 }}>
-            <Paper
-              sx={{
-                width: 290,
-                p: 1.5,
-                borderRadius: 0,
-                height: 280,
-                display: "flex",
-                flexDirection: "column",
-                flexShrink: 0,
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary", mb: 0.5 }}
-              >
-                MODULE HEALTH RADAR — {selectedVehicle || "—"}
-              </Typography>
+            <Card sx={{ width: 290, p: 1.5, height: 280, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+              <SectionTitle sx={{ mb: 0.5 }}>Module Health Radar — {selectedVehicle || "—"}</SectionTitle>
               <Box sx={{ flex: 1, minHeight: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart
-                    data={radarData}
-                    margin={{ top: 10, right: 20, bottom: 10, left: 20 }}
-                  >
-                    <PolarGrid stroke={ct.gridColor} />
+                  <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+                    <PolarGrid stroke={isDark ? alpha("#7dd3fc", 0.12) : alpha("#1f2937", 0.1)} />
                     <PolarAngleAxis
                       dataKey="module"
-                      tick={
-                        {
-                          fontSize: 10,
-                          fontWeight: 700,
-                          fill: ct.tooltipText,
-                          fontFamily: "monospace",
-                        } as any
-                      }
+                      tick={{ fontSize: 10, fontWeight: 700, fill: isDark ? "#e2e8f0" : "#0f172a", fontFamily: "monospace" } as any}
                     />
-                    <PolarRadiusAxis
-                      angle={90}
-                      domain={[0, 100]}
-                      tick={false}
-                      axisLine={false}
-                    />
-                    <Radar
-                      name="Health %"
-                      dataKey="score"
-                      stroke="#1976d2"
-                      fill="#1976d2"
-                      fillOpacity={0.2}
-                      isAnimationActive={false}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(v: any) => [`${v}%`, "Health"]}
-                    />
+                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+                    <Radar name="Health %" dataKey="score" stroke={isDark ? "#3b82f6" : "#2563eb"} fill={isDark ? "#3b82f6" : "#2563eb"} fillOpacity={0.18} isAnimationActive={false} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${v}%`, "Health"]} />
                   </RadarChart>
                 </ResponsiveContainer>
               </Box>
-            </Paper>
+            </Card>
 
-            <Paper
-              sx={{
-                flex: 1,
-                p: 1.5,
-                borderRadius: 0,
-                height: 280,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 1,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{ fontWeight: "bold", color: "text.secondary" }}
-                >
-                  SEVERITY TRANSITION HISTORY — {selectedModule.toUpperCase()}{" "}
-                  &nbsp;
-                  <span style={{ color: ct.axisColor, fontWeight: "normal" }}>
-                    (SILVER)
-                  </span>
+            <Card sx={{ flex: 1, p: 1.5, height: 280, display: "flex", flexDirection: "column" }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px" }}>
+                  SEVERITY TRANSITION HISTORY — {selectedModule.toUpperCase()}
+                  <span style={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 400 }}> (SILVER)</span>
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
                   {[
-                    { label: "NORMAL", color: "#2e7d32" },
-                    { label: "WARNING", color: "#ed6c02" },
-                    { label: "CRITICAL", color: "#d32f2f" },
+                    { label: "NORMAL", color: "#22c55e" },
+                    { label: "WARNING", color: "#eab308" },
+                    { label: "CRITICAL", color: "#ef4444" },
                   ].map((s) => (
                     <Box
                       key={s.label}
@@ -2892,10 +2626,10 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                           flex: run.count,
                           bgcolor:
                             run.severity === "CRITICAL"
-                              ? "#d32f2f"
+                              ? "#ef4444"
                               : run.severity === "WARNING"
-                              ? "#ed6c02"
-                              : "#2e7d32",
+                              ? "#eab308"
+                              : "#22c55e",
                           "&:hover": { opacity: 0.75, cursor: "default" },
                         }}
                       />
@@ -2987,41 +2721,21 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                   </Typography>
                 </Box>
               )}
-            </Paper>
+            </Card>
           </Box>
 
           {/* ── ROW C: Anomaly driver trends — small multiples grid ── */}
-          <Paper sx={{ p: 1.5, borderRadius: 0 }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 1,
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary" }}
-              >
+          <Card sx={{ p: 1.5 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px" }}>
                 ANOMALY DRIVER TRENDS — LSTM RECONSTRUCTION ERROR PER FEATURE
-                &nbsp;
-                <span style={{ color: ct.axisColor, fontWeight: "normal" }}>
-                  ({selectedModule.toUpperCase()} SILVER · higher = more
-                  anomalous · standardized units)
+                <span style={{ color: isDark ? "#60a5fa" : "#3b82f6", fontWeight: 400 }}>
+                  {" "}({selectedModule.toUpperCase()} SILVER · higher = more anomalous · standardized units)
                 </span>
               </Typography>
               {anomalyTrendSeries.length > 0 && (
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "text.secondary",
-                    fontFamily: "monospace",
-                    fontSize: "10px",
-                  }}
-                >
-                  {anomalyTrendSeries.length} drivers ·{" "}
-                  {anomalyTrendData.length} pts
+                <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace", fontSize: "10px" }}>
+                  {anomalyTrendSeries.length} drivers · {anomalyTrendData.length} pts
                 </Typography>
               )}
             </Box>
@@ -3066,104 +2780,48 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                 </Typography>
               </Box>
             )}
-          </Paper>
+          </Card>
 
           {/* ── ROW D: Bronze sensor statistics table ── */}
-          <Paper sx={{ p: 1.5, borderRadius: 0 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: "bold",
-                color: "text.secondary",
-                mb: 1,
-                display: "block",
-              }}
-            >
-              BRONZE SENSOR STATISTICS — {selectedModule.toUpperCase()} &nbsp;
-              <span style={{ color: ct.axisColor, fontWeight: "normal" }}>
-                ({sensorData.length.toLocaleString()} data points)
-              </span>
-            </Typography>
+          <Card sx={{ p: 1.5 }}>
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px" }}>
+                BRONZE SENSOR STATISTICS — {selectedModule.toUpperCase()}
+                <span style={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 400 }}> ({sensorData.length.toLocaleString()} data points)</span>
+              </Typography>
+            </Box>
             {sensorStats.length > 0 ? (
               <Box sx={{ overflowX: "auto" }}>
                 <table
                   style={{
                     width: "100%",
-                    borderCollapse: "collapse",
+                    borderCollapse: "collapse" as const,
                     fontFamily: "monospace",
                     fontSize: "11px",
+                    color: _tblText,
                   }}
                 >
                   <thead>
                     <tr>
-                      {[
-                        "SENSOR",
-                        "UNIT",
-                        "MIN",
-                        "MAX",
-                        "MEAN",
-                        "STD DEV",
-                        "LATEST",
-                      ].map((h) => (
-                        <th key={h} style={tblHeader}>
-                          {h}
-                        </th>
+                      {["SENSOR", "UNIT", "MIN", "MAX", "MEAN", "STD DEV", "LATEST"].map((h) => (
+                        <th key={h} style={tblHeader}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {sensorStats.map((s: any, i: number) => {
-                      const isWarn =
-                        s.latest !== null && !isNaN(s.latest) && s.warnFn
-                          ? s.warnFn(s.latest)
-                          : false;
-
+                      const isWarn = s.latest !== null && !isNaN(s.latest) && s.warnFn ? s.warnFn(s.latest) : false;
                       return (
-                        <tr
-                          key={s.key}
-                          style={i % 2 === 0 ? tblRowEven : tblRowOdd}
-                        >
-                          <td style={{ padding: "5px 12px", fontWeight: 600 }}>
-                            {s.label}
-                          </td>
-                          <td
-                            style={{ padding: "5px 12px", color: ct.axisColor }}
-                          >
-                            {s.unit || "—"}
-                          </td>
-                          <td style={{ padding: "5px 12px" }}>
-                            {s.min !== null ? s.min.toFixed(2) : "—"}
-                          </td>
-                          <td style={{ padding: "5px 12px" }}>
-                            {s.max !== null ? s.max.toFixed(2) : "—"}
-                          </td>
-                          <td style={{ padding: "5px 12px" }}>
-                            {s.mean !== null ? s.mean.toFixed(2) : "—"}
-                          </td>
-                          <td style={{ padding: "5px 12px" }}>
-                            {s.std !== null ? s.std.toFixed(2) : "—"}
-                          </td>
-                          <td
-                            style={{
-                              padding: "5px 12px",
-                              fontWeight: "bold",
-                              color: isWarn ? "#d32f2f" : ct.tooltipText,
-                            }}
-                          >
-                            {s.latest !== null && !isNaN(s.latest)
-                              ? s.latest.toFixed(2)
-                              : "—"}
-                            {isWarn && (
-                              <span
-                                style={{
-                                  marginLeft: 4,
-                                  fontSize: "9px",
-                                  color: "#d32f2f",
-                                }}
-                              >
-                                ▲
-                              </span>
-                            )}
+                        <tr key={s.key} style={i % 2 === 0 ? tblRowEven : tblRowOdd}>
+                          <td style={{ padding: "5px 12px", fontWeight: 600, color: _tblText }}>{s.label}</td>
+                          <td style={{ padding: "5px 12px", color: _tblMuted }}>{s.unit || "—"}</td>
+                          <td style={{ padding: "5px 12px" }}>{s.min !== null ? s.min.toFixed(2) : "—"}</td>
+                          <td style={{ padding: "5px 12px" }}>{s.max !== null ? s.max.toFixed(2) : "—"}</td>
+                          <td style={{ padding: "5px 12px" }}>{s.mean !== null ? s.mean.toFixed(2) : "—"}</td>
+                          <td style={{ padding: "5px 12px" }}>{s.std !== null ? s.std.toFixed(2) : "—"}</td>
+                          <td style={{ padding: "5px 12px", fontWeight: "bold", color: isWarn ? "#ef4444" : _tblText }}>
+                            {s.latest !== null && !isNaN(s.latest) ? s.latest.toFixed(2) : "—"}
+                            {isWarn && <span style={{ marginLeft: 4, fontSize: "9px", color: "#ef4444" }}>▲</span>}
                           </td>
                         </tr>
                       );
@@ -3176,108 +2834,49 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                 Select a vehicle and module to load sensor statistics
               </Typography>
             )}
-          </Paper>
+          </Card>
 
           {/* ── SECTION DIVIDER ── */}
-          <Box
-            sx={{ display: "flex", alignItems: "center", gap: 1.5, my: 0.5 }}
-          >
-            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
-            <Typography
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-                fontWeight: "bold",
-                fontFamily: "monospace",
-                letterSpacing: 1,
-                whiteSpace: "nowrap",
-              }}
-            >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, my: 0.5 }}>
+            <Box sx={{ flex: 1, height: "1px", bgcolor: isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1) }} />
+            <Typography variant="caption" sx={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: "bold", fontFamily: "monospace", letterSpacing: 1, whiteSpace: "nowrap" }}>
               FAULT & ALERT HISTORY
             </Typography>
-            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+            <Box sx={{ flex: 1, height: "1px", bgcolor: isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1) }} />
           </Box>
 
           {/* ── ROW E: Vehicle alerts table ── */}
-          <Paper sx={{ p: 1.5, borderRadius: 0 }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 1,
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary" }}
-              >
-                VEHICLE ALERTS — {selectedVehicle} &nbsp;
-                <span style={{ color: ct.axisColor, fontWeight: "normal" }}>
-                  (GOLD ALERTS DELTA)
-                </span>
+          <Card sx={{ p: 1.5 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px" }}>
+                VEHICLE ALERTS — {selectedVehicle}
+                <span style={{ color: isDark ? "#60a5fa" : "#3b82f6", fontWeight: 400 }}> (GOLD ALERTS DELTA)</span>
               </Typography>
               <Box sx={{ display: "flex", gap: 1 }}>
                 {vehicleAlertsQuery.data?.open?.length > 0 && (
-                  <Chip
-                    size="small"
-                    label={`${vehicleAlertsQuery.data.open.length} OPEN`}
-                    sx={{
-                      borderRadius: 0,
-                      fontWeight: "bold",
-                      fontSize: "10px",
-                      height: 18,
-                      bgcolor: "#d32f2f",
-                      color: "white",
-                    }}
+                  <Chip size="small" label={`${vehicleAlertsQuery.data.open.length} OPEN`}
+                    sx={{ borderRadius: "4px", fontWeight: "bold", fontSize: "10px", height: 18, bgcolor: "#ef4444", color: "white" }}
                   />
                 )}
                 {vehicleAlertsQuery.data?.closed?.length > 0 && (
-                  <Chip
-                    size="small"
-                    label={`${vehicleAlertsQuery.data.closed.length} CLOSED`}
-                    sx={{
-                      borderRadius: 0,
-                      fontWeight: "bold",
-                      fontSize: "10px",
-                      height: 18,
-                    }}
+                  <Chip size="small" label={`${vehicleAlertsQuery.data.closed.length} CLOSED`}
+                    sx={{ borderRadius: "4px", fontWeight: "bold", fontSize: "10px", height: 18 }}
                   />
                 )}
               </Box>
             </Box>
             {vehicleAlertsQuery.isLoading ? (
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                Loading…
-              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>Loading…</Typography>
             ) : (
-              <Box
-                sx={{
-                  maxHeight: 320,
-                  overflowY: "auto",
-                  overflowX: "auto",
-                  border: `1px solid ${theme.palette.divider}`,
-                }}
-              >
-                <table style={tableStyle}>
+              <Box sx={{ maxHeight: 320, overflowY: "auto", overflowX: "auto", border: `1px solid ${_tblBorder}`, borderRadius: 1 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" as const, fontFamily: "monospace", fontSize: "11px", color: _tblText }}>
                   <thead>
                     <tr>
-                      {[
-                        "STATUS",
-                        "MODULE",
-                        "STARTED",
-                        "PEAK TS",
-                        "ENDED",
-                        "MAX SCORE",
-                        "TOP FEATURES",
-                      ].map((h) => (
-                        <th key={h} style={tblHeaders}>
-                          {h}
-                        </th>
+                      {["STATUS", "MODULE", "STARTED", "PEAK TS", "ENDED", "MAX SCORE", "TOP FEATURES"].map((h) => (
+                        <th key={h} style={tblHeaders}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-
                   <tbody>
                     {[
                       ...(vehicleAlertsQuery.data?.open || []),
@@ -3285,245 +2884,80 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                     ].map((a, i) => (
                       <tr
                         key={a.alert_id || i}
-                        style={i % 2 === 0 ? tblRowEven : tblRowOdd}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = ct.gridColor;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background =
-                            i % 2 === 0 ? ct.tableBg : ct.tableAltBg;
-                        }}
+                        style={i % 2 === 0 ? tblRowEvens : tblRowOdds}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? alpha("#7dd3fc", 0.09) : alpha("#3b82f6", 0.05); }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? _tblEvenBg : _tblOddBg; }}
                       >
-                        {/* STATUS */}
                         <td style={tblCell}>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              minWidth: 56,
-                              padding: "2px 8px",
-                              fontSize: "10px",
-                              fontWeight: 700,
-                              borderRadius: 0,
-                              background:
-                                a.status === "OPEN"
-                                  ? "#d32f2f"
-                                  : ct.tableHeaderBg,
-                              color:
-                                a.status === "OPEN"
-                                  ? "#fff"
-                                  : ct.tableHeaderText,
-                            }}
-                          >
+                          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 56, padding: "2px 8px", fontSize: "10px", fontWeight: 700, borderRadius: "4px", background: a.status === "OPEN" ? "#ef4444" : _tblHdrBg, color: "#fff" }}>
                             {a.status}
                           </span>
                         </td>
-
-                        {/* MODULE */}
-                        <td
-                          style={{
-                            ...tblCell,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {(a.module || "—").toUpperCase()}
+                        <td style={{ ...tblCell, fontWeight: 600 }}>{(a.module || "—").toUpperCase()}</td>
+                        <td style={{ ...tblCell, color: _tblMuted }}>{String(a.alert_start_ts || "—").slice(0, 16)}</td>
+                        <td style={{ ...tblCell, color: _tblMuted }}>{String(a.peak_anomaly_ts || "—").slice(0, 16)}</td>
+                        <td style={{ ...tblCell, color: _tblMuted }}>{a.status === "CLOSED" ? String(a.alert_end_ts || "—").slice(0, 16) : "—"}</td>
+                        <td style={{ ...tblCell, fontWeight: 700, color: Number(a.max_composite_score) >= 80 ? "#ef4444" : Number(a.max_composite_score) >= 60 ? "#eab308" : "#22c55e" }}>
+                          {a.max_composite_score != null ? Number(a.max_composite_score).toFixed(1) : "—"}
                         </td>
-
-                        {/* START */}
-                        <td
-                          style={{
-                            ...tblCell,
-                            color: ct.axisColor,
-                          }}
-                        >
-                          {String(a.alert_start_ts || "—").slice(0, 16)}
-                        </td>
-
-                        {/* PEAK */}
-                        <td
-                          style={{
-                            ...tblCell,
-                            color: ct.axisColor,
-                          }}
-                        >
-                          {String(a.peak_anomaly_ts || "—").slice(0, 16)}
-                        </td>
-
-                        {/* END */}
-                        <td
-                          style={{
-                            ...tblCell,
-                            color: ct.axisColor,
-                          }}
-                        >
-                          {a.status === "CLOSED"
-                            ? String(a.alert_end_ts || "—").slice(0, 16)
-                            : "—"}
-                        </td>
-
-                        {/* SCORE */}
-                        <td
-                          style={{
-                            ...tblCell,
-                            fontWeight: 700,
-                            color:
-                              Number(a.max_composite_score) >= 80
-                                ? "#d32f2f"
-                                : Number(a.max_composite_score) >= 60
-                                ? "#ed6c02"
-                                : "#2e7d32",
-                          }}
-                        >
-                          {a.max_composite_score != null
-                            ? Number(a.max_composite_score).toFixed(1)
-                            : "—"}
-                        </td>
-
-                        {/* FEATURES */}
-                        <td
-                          style={{
-                            ...tblCell,
-                            color: ct.axisColor,
-                            maxWidth: 260,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                          title={a.top_10_features}
-                        >
+                        <td style={{ ...tblCell, color: _tblMuted, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.top_10_features}>
                           {a.top_10_features || "—"}
                         </td>
                       </tr>
                     ))}
-
-                    {!vehicleAlertsQuery.data?.open?.length &&
-                      !vehicleAlertsQuery.data?.closed?.length && (
-                        <tr>
-                          <td
-                            colSpan={7}
-                            style={{
-                              padding: "24px",
-                              textAlign: "center",
-                              color: ct.axisColor,
-                              borderBottom: `1px solid ${ct.tableBorder}`,
-                            }}
-                          >
-                            No alerts recorded for this vehicle
-                          </td>
-                        </tr>
-                      )}
+                    {!vehicleAlertsQuery.data?.open?.length && !vehicleAlertsQuery.data?.closed?.length && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: "24px", textAlign: "center" as const, color: _tblMuted, borderBottom: `1px solid ${_tblBorder}` }}>
+                          No alerts recorded for this vehicle
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </Box>
             )}
-          </Paper>
+          </Card>
 
           {/* ── ROW F: DTC run history ── */}
-          <Paper sx={{ p: 1.5, borderRadius: 0 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: "bold",
-                color: "text.secondary",
-                mb: 1,
-                display: "block",
-              }}
-            >
+          <Card sx={{ p: 1.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", mb: 1, display: "block", fontSize: "10px", letterSpacing: "0.06em" }}>
               DTC ANALYSIS RUN HISTORY — {selectedVehicle} &nbsp;
-              <span style={{ color: ct.axisColor, fontWeight: "normal" }}>
-                (last 50 runs)
-              </span>
+              <span style={{ color: isDark ? "#60a5fa" : "#3b82f6", fontWeight: 400 }}>(last 50 runs)</span>
             </Typography>
             {dtcHistoryQuery.isLoading ? (
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                Loading…
-              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>Loading…</Typography>
             ) : (
               <Box sx={{ overflowX: "auto" }}>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontFamily: "monospace",
-                    fontSize: "11px",
-                  }}
-                >
+                <table style={{ width: "100%", borderCollapse: "collapse" as const, fontFamily: "monospace", fontSize: "11px", color: _tblText }}>
                   <thead>
                     <tr>
-                      {["RUN TIME", "MODULE", "PEAK TS", "TRIGGERED CODES"].map(
-                        (h) => (
-                          <th key={h} style={tblHeader}>
-                            {h}
-                          </th>
-                        )
-                      )}
+                      {["RUN TIME", "MODULE", "PEAK TS", "TRIGGERED CODES"].map((h) => (
+                        <th key={h} style={tblHeader}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {(dtcHistoryQuery.data?.runs || []).map(
-                      (run: any, i: number) => (
-                        <tr
-                          key={i}
-                          style={i % 2 === 0 ? tblRowEven : tblRowOdd}
-                        >
-                          <td
-                            style={{ padding: "5px 12px", color: ct.axisColor }}
-                          >
-                            {String(run.run_ts || "—").slice(0, 16)}
-                          </td>
-                          <td style={{ padding: "5px 12px", fontWeight: 600 }}>
-                            {(run.module || "—").toUpperCase()}
-                          </td>
-                          <td
-                            style={{ padding: "5px 12px", color: ct.axisColor }}
-                          >
-                            {String(run.peak_ts || "—").slice(0, 16)}
-                          </td>
-                          <td style={{ padding: "5px 12px" }}>
-                            {(run.triggers || []).length === 0 ? (
-                              <span
-                                style={{ color: "#2e7d32", fontWeight: 600 }}
-                              >
-                                NO FAULTS
+                    {(dtcHistoryQuery.data?.runs || []).map((run: any, i: number) => (
+                      <tr key={i} style={i % 2 === 0 ? tblRowEven : tblRowOdd}>
+                        <td style={{ padding: "5px 12px", color: _tblMuted }}>{String(run.run_ts || "—").slice(0, 16)}</td>
+                        <td style={{ padding: "5px 12px", fontWeight: 600 }}>{(run.module || "—").toUpperCase()}</td>
+                        <td style={{ padding: "5px 12px", color: _tblMuted }}>{String(run.peak_ts || "—").slice(0, 16)}</td>
+                        <td style={{ padding: "5px 12px" }}>
+                          {(run.triggers || []).length === 0 ? (
+                            <span style={{ color: "#22c55e", fontWeight: 600 }}>NO FAULTS</span>
+                          ) : (
+                            (run.triggers as any[]).map((t: any, j: number) => (
+                              <span key={j} style={{ display: "inline-block", marginRight: 6, padding: "1px 6px", fontSize: "10px", fontWeight: 700, borderRadius: "4px", background: t.severity === "CRITICAL" ? "#ef4444" : "#eab308", color: "white" }}>
+                                {t.code}
                               </span>
-                            ) : (
-                              (run.triggers as any[]).map(
-                                (t: any, j: number) => (
-                                  <span
-                                    key={j}
-                                    style={{
-                                      display: "inline-block",
-                                      marginRight: 6,
-                                      padding: "1px 6px",
-                                      fontSize: "10px",
-                                      fontWeight: 700,
-                                      background:
-                                        t.severity === "CRITICAL"
-                                          ? "#d32f2f"
-                                          : "#ed6c02",
-                                      color: "white",
-                                    }}
-                                  >
-                                    {t.code}
-                                  </span>
-                                )
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    )}
+                            ))
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                     {!dtcHistoryQuery.data?.runs?.length && (
                       <tr>
-                        <td
-                          colSpan={4}
-                          style={{
-                            padding: "10px 12px",
-                            color: ct.axisColor,
-                            textAlign: "center",
-                          }}
-                        >
+                        <td colSpan={4} style={{ padding: "10px 12px", color: _tblMuted, textAlign: "center" as const }}>
                           No DTC analysis runs recorded for this vehicle
                         </td>
                       </tr>
@@ -3532,7 +2966,7 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                 </table>
               </Box>
             )}
-          </Paper>
+          </Card>
 
           {/* ── SECTION DIVIDER ── */}
           <Box
@@ -3555,68 +2989,31 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
           </Box>
 
           {/* ── ROW G: On-demand DTC analysis ── */}
-          <Paper sx={{ p: 1.5, borderRadius: 0 }}>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-                mb: 1.5,
-                flexWrap: "wrap",
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary" }}
-              >
-                DTC DEEP DIVE — {selectedVehicle} /{" "}
-                {selectedModule.toUpperCase()}
+          <Card sx={{ p: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1.5, flexWrap: "wrap" }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px", letterSpacing: "0.06em" }}>
+                DTC DEEP DIVE — {selectedVehicle} / {selectedModule.toUpperCase()}
               </Typography>
               <button
                 onClick={runDtcAnalysis}
                 disabled={dtcRunning || !selectedVehicle}
                 style={{
-                  padding: "4px 14px",
-                  fontFamily: "monospace",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  background: dtcRunning
-                    ? theme.palette.action.disabledBackground
-                    : theme.palette.primary.main,
+                  padding: "4px 14px", fontFamily: "monospace", fontSize: "11px", fontWeight: 700,
+                  background: dtcRunning ? theme.palette.action.disabledBackground : theme.palette.primary.main,
                   color: dtcRunning ? theme.palette.text.disabled : "white",
-                  border: "none",
-                  borderRadius: 0,
-                  cursor: dtcRunning ? "not-allowed" : "pointer",
-                  letterSpacing: "0.5px",
+                  border: "none", borderRadius: "4px", cursor: dtcRunning ? "not-allowed" : "pointer", letterSpacing: "0.5px",
                 }}
               >
                 {dtcRunning ? "RUNNING INFERENCE…" : "RUN DTC ANALYSIS"}
               </button>
-              <Typography
-                variant="caption"
-                sx={{
-                  color: "text.secondary",
-                  fontFamily: "monospace",
-                  fontSize: "10px",
-                }}
-              >
-                Runs PyTorch fault models on 600-row bronze traceback at peak
-                anomaly timestamp
+              <Typography variant="caption" sx={{ color: isDark ? "#64748b" : "#94a3b8", fontFamily: "monospace", fontSize: "10px" }}>
+                Runs PyTorch fault models on 600-row bronze traceback at peak anomaly timestamp
               </Typography>
             </Box>
 
             {dtcResult?.error && (
-              <Box
-                sx={{
-                  p: 1.5,
-                  bgcolor: darkMode ? "rgba(230,81,0,0.1)" : "#fff8e1",
-                  border: `1px solid ${darkMode ? "#e65100" : "#ffe082"}`,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{ color: "#e65100", fontFamily: "monospace" }}
-                >
+              <Box sx={{ p: 1.5, bgcolor: isDark ? alpha("#e65100", 0.1) : "#fff8e1", border: `1px solid ${isDark ? "#e65100" : "#ffe082"}`, borderRadius: 1 }}>
+                <Typography variant="caption" sx={{ color: "#e65100", fontFamily: "monospace" }}>
                   {dtcResult.error}
                 </Typography>
               </Box>
@@ -3624,88 +3021,24 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
 
             {dtcResult?.success && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    gap: 1,
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: "bold",
-                      color: "text.secondary",
-                      mr: 0.5,
-                    }}
-                  >
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", mr: 0.5, fontSize: "10px" }}>
                     TRIGGERED CODES:
                   </Typography>
                   {dtcResult.triggers?.length === 0 ? (
-                    <Chip
-                      size="small"
-                      label="NO FAULTS TRIGGERED"
-                      sx={{
-                        borderRadius: 0,
-                        fontWeight: "bold",
-                        bgcolor: "#e8f5e9",
-                        color: "#2e7d32",
-                        fontSize: "11px",
-                      }}
-                    />
+                    <Chip size="small" label="NO FAULTS TRIGGERED" sx={{ borderRadius: "4px", fontWeight: "bold", bgcolor: isDark ? alpha("#22c55e", 0.15) : "#dcfce7", color: "#22c55e", fontSize: "11px" }} />
                   ) : (
                     (dtcResult.triggers as any[]).map((t: any, i: number) => (
-                      <Box
-                        key={i}
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          p: 1,
-                          border: `1px solid ${
-                            t.severity === "CRITICAL" ? "#d32f2f" : "#ed6c02"
-                          }`,
-                          minWidth: 200,
-                          maxWidth: 320,
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            gap: 1,
-                            alignItems: "center",
-                            mb: 0.5,
-                          }}
-                        >
-                          <span
-                            style={{
-                              padding: "1px 6px",
-                              fontSize: "10px",
-                              fontWeight: 700,
-                              background:
-                                t.severity === "CRITICAL"
-                                  ? "#d32f2f"
-                                  : "#ed6c02",
-                              color: "white",
-                            }}
-                          >
+                      <Box key={i} sx={{ display: "flex", flexDirection: "column", p: 1, borderRadius: 1, border: `1px solid ${t.severity === "CRITICAL" ? "#ef4444" : "#eab308"}`, minWidth: 200, maxWidth: 320 }}>
+                        <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 0.5 }}>
+                          <span style={{ padding: "1px 6px", fontSize: "10px", fontWeight: 700, borderRadius: "4px", background: t.severity === "CRITICAL" ? "#ef4444" : "#eab308", color: "white" }}>
                             {t.severity}
                           </span>
-                          <Typography
-                            variant="caption"
-                            sx={{ fontWeight: "bold", fontFamily: "monospace" }}
-                          >
+                          <Typography variant="caption" sx={{ fontWeight: "bold", fontFamily: "monospace" }}>
                             {t.code}
                           </Typography>
                         </Box>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontSize: "10px",
-                            color: "text.secondary",
-                            lineHeight: 1.4,
-                          }}
-                        >
+                        <Typography variant="caption" sx={{ fontSize: "10px", color: isDark ? "#94a3b8" : "#64748b", lineHeight: 1.4 }}>
                           {t.message}
                         </Typography>
                       </Box>
@@ -3714,107 +3047,38 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
                 </Box>
 
                 <Box sx={{ display: "flex", gap: 2, height: 380 }}>
-                  <Paper
-                    sx={{
-                      flex: 1,
-                      borderRadius: 0,
-                      border: `1px solid ${theme.palette.divider}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                  <Card sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {dtcResult.critical_plot ? (
-                      <Plot
-                        data={dtcResult.critical_plot.data}
-                        layout={{
-                          ...(dtcResult.critical_plot.layout || {}),
-                          ...plotLayout,
-                        }}
-                        useResizeHandler={true}
-                        style={{ width: "100%", height: "100%" }}
-                        config={{ displayModeBar: false }}
-                      />
+                      <Plot data={dtcResult.critical_plot.data} layout={{ ...(dtcResult.critical_plot.layout || {}), ...plotLayout }} useResizeHandler={true} style={{ width: "100%", height: "100%" }} config={{ displayModeBar: false }} />
                     ) : (
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary" }}
-                      >
-                        No critical DTCs monitored for this module
-                      </Typography>
+                      <Typography variant="caption" sx={{ color: isDark ? "#64748b" : "#94a3b8" }}>No critical DTCs monitored for this module</Typography>
                     )}
-                  </Paper>
-                  <Paper
-                    sx={{
-                      flex: 1,
-                      borderRadius: 0,
-                      border: `1px solid ${theme.palette.divider}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                  </Card>
+                  <Card sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {dtcResult.non_critical_plot ? (
-                      <Plot
-                        data={dtcResult.non_critical_plot.data}
-                        layout={{
-                          ...(dtcResult.non_critical_plot.layout || {}),
-                          ...plotLayout,
-                        }}
-                        useResizeHandler={true}
-                        style={{ width: "100%", height: "100%" }}
-                        config={{ displayModeBar: false }}
-                      />
+                      <Plot data={dtcResult.non_critical_plot.data} layout={{ ...(dtcResult.non_critical_plot.layout || {}), ...plotLayout }} useResizeHandler={true} style={{ width: "100%", height: "100%" }} config={{ displayModeBar: false }} />
                     ) : (
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary" }}
-                      >
-                        No non-critical DTCs monitored for this module
-                      </Typography>
+                      <Typography variant="caption" sx={{ color: isDark ? "#64748b" : "#94a3b8" }}>No non-critical DTCs monitored for this module</Typography>
                     )}
-                  </Paper>
+                  </Card>
                 </Box>
 
-                {dtcResult.diagnostics?.skipped_dtcs &&
-                  Object.keys(dtcResult.diagnostics.skipped_dtcs).length >
-                    0 && (
-                    <Box
-                      sx={{
-                        p: 1,
-                        bgcolor: "background.default",
-                        border: `1px solid ${theme.palette.divider}`,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "text.secondary",
-                          fontFamily: "monospace",
-                          fontSize: "10px",
-                        }}
-                      >
-                        SKIPPED:{" "}
-                        {Object.keys(dtcResult.diagnostics.skipped_dtcs).join(
-                          ", "
-                        )}{" "}
-                        — missing bronze features
-                      </Typography>
-                    </Box>
-                  )}
+                {dtcResult.diagnostics?.skipped_dtcs && Object.keys(dtcResult.diagnostics.skipped_dtcs).length > 0 && (
+                  <Box sx={{ p: 1, bgcolor: isDark ? alpha("#0b1724", 0.6) : "#f8fafc", border: `1px solid ${_tblBorder}`, borderRadius: 1 }}>
+                    <Typography variant="caption" sx={{ color: isDark ? "#64748b" : "#94a3b8", fontFamily: "monospace", fontSize: "10px" }}>
+                      SKIPPED: {Object.keys(dtcResult.diagnostics.skipped_dtcs).join(", ")} — missing bronze features
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             )}
 
             {!dtcResult && !dtcRunning && (
-              <Typography
-                variant="caption"
-                sx={{ color: "text.secondary", fontFamily: "monospace" }}
-              >
-                Click RUN DTC ANALYSIS to run fault inference. Requires
-                dtc_service/api.py to be running.
+              <Typography variant="caption" sx={{ color: isDark ? "#64748b" : "#94a3b8", fontFamily: "monospace" }}>
+                Click RUN DTC ANALYSIS to run fault inference. Requires dtc_service/api.py to be running.
               </Typography>
             )}
-          </Paper>
+          </Card>
 
           {/* ── SECTION DIVIDER ── */}
           <Box
@@ -3837,84 +3101,38 @@ export default function AutomotiveDive({ isActive = true }: { isActive?: boolean
           </Box>
 
           {/* ── Sensor Timeline ── */}
-          <Paper sx={{ p: 1.5, borderRadius: 0 }}>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-                mb: 1,
-                flexWrap: "wrap",
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary" }}
-              >
-                SENSOR TIMELINE — {selectedModule.toUpperCase()} ·{" "}
-                {selectedVehicle || "—"}
+          <Card sx={{ p: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1, flexWrap: "wrap" }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "10px", letterSpacing: "0.06em" }}>
+                SENSOR TIMELINE — {selectedModule.toUpperCase()} · {selectedVehicle || "—"}
               </Typography>
               {allVehicleSensorKeys.length > 0 && (
                 <FormControl size="small" sx={{ minWidth: 300 }}>
                   <Select
-                    value={
-                      vehicleTimelineSensorKey ||
-                      allVehicleSensorKeys[0]?.key ||
-                      ""
-                    }
-                    onChange={(e) =>
-                      setVehicleTimelineSensorKey(e.target.value)
-                    }
-                    sx={{
-                      borderRadius: 0,
-                      fontFamily: "monospace",
-                      fontSize: "11px",
-                    }}
+                    value={vehicleTimelineSensorKey || allVehicleSensorKeys[0]?.key || ""}
+                    onChange={(e) => setVehicleTimelineSensorKey(e.target.value)}
+                    sx={{ borderRadius: 1, fontFamily: "monospace", fontSize: "11px" }}
                   >
                     {allVehicleSensorKeys.map((s) => (
-                      <MenuItem
-                        key={s.key}
-                        value={s.key}
-                        sx={{ fontFamily: "monospace", fontSize: "11px" }}
-                      >
+                      <MenuItem key={s.key} value={s.key} sx={{ fontFamily: "monospace", fontSize: "11px" }}>
                         {s.groupTitle} — {s.label}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               )}
-              <Chip
-                size="small"
-                label={`${downsampledBronze.length} pts`}
-                sx={{ borderRadius: 0, fontWeight: "bold", fontSize: "11px" }}
-              />
+              <Chip size="small" label={`${downsampledBronze.length} pts`} sx={{ borderRadius: "4px", fontWeight: "bold", fontSize: "11px" }} />
             </Box>
             {vehicleTimelineSensorGroup && downsampledBronze.length > 0 ? (
-              <SensorChart
-                data={downsampledBronze}
-                group={vehicleTimelineSensorGroup}
-                xAxisMode={xAxisMode}
-                height={280}
-              />
+              <SensorChart data={downsampledBronze} group={vehicleTimelineSensorGroup} xAxisMode={xAxisMode} height={280} />
             ) : (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: 280,
-                }}
-              >
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  {!selectedVehicle
-                    ? "Select a vehicle"
-                    : sensorQuery.isLoading
-                    ? "Loading…"
-                    : "No bronze sensor data for this module"}
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: 280 }}>
+                <Typography variant="caption" sx={{ color: isDark ? "#64748b" : "#94a3b8" }}>
+                  {!selectedVehicle ? "Select a vehicle" : sensorQuery.isLoading ? "Loading…" : "No bronze sensor data for this module"}
                 </Typography>
               </Box>
             )}
-          </Paper>
+          </Card>
         </Box>
       )}
 

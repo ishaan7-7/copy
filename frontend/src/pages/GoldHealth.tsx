@@ -9,7 +9,6 @@ import {
   InputLabel,
   ToggleButton,
   ToggleButtonGroup,
-  Divider,
   Checkbox,
   FormControlLabel,
   Slider,
@@ -18,8 +17,10 @@ import {
   Chip,
   TextField,
   IconButton,
+  Stack,
+  Tooltip,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, alpha } from "@mui/material/styles";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { ModuleRegistry, ClientSideRowModelModule } from "ag-grid-community";
@@ -28,7 +29,6 @@ import "ag-grid-community/styles/ag-theme-balham.css";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useStore } from "../store";
-import { useChartTheme } from "../hooks/useChartTheme";
 import { MODULE_COLORS } from "../constants/chartColors";
 import {
   LineChart,
@@ -36,15 +36,22 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
 } from "recharts";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import DirectionsCarOutlinedIcon from "@mui/icons-material/DirectionsCarOutlined";
+import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
+import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
+
+const CHART_FONT = '"Inter", "Segoe UI", Roboto, Arial, sans-serif';
 
 const ALL_MODULES = ["engine", "transmission", "battery", "body", "tyre"];
 
@@ -130,30 +137,12 @@ function WeightPanel({
         overflowY: "auto",
         p: 1.5,
         gap: 1,
-
-        "& .MuiTypography-root": {
-          fontSize: "10px",
-        },
-
-        "& .MuiInputLabel-root": {
-          fontSize: "10px",
-        },
-
-        "& .MuiSelect-select": {
-          fontSize: "10px",
-        },
-
-        "& .MuiMenuItem-root": {
-          fontSize: "10px",
-        },
-
-        "& .MuiInputBase-input": {
-          fontSize: "10px",
-        },
-
-        "& .MuiButton-root": {
-          fontSize: "10px",
-        },
+        "& .MuiTypography-root": { fontSize: "10px" },
+        "& .MuiInputLabel-root": { fontSize: "10px" },
+        "& .MuiSelect-select": { fontSize: "10px" },
+        "& .MuiMenuItem-root": { fontSize: "10px" },
+        "& .MuiInputBase-input": { fontSize: "10px" },
+        "& .MuiButton-root": { fontSize: "10px" },
       }}
     >
       <Typography
@@ -167,39 +156,22 @@ function WeightPanel({
         {label}
       </Typography>
 
-      {/* Preset */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 0.75,
-          mb: 1,
-          alignItems: "center",
-        }}
-      >
+      <Box sx={{ display: "flex", gap: 0.75, mb: 1, alignItems: "center" }}>
         <FormControl size="small" sx={{ flex: 1 }}>
           <Select
             value={selectedPreset}
             onChange={(e) => setSelectedPreset(e.target.value)}
             displayEmpty
-            sx={{
-              borderRadius: 0,
-              fontSize: "10px",
-              height: 30,
-            }}
+            sx={{ borderRadius: 1, fontSize: "10px", height: 30 }}
             MenuProps={{
               PaperProps: {
-                sx: {
-                  "& .MuiMenuItem-root": {
-                    fontSize: "10px",
-                  },
-                },
+                sx: { "& .MuiMenuItem-root": { fontSize: "10px" } },
               },
             }}
           >
             <MenuItem value="">
               <em>— Select Preset —</em>
             </MenuItem>
-
             {Object.keys(allPresets).map((name) => (
               <MenuItem key={name} value={name}>
                 {name}
@@ -216,7 +188,7 @@ function WeightPanel({
           }}
           disabled={!selectedPreset}
           sx={{
-            borderRadius: 0,
+            borderRadius: 1,
             fontWeight: 700,
             fontSize: "10px",
             minWidth: 55,
@@ -234,28 +206,21 @@ function WeightPanel({
               onDeletePreset(selectedPreset);
               setSelectedPreset("");
             }}
-            sx={{
-              borderRadius: 0,
-              p: 0.5,
-            }}
+            sx={{ p: 0.5 }}
           >
             <DeleteIcon sx={{ fontSize: 14 }} />
           </IconButton>
         )}
       </Box>
 
-      {/* Warning */}
       {isImbalanced && (
         <Alert
           severity="warning"
           icon={false}
           sx={{
-            borderRadius: 0,
+            borderRadius: 1,
             mb: 1,
-
-            "& .MuiAlert-message": {
-              p: 0,
-            },
+            "& .MuiAlert-message": { p: 0 },
           }}
           action={
             <Button
@@ -263,44 +228,23 @@ function WeightPanel({
               color="inherit"
               onClick={onAutoBalance}
               startIcon={<AutoFixHighIcon sx={{ fontSize: 12 }} />}
-              sx={{
-                fontSize: "10px",
-              }}
+              sx={{ fontSize: "10px", borderRadius: 1 }}
             >
               RECALIBRATE
             </Button>
           }
         >
-          <Typography
-            sx={{
-              fontWeight: 700,
-              fontSize: "10px",
-            }}
-          >
+          <Typography sx={{ fontWeight: 700, fontSize: "10px" }}>
             Sum: {weightSum.toFixed(3)} (Target: 1.0)
           </Typography>
         </Alert>
       )}
 
-      {/* Modules */}
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 1.25,
-        }}
-      >
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
         {ALL_MODULES.map((mod) => {
           const isActive = modules.includes(mod);
-
           return (
-            <Box
-              key={mod}
-              sx={{
-                opacity: isActive ? 1 : 0.5,
-                px: 0.5,
-              }}
-            >
+            <Box key={mod} sx={{ opacity: isActive ? 1 : 0.5, px: 0.5 }}>
               <Box
                 sx={{
                   display: "flex",
@@ -315,10 +259,7 @@ function WeightPanel({
                       size="small"
                       checked={isActive}
                       onChange={() => onToggleModule(mod)}
-                      sx={{
-                        color: MODULE_COLORS[mod],
-                        p: 0.5,
-                      }}
+                      sx={{ color: MODULE_COLORS[mod], p: 0.5 }}
                     />
                   }
                   label={
@@ -333,19 +274,17 @@ function WeightPanel({
                     </Typography>
                   }
                 />
-
                 <Chip
                   size="small"
                   label={isActive ? (weights[mod] || 0).toFixed(2) : "OFF"}
                   sx={{
-                    borderRadius: 0,
+                    borderRadius: "4px",
                     height: 18,
                     fontSize: "10px",
                     fontWeight: 700,
                   }}
                 />
               </Box>
-
               <Slider
                 size="small"
                 value={weights[mod] || 0}
@@ -359,14 +298,8 @@ function WeightPanel({
                   ml: 3,
                   width: "calc(100% - 24px)",
                   mt: -0.5,
-
-                  "& .MuiSlider-markLabel": {
-                    fontSize: "10px",
-                  },
-
-                  "& .MuiSlider-valueLabel": {
-                    fontSize: "10px",
-                  },
+                  "& .MuiSlider-markLabel": { fontSize: "10px" },
+                  "& .MuiSlider-valueLabel": { fontSize: "10px" },
                 }}
               />
             </Box>
@@ -374,7 +307,6 @@ function WeightPanel({
         })}
       </Box>
 
-      {/* Save */}
       <Box
         sx={{
           mt: 1.5,
@@ -391,18 +323,10 @@ function WeightPanel({
           onChange={(e) => setSaveAsName(e.target.value)}
           sx={{
             flex: 1,
-
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 0,
-              height: 30,
-            },
-
-            "& .MuiInputBase-input": {
-              fontSize: "10px",
-            },
+            "& .MuiOutlinedInput-root": { borderRadius: 1, height: 30 },
+            "& .MuiInputBase-input": { fontSize: "10px" },
           }}
         />
-
         <Button
           size="small"
           variant="contained"
@@ -413,7 +337,7 @@ function WeightPanel({
           }}
           disabled={!saveAsName.trim()}
           sx={{
-            borderRadius: 0,
+            borderRadius: 1,
             fontWeight: 700,
             fontSize: "10px",
             px: 2,
@@ -427,11 +351,154 @@ function WeightPanel({
   );
 }
 
+// ── Inline design-system components ──────────────────────────────────────────
+
+const Card = ({ children, sx }: { children: React.ReactNode; sx?: object }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 2,
+        overflow: "hidden",
+        bgcolor: isDark ? alpha("#0b1724", 0.9) : "#ffffff",
+        border: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.1)}`,
+        boxShadow: isDark
+          ? `0 18px 42px ${alpha("#000", 0.22)}`
+          : `0 12px 30px ${alpha("#334155", 0.08)}`,
+        ...sx,
+      }}
+    >
+      {children}
+    </Paper>
+  );
+};
+
+const SectionTitle = ({
+  title,
+  action,
+}: {
+  title: string;
+  action?: React.ReactNode;
+}) => (
+  <Box
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 1,
+      mb: 1,
+    }}
+  >
+    <Typography sx={{ fontSize: "12px", fontWeight: 800 }}>{title}</Typography>
+    {action}
+  </Box>
+);
+
+const MetricTile = ({
+  label,
+  value,
+  icon,
+  color,
+  delta,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: string;
+  delta?: string;
+}) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <Box
+      sx={{
+        p: 1,
+        borderRadius: 1.5,
+        border: `1px solid ${alpha(color, isDark ? 0.22 : 0.18)}`,
+        bgcolor: alpha(color, isDark ? 0.07 : 0.05),
+        display: "flex",
+        flexDirection: "column",
+        gap: 0.35,
+        position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "3px",
+          height: "100%",
+          bgcolor: color,
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: "16px",
+            fontWeight: 800,
+            lineHeight: 1,
+            pl: 0.5,
+            color: isDark ? "#f1f5f9" : "#0f172a",
+          }}
+        >
+          {value}
+        </Typography>
+        <Box
+          sx={{
+            width: 24,
+            height: 24,
+            borderRadius: "6px",
+            bgcolor: alpha(color, isDark ? 0.2 : 0.12),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </Box>
+      </Box>
+      <Typography
+        sx={{
+          fontSize: "10px",
+          fontWeight: 600,
+          color: "text.secondary",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px",
+          pl: 0.5,
+          lineHeight: 1,
+        }}
+      >
+        {label}
+      </Typography>
+      {delta && (
+        <Typography
+          sx={{ fontSize: "9px", color, fontWeight: 700, pl: 0.5, lineHeight: 1 }}
+        >
+          {delta}
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function GoldHealth({ isActive = true }: { isActive?: boolean }) {
-  const { autoRefresh, darkMode } = useStore();
+  const { autoRefresh } = useStore();
   const wasActiveRef = useRef(isActive);
   const theme = useTheme();
-  const ct = useChartTheme();
+  const isDark = theme.palette.mode === "dark";
 
   const [activeTab, setActiveTab] = useState<"operations" | "experiment">(
     "operations"
@@ -457,7 +524,8 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
   const { data: metrics, refetch: refetchMetrics } = useQuery({
     queryKey: ["goldMetrics"],
     queryFn: fetchGoldMetrics,
-    refetchInterval: isActive && activeTab === "operations" && autoRefresh ? 5000 : false,
+    refetchInterval:
+      isActive && activeTab === "operations" && autoRefresh ? 5000 : false,
   });
   const { data: config } = useQuery({
     queryKey: ["goldConfig"],
@@ -470,7 +538,8 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
   const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ["goldHistory", filterSim],
     queryFn: () => fetchGoldHistory(filterSim),
-    refetchInterval: isActive && activeTab === "operations" && autoRefresh ? 8000 : false,
+    refetchInterval:
+      isActive && activeTab === "operations" && autoRefresh ? 8000 : false,
   });
 
   useEffect(() => {
@@ -546,7 +615,8 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
     setExpWeightsB((prev) => ({ ...prev, [mod]: val }));
   };
   const currentWeightSumB = useMemo(
-    () => activeModulesB.reduce((sum, mod) => sum + (expWeightsB[mod] || 0), 0),
+    () =>
+      activeModulesB.reduce((sum, mod) => sum + (expWeightsB[mod] || 0), 0),
     [activeModulesB, expWeightsB]
   );
   const isUnbalancedB = Math.abs(currentWeightSumB - 1.0) > 0.001;
@@ -599,7 +669,6 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
     [activeModules, expWeights]
   );
   const isUnbalanced = Math.abs(currentWeightSum - 1.0) > 0.001;
-
   const autoBalanceWeights = () => {
     if (currentWeightSum === 0) return;
     const balanced: Record<string, number> = {};
@@ -644,7 +713,6 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
           (m) => (grouped[row.ts_short][`${m}_raw`] += row[`${m}_raw`])
         );
       });
-
       return Object.keys(grouped)
         .map((ts) => {
           const g = grouped[ts];
@@ -665,7 +733,6 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
         })
         .sort((a, b) => a.ts_short.localeCompare(b.ts_short));
     }
-
     return processedRows;
   }, [history, config, activeModules, expWeights, filterSim]);
 
@@ -762,154 +829,250 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
         width: key.includes("ts") ? 200 : 140,
         cellStyle:
           key === "vehicle_health_score"
-            ? (params: any) => ({
-                fontWeight: "bold",
-                color:
-                  params.value < 50
-                    ? "#d32f2f"
-                    : params.value < 80
-                    ? "#f57c00"
-                    : "#388e3c",
-              })
+            ? (params: any): any => {
+                const color =
+                  params.value >= 80
+                    ? "#22c55e"
+                    : params.value >= 60
+                    ? "#eab308"
+                    : "#ef4444";
+                return {
+                  fontWeight: "bold",
+                  color,
+                  backgroundColor:
+                    params.value < 60
+                      ? isDark
+                        ? "rgba(239,68,68,0.15)"
+                        : "#fee2e2"
+                      : "transparent",
+                };
+              }
             : undefined,
       });
     });
     return cols;
-  }, [history]);
+  }, [history, isDark]);
 
-  const agTheme = darkMode ? "ag-theme-balham-dark" : "ag-theme-balham";
-  const chartAxisStyle = {
-    fontSize: "11px",
-    fill: ct.axisColor,
-    fontWeight: 600,
+  const agTheme = isDark ? "ag-theme-balham-dark" : "ag-theme-balham";
+
+  const agGridContainerSx: object = {
+    "--ag-background-color": "transparent",
+    "--ag-odd-row-background-color": isDark ? alpha("#7dd3fc", 0.04) : "#f8fafc",
+    "--ag-row-hover-color": isDark
+      ? alpha("#7dd3fc", 0.09)
+      : alpha("#3b82f6", 0.05),
+    "--ag-selected-row-background-color": isDark
+      ? alpha("#3b82f6", 0.22)
+      : alpha("#3b82f6", 0.1),
+    "--ag-foreground-color": isDark ? "#e2e8f0" : "#0f172a",
+    "--ag-data-color": isDark ? "#e2e8f0" : "#1f2937",
+    "--ag-secondary-foreground-color": isDark ? "#94a3b8" : "#64748b",
+    "--ag-border-color": isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1),
+    "--ag-row-border-color": isDark
+      ? alpha("#7dd3fc", 0.07)
+      : alpha("#1f2937", 0.07),
+    "--ag-input-focus-border-color": isDark
+      ? alpha("#7dd3fc", 0.5)
+      : alpha("#3b82f6", 0.5),
+    "& .ag-header": {
+      backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important`,
+    },
+    "& .ag-header-cell": {
+      backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important`,
+      color: "#fff !important",
+      fontSize: "11px !important",
+      fontWeight: "700 !important",
+      letterSpacing: "0.04em !important",
+    },
+    "& .ag-header-cell-label": { color: "#fff !important" },
+    "& .ag-icon": { color: "#fff !important" },
+    "& .ag-header-icon": { color: "#fff !important" },
+    "& .ag-sort-ascending-icon": { color: "#fff !important" },
+    "& .ag-sort-descending-icon": { color: "#fff !important" },
+    "& .ag-sort-none-icon": { color: "#fff !important" },
+    "& .ag-cell": { fontSize: "10px !important" },
+    "& .ag-row": {
+      fontSize: "10px !important",
+      borderColor: `${
+        isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.08)
+      } !important`,
+    },
+    "& .ag-root-wrapper": { borderRadius: "6px", border: "none !important" },
+    "& .ag-root-wrapper-body": { borderRadius: "6px" },
   };
+
+  const chartAxisStyle = {
+    fontSize: "10px",
+    fill: isDark ? "#94a3b8" : "#64748b",
+    fontFamily: CHART_FONT,
+  };
+
   const tooltipStyle = {
-    borderRadius: 0,
-    fontSize: "12px",
-    padding: "10px",
-    backgroundColor: ct.tooltipBg,
-    border: `1px solid ${ct.tooltipBorder}`,
-    color: ct.tooltipText,
+    backgroundColor: isDark ? alpha("#0b1724", 0.97) : "#ffffff",
+    border: `1px solid ${
+      isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.15)
+    }`,
+    borderRadius: 8,
+    fontSize: "11px",
+    padding: "10px 14px",
+    color: isDark ? "#e2e8f0" : "#0f172a",
+    boxShadow: isDark
+      ? `0 8px 20px ${alpha("#000", 0.35)}`
+      : `0 4px 12px ${alpha("#334155", 0.12)}`,
+  };
+
+  const selectSx = {
+    borderRadius: 1,
+    fontSize: "10px",
+    height: 28,
+    bgcolor: isDark ? alpha("#0b1724", 0.6) : "#ffffff",
+    "& .MuiSelect-select": { fontSize: "10px", py: 0.5 },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.18),
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: isDark ? alpha("#7dd3fc", 0.4) : alpha("#1f2937", 0.35),
+    },
+  };
+
+  const menuPropsSx = {
+    PaperProps: {
+      sx: {
+        bgcolor: isDark ? "#0b1724" : "#ffffff",
+        border: `1px solid ${
+          isDark ? alpha("#7dd3fc", 0.15) : alpha("#1f2937", 0.1)
+        }`,
+        "& .MuiMenuItem-root": {
+          fontSize: "10px",
+          "&:hover": {
+            bgcolor: isDark
+              ? alpha("#7dd3fc", 0.06)
+              : alpha("#3b82f6", 0.05),
+          },
+        },
+      },
+    },
+  };
+
+  const healthValue =
+    filterSim === "ALL"
+      ? fleetHealthKpi
+      : latestRow?.vehicle_health_score || 0;
+  const healthColor =
+    healthValue >= 80 ? "#22c55e" : healthValue >= 60 ? "#eab308" : "#ef4444";
+
+  const tabSwitcherSx = {
+    bgcolor: isDark ? alpha("#020c16", 0.7) : alpha("#dde6ef", 0.6),
+    borderRadius: "10px",
+    border: `1px solid ${
+      isDark ? alpha("#7dd3fc", 0.08) : alpha("#94a3b8", 0.2)
+    }`,
+    p: "3px",
+    "& .MuiToggleButtonGroup-grouped": {
+      border: "none !important",
+      borderRadius: "7px !important",
+    },
+    "& .MuiToggleButton-root": {
+      py: "5px",
+      px: "14px",
+      fontSize: "10px",
+      fontWeight: 600,
+      lineHeight: 1,
+      textTransform: "none",
+      letterSpacing: "0.015em",
+      whiteSpace: "nowrap",
+      color: isDark ? alpha("#94a3b8", 0.8) : "#64748b",
+      transition: "background-color 0.15s, color 0.15s, box-shadow 0.15s",
+      "&.Mui-selected": {
+        color: isDark ? "#f1f5f9" : "#0f172a",
+        fontWeight: 700,
+        bgcolor: isDark ? "#0d2137" : "#ffffff",
+        boxShadow: isDark
+          ? `0 1px 4px ${alpha("#000", 0.45)}, 0 0 0 1px ${alpha(
+              "#7dd3fc",
+              0.06
+            )}`
+          : `0 1px 3px ${alpha("#334155", 0.16)}, 0 1px 2px ${alpha(
+              "#334155",
+              0.1
+            )}`,
+      },
+      "&:hover:not(.Mui-selected)": {
+        bgcolor: isDark ? alpha("#7dd3fc", 0.05) : alpha("#94a3b8", 0.12),
+        color: isDark ? "#cbd5e1" : "#374151",
+      },
+    },
   };
 
   return (
     <Box
       sx={{
-        height: "calc(100vh - 80px)", // slightly more available space
-        minHeight: 0, // prevents flex children from shrinking
+        height: "calc(100vh - 64px)",
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         gap: 1,
-        padding: "0 8px",
-        bgcolor: "background.default",
-        // pb: 10,
-        // overflow: "hidden", // avoids nested overflow issues
+        p: 1,
+        background: isDark
+          ? "linear-gradient(145deg, #06111d 0%, #0b1724 52%, #0d1b2a 100%)"
+          : "linear-gradient(145deg, #f8fafc 0%, #eef6ff 52%, #f7fbff 100%)",
       }}
     >
+      {/* Page Header */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          borderBottom: `2px solid ${theme.palette.divider}`,
           pb: 1,
+          borderBottom: `1px solid ${
+            isDark ? alpha("#7dd3fc", 0.12) : alpha("#1f2937", 0.1)
+          }`,
           gap: 2,
           flexWrap: "wrap",
-
-          "& .MuiTypography-root": {
-            fontSize: "10px",
-          },
-
-          "& .MuiInputLabel-root": {
-            fontSize: "10px",
-          },
-
-          "& .MuiSelect-select": {
-            fontSize: "10px",
-          },
-
-          "& .MuiMenuItem-root": {
-            fontSize: "10px",
-          },
         }}
       >
-        {/* LEFT TITLE */}
         <Typography
           sx={{
             fontWeight: 700,
-            color: "text.secondary",
+            fontSize: "16px",
             letterSpacing: "-0.3px",
-            fontSize: "14px !important",
             whiteSpace: "nowrap",
+            background: isDark
+              ? "linear-gradient(135deg, #e2e8f0, #7dd3fc)"
+              : "linear-gradient(135deg, #0f172a, #1e40af)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
           }}
         >
           GOLD LAYER: FUSED VEHICLE HEALTH
         </Typography>
 
-        {/* CENTER FILTER */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            flexWrap: "wrap",
-            flex: 1,
-            justifyContent: "center",
-          }}
-        >
+        <Stack direction="row" alignItems="center" spacing={1}>
           <Typography
             sx={{
-              fontWeight: 700,
-              color: "text.secondary",
               fontSize: "10px",
+              fontWeight: 600,
+              color: "text.secondary",
+              whiteSpace: "nowrap",
             }}
           >
             FILTER CONTEXT:
           </Typography>
-
-          <FormControl
-            size="small"
-            sx={{
-              minWidth: 220,
-
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 0,
-                height: 30,
-                fontSize: "10px",
-              },
-            }}
-          >
+          <FormControl size="small" sx={{ minWidth: 220 }}>
             <InputLabel sx={{ fontSize: "10px" }}>
               Active Vehicle (Sim)
             </InputLabel>
-
             <Select
               value={filterSim}
               onChange={(e) => setFilterSim(e.target.value)}
               label="Active Vehicle (Sim)"
-              sx={{
-                fontSize: "10px",
-              }}
-              MenuProps={{
-                PaperProps: {
-                  sx: {
-                    "& .MuiMenuItem-root": {
-                      fontSize: "10px",
-                    },
-                  },
-                },
-              }}
+              sx={selectSx}
+              MenuProps={menuPropsSx}
             >
-              <MenuItem
-                value="ALL"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: "10px",
-                }}
-              >
+              <MenuItem value="ALL" sx={{ fontWeight: 700, fontSize: "10px" }}>
                 ALL VEHICLES (FLEET)
               </MenuItem>
-
               {availableSims.map((sim: string) => (
                 <MenuItem key={sim} value={sim} sx={{ fontSize: "10px" }}>
                   {sim}
@@ -917,303 +1080,202 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
               ))}
             </Select>
           </FormControl>
-        </Box>
+        </Stack>
 
-        {/* RIGHT TOGGLE */}
         <ToggleButtonGroup
           value={activeTab}
           exclusive
           onChange={(_e, val) => val && setActiveTab(val)}
           size="small"
-          sx={{
-            height: 28,
-            bgcolor: "background.paper",
-            "& .MuiToggleButton-root": {
-              px: 2,
-              py: 0,
-              minHeight: 28,
-              borderRadius: 0,
-              fontSize: "10px",
-              fontWeight: 700,
-              lineHeight: 1,
-            },
-          }}
+          sx={tabSwitcherSx}
         >
-          <ToggleButton value="operations">LIVE OPERATIONS</ToggleButton>
-
-          <ToggleButton value="experiment">
-            WEIGHT EXPERIMENTATION LAB
-          </ToggleButton>
+          <ToggleButton value="operations">Live Operations</ToggleButton>
+          <ToggleButton value="experiment">Weight Lab</ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
+      {/* ── OPERATIONS TAB ──────────────────────────────────────────────────── */}
       {activeTab === "operations" && (
         <Box
           sx={{
             display: "flex",
             flexDirection: "column",
-            height: "100%",
-            gap: 2,
+            flex: 1,
+            gap: 1,
             minHeight: 0,
           }}
         >
-          <Box sx={{ display: "flex", gap: 1, width: "100%" }}>
-            {[
-              {
-                label: "ACTIVE SIMULATIONS",
-                value: availableSims.length,
-                bg: "#EEF6FF",
-                border: "#005071",
-              },
-              {
-                label: "TOTAL GOLD ROWS",
-                value: metrics?.total_gold_rows?.toLocaleString() || 0,
-                bg: "#F3F0FF",
-                border: "#6D5BD0",
-              },
-              {
-                label: "GLOBAL MAX LAG",
-                value: displayLag.toLocaleString(),
-                color: displayLag > 1000 ? theme.palette.error.main : undefined,
-                bg: "#FFF4E8",
-                border: "#E67E22",
-              },
-              {
-                label:
+          {/* KPI Tiles */}
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+            <Box sx={{ flex: 1 }}>
+              <MetricTile
+                label="Active Simulations"
+                value={availableSims.length}
+                color="#3b82f6"
+                icon={<DirectionsCarOutlinedIcon sx={{ fontSize: 14 }} />}
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <MetricTile
+                label="Total Gold Rows"
+                value={metrics?.total_gold_rows?.toLocaleString() || "0"}
+                color="#8b5cf6"
+                icon={<StorageOutlinedIcon sx={{ fontSize: 14 }} />}
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <MetricTile
+                label="Global Max Lag"
+                value={displayLag.toLocaleString()}
+                color={displayLag > 1000 ? "#ef4444" : "#f59e0b"}
+                icon={<TimerOutlinedIcon sx={{ fontSize: 14 }} />}
+                delta={
+                  displayLag > 1000 ? "High lag — check pipeline" : undefined
+                }
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <MetricTile
+                label={
                   filterSim === "ALL"
-                    ? "FLEET AVG VEHICLE HEALTH"
-                    : "CURRENT VEHICLE HEALTH",
-                value: `${
-                  filterSim === "ALL"
-                    ? fleetHealthKpi
-                    : latestRow?.vehicle_health_score || 0
-                }%`,
-                color:
-                  (filterSim === "ALL"
-                    ? fleetHealthKpi
-                    : latestRow?.vehicle_health_score ?? 100) < 60
-                    ? theme.palette.error.main
-                    : theme.palette.success.main,
-                bg:
-                  (filterSim === "ALL"
-                    ? fleetHealthKpi
-                    : latestRow?.vehicle_health_score ?? 100) < 60
-                    ? "#FFF1F1"
-                    : "#EEFCEF",
-                border:
-                  (filterSim === "ALL"
-                    ? fleetHealthKpi
-                    : latestRow?.vehicle_health_score ?? 100) < 60
-                    ? "#D32F2F"
-                    : "#2E7D32",
-              },
-            ].map((kpi, idx) => (
-              <Paper
-                key={idx}
-                elevation={0}
-                sx={{
-                  flex: 1,
-                  p: 1.5,
-                  borderRadius: 0,
-                  bgcolor: kpi.bg,
-                  borderLeft: `5px solid ${kpi.border}`,
-                  minHeight: 100,
+                    ? "Fleet Avg Health"
+                    : "Vehicle Health"
+                }
+                value={`${healthValue}%`}
+                color={healthColor}
+                icon={<HealthAndSafetyOutlinedIcon sx={{ fontSize: 14 }} />}
+                delta={
+                  healthValue < 60 ? "Critical threshold" : undefined
+                }
+              />
+            </Box>
+          </Stack>
 
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                }}
-              >
-                <Typography
-                  sx={{
-                    color: "text.secondary",
-                    fontWeight: 700,
-                    fontSize: "10px",
-                  }}
-                >
-                  {kpi.label}
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    color: kpi.color || "text.primary",
-                    mt: 1,
-                    fontSize: "20px",
-                  }}
-                >
-                  {kpi.value}
-                </Typography>
-              </Paper>
-            ))}
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 2, flex: 1, minHeight: 0 }}>
-            <Paper
+          {/* Main content row */}
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            {/* Degradation Drivers */}
+            <Card
               sx={{
-                width: "300px",
-                p: 1,
-                borderRadius: 0,
+                width: 280,
+                flexShrink: 0,
                 display: "flex",
                 flexDirection: "column",
+                p: 1.25,
                 overflowY: "auto",
               }}
             >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary", mb: 2 }}
-              >
-                {filterSim === "ALL"
-                  ? "LATEST DEGRADATION DRIVERS (FLEET)"
-                  : "LATEST DEGRADATION DRIVERS"}
-              </Typography>
+              <SectionTitle
+                title={
+                  filterSim === "ALL"
+                    ? "Degradation Drivers (Fleet)"
+                    : "Degradation Drivers"
+                }
+              />
               {topFeatures.length > 0 ? (
                 topFeatures.map((f: any, i) => (
                   <Box key={i} sx={{ mb: 1.5 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: "bold", fontSize: "12px" }}
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      sx={{ mb: 0.4 }}
                     >
-                      {f.feature}
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Box
+                      <Typography
+                        sx={{ fontSize: "10px", fontWeight: 700 }}
+                      >
+                        {f.feature}
+                      </Typography>
+                      <Typography
                         sx={{
-                          flex: 1,
-                          height: "6px",
-                          bgcolor: ct.gridColor,
-                          borderRadius: "3px",
-                          overflow: "hidden",
+                          fontSize: "9px",
+                          color: "text.secondary",
+                          fontWeight: 600,
                         }}
                       >
-                        <Box
-                          sx={{
-                            width: `${Math.min(
-                              100,
-                              (f.impact as number) * 10
-                            )}%`,
-                            height: "100%",
-                            bgcolor: theme.palette.error.main,
-                          }}
-                        />
-                      </Box>
-                      <Typography variant="caption">
                         {parseFloat(f.impact).toFixed(2)}
                       </Typography>
+                    </Stack>
+                    <Box
+                      sx={{
+                        height: 5,
+                        borderRadius: "3px",
+                        bgcolor: isDark ? "#1e293b" : "#e2e8f0",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: `${Math.min(
+                            100,
+                            (f.impact as number) * 10
+                          )}%`,
+                          height: "100%",
+                          bgcolor: "#ef4444",
+                          borderRadius: "3px",
+                          transition: "width 0.3s ease",
+                        }}
+                      />
                     </Box>
                   </Box>
                 ))
               ) : (
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  sx={{ fontSize: "10px", color: "text.secondary" }}
+                >
                   Awaiting anomaly data...
                 </Typography>
               )}
-            </Paper>
+            </Card>
 
-            <Paper
+            {/* Vehicle Health History Table */}
+            <Card
               sx={{
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                p: 1,
-                borderRadius: 0,
+                p: 1.25,
                 minHeight: 0,
-
-                /* Global text */
-                "& .MuiTypography-root": {
-                  fontSize: "10px",
-                },
-
-                /* AG Grid Header */
-                "& .ag-header": {
-                  background: "#005071 !important",
-                  borderBottom: "none !important",
-                },
-
-                "& .ag-header-cell": {
-                  background: "#005071 !important",
-                  color: "#fff !important",
-                  fontSize: "10px !important",
-                  fontWeight: 700,
-                  borderColor: "#0B658B !important",
-                },
-
-                "& .ag-header-cell-label": {
-                  color: "#fff !important",
-                },
-
-                /* Sort / Filter icons */
-                "& .ag-icon": {
-                  color: "#fff !important",
-                },
-
-                /* Rows */
-                "& .ag-cell": {
-                  fontSize: "10px !important",
-                  display: "flex",
-                  alignItems: "center",
-                },
-
-                "& .ag-row": {
-                  minHeight: "30px !important",
-                },
-
-                "& .ag-row:nth-of-type(even)": {
-                  backgroundColor: "#FAFBFC",
-                },
-
-                "& .ag-root-wrapper": {
-                  border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 0,
-                },
               }}
             >
-              <Box
-                sx={{
-                  px: 0,
-                  py: 0,
-                  mb: 1,
-                  bgcolor: "transparent",
-                  lineHeight: "12px",
-                  // borderBottom: `1px solid ${theme.palette.divider}`,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: "bold",
-                    color: "text.secondary",
-                    mb: 0,
-                    fontSize: "12px !important",
-                    lineHeight: "12px",
-                  }}
-                >
-                  VEHICLE HEALTH HISTORY
-                </Typography>
-              </Box>
-
+              <SectionTitle
+                title="Vehicle Health History"
+                action={
+                  <Tooltip title="Refresh history">
+                    <IconButton
+                      size="small"
+                      onClick={() => refetchHistory()}
+                      sx={{ p: 0.4 }}
+                    >
+                      <RestartAltOutlinedIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </Tooltip>
+                }
+              />
               <Box
                 className={agTheme}
-                sx={{
-                  flex: 1,
-                  minHeight: 0,
-                  width: "100%",
-                }}
+                sx={{ flex: 1, minHeight: 0, width: "100%", ...agGridContainerSx }}
               >
                 <AgGridReact
                   rowData={reversedHistory}
                   columnDefs={tableColDefs}
-                  defaultColDef={{
-                    resizable: true,
-                    sortable: true,
-                  }}
+                  defaultColDef={{ resizable: true, sortable: true }}
+                  rowHeight={28}
+                  headerHeight={30}
                 />
               </Box>
-            </Paper>
+            </Card>
           </Box>
         </Box>
       )}
 
+      {/* ── EXPERIMENT TAB ──────────────────────────────────────────────────── */}
       {activeTab === "experiment" && (
         <Box
           sx={{
@@ -1221,13 +1283,18 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
             flexDirection: "column",
             flex: 1,
             minHeight: 0,
-            gap: 2,
+            gap: 1,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {/* Mode switcher */}
+          <Stack direction="row" alignItems="center" spacing={1.5}>
             <Typography
-              variant="body2"
-              sx={{ fontWeight: "bold", color: "text.secondary" }}
+              sx={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "text.secondary",
+                whiteSpace: "nowrap",
+              }}
             >
               SIMULATION MODE:
             </Typography>
@@ -1236,56 +1303,29 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
               exclusive
               onChange={(_, val) => val && setProfileMode(val)}
               size="small"
-              // sx={{ bgcolor: "background.paper" }}
-              sx={{
-                height: 28,
-                bgcolor: "background.paper",
-                "& .MuiToggleButton-root": {
-                  px: 2,
-                  py: 0,
-                  minHeight: 28,
-                  borderRadius: 0,
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  lineHeight: 1,
-                },
-              }}
+              sx={tabSwitcherSx}
             >
-              <ToggleButton
-                value="single"
-                sx={{
-                  fontWeight: "bold",
-                  px: 2,
-                  borderRadius: 0,
-                  fontSize: "12px",
-                }}
-              >
-                SINGLE PROFILE
-              </ToggleButton>
-              <ToggleButton
-                value="ab"
-                sx={{
-                  fontWeight: "bold",
-                  px: 2,
-                  borderRadius: 0,
-                  fontSize: "12px",
-                }}
-              >
-                <CompareArrowsIcon sx={{ fontSize: 16, mr: 0.5 }} />
-                A/B COMPARISON
+              <ToggleButton value="single">Single Profile</ToggleButton>
+              <ToggleButton value="ab">
+                <CompareArrowsIcon sx={{ fontSize: 12, mr: 0.5 }} />
+                A/B Comparison
               </ToggleButton>
             </ToggleButtonGroup>
-          </Box>
+          </Stack>
 
-          <Box sx={{ display: "flex", gap: 2, flex: 1, minHeight: 0 }}>
-            <Paper
+          {/* Panels + Chart */}
+          <Box sx={{ display: "flex", gap: 1, flex: 1, minHeight: 0 }}>
+            {/* Profile A */}
+            <Card
               sx={{
-                width: profileMode === "ab" ? "280px" : "320px",
-                p: 1,
-                borderRadius: 0,
+                width: profileMode === "ab" ? 280 : 320,
+                flexShrink: 0,
                 display: "flex",
                 flexDirection: "column",
-                borderTop: "3px solid #1976d2",
+                p: 0,
+                borderTop: `3px solid ${
+                  isDark ? alpha("#3b82f6", 0.9) : "#3b82f6"
+                }`,
               }}
             >
               <WeightPanel
@@ -1306,17 +1346,20 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
                 onSavePreset={savePreset}
                 onDeletePreset={deletePreset}
               />
-            </Paper>
+            </Card>
 
+            {/* Profile B */}
             {profileMode === "ab" && (
-              <Paper
+              <Card
                 sx={{
-                  width: "280px",
-                  p: 1,
-                  borderRadius: 0,
+                  width: 280,
+                  flexShrink: 0,
                   display: "flex",
                   flexDirection: "column",
-                  borderTop: "3px solid #7b1fa2",
+                  p: 0,
+                  borderTop: `3px solid ${
+                    isDark ? alpha("#8b5cf6", 0.9) : "#7b1fa2"
+                  }`,
                 }}
               >
                 <WeightPanel
@@ -1335,128 +1378,141 @@ export default function GoldHealth({ isActive = true }: { isActive?: boolean }) 
                   onSavePreset={savePreset}
                   onDeletePreset={deletePreset}
                 />
-              </Paper>
+              </Card>
             )}
 
-            <Paper
+            {/* Chart */}
+            <Card
               sx={{
                 flex: 1,
-                p: 1,
-                borderRadius: 0,
                 display: "flex",
                 flexDirection: "column",
+                p: 1.25,
+                minHeight: 0,
               }}
             >
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: "bold",
-                  color: "text.secondary",
-                  mb: 1,
-                  fontSize: "12px !important",
-                }}
-              >
-                {filterSim === "ALL"
-                  ? "FLEET-WIDE AVERAGED HEALTH TRAJECTORY"
-                  : `RECALCULATED HEALTH TRAJECTORY: ${filterSim}`}
-                {profileMode === "ab" && " — A/B COMPARISON"}
-              </Typography>
+              <SectionTitle
+                title={
+                  (filterSim === "ALL"
+                    ? "Fleet-Wide Averaged Health Trajectory"
+                    : `Recalculated Health Trajectory: ${filterSim}`) +
+                  (profileMode === "ab" ? " — A/B Comparison" : "")
+                }
+              />
+              <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={mergedChartData}
+                    margin={{ top: 10, right: 30, left: -20, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke={
+                        isDark
+                          ? alpha("#7dd3fc", 0.08)
+                          : alpha("#1f2937", 0.06)
+                      }
+                    />
+                    <XAxis
+                      dataKey="ts_short"
+                      tick={chartAxisStyle}
+                      axisLine={{
+                        stroke: isDark
+                          ? alpha("#7dd3fc", 0.15)
+                          : alpha("#1f2937", 0.12),
+                      }}
+                      tickLine={false}
+                      minTickGap={30}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={chartAxisStyle}
+                      axisLine={{
+                        stroke: isDark
+                          ? alpha("#7dd3fc", 0.15)
+                          : alpha("#1f2937", 0.12),
+                      }}
+                      tickLine={false}
+                    />
+                    <RechartsTooltip
+                      cursor={{
+                        stroke: isDark
+                          ? alpha("#7dd3fc", 0.3)
+                          : alpha("#3b82f6", 0.2),
+                        strokeWidth: 1,
+                      }}
+                      contentStyle={tooltipStyle}
+                    />
+                    <Legend
+                      wrapperStyle={{ fontSize: "10px" }}
+                      formatter={(value) => (
+                        <span
+                          style={{
+                            fontSize: "8px",
+                            fontWeight: 600,
+                            color: isDark ? "#94a3b8" : "#64748b",
+                            fontFamily: CHART_FONT,
+                          }}
+                        >
+                          {value}
+                        </span>
+                      )}
+                    />
 
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={mergedChartData}
-                  margin={{ top: 10, right: 30, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke={ct.gridColor}
-                  />
-                  <XAxis
-                    dataKey="ts_short"
-                    tick={chartAxisStyle}
-                    axisLine={{ stroke: ct.tableBorder }}
-                    tickLine={false}
-                    minTickGap={30}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={chartAxisStyle}
-                    axisLine={{ stroke: ct.tableBorder }}
-                    tickLine={false}
-                  />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend
-                    wrapperStyle={{
-                      fontSize: "10px",
-                    }}
-                    formatter={(value) => (
-                      <span
-                        style={{
-                          fontSize: "8px",
-                          fontWeight: 600,
-                          color: ct.axisColor,
-                        }}
-                      >
-                        {value}
-                      </span>
-                    )}
-                  />
+                    {profileMode === "single" &&
+                      activeModules.map((mod) => (
+                        <Line
+                          key={`${mod}_raw`}
+                          type="monotone"
+                          dataKey={`${mod}_raw`}
+                          name={`${mod.toUpperCase()} MODULE HEALTH`}
+                          stroke={MODULE_COLORS[mod]}
+                          strokeWidth={1}
+                          strokeDasharray="5 5"
+                          dot={false}
+                        />
+                      ))}
 
-                  {profileMode === "single" &&
-                    activeModules.map((mod) => (
+                    {profileMode === "ab" && (
                       <Line
-                        key={`${mod}_raw`}
                         type="monotone"
-                        dataKey={`${mod}_raw`}
-                        name={`${mod.toUpperCase()} MODULE HEALTH`}
-                        stroke={MODULE_COLORS[mod]}
-                        strokeWidth={1}
-                        strokeDasharray="5 5"
+                        dataKey="actual_gold"
+                        name="ACTUAL GOLD"
+                        stroke={isDark ? "#94a3b8" : "#475569"}
+                        strokeWidth={1.5}
+                        strokeDasharray="4 4"
                         dot={false}
                       />
-                    ))}
+                    )}
 
-                  {profileMode === "ab" && (
                     <Line
                       type="monotone"
-                      dataKey="actual_gold"
-                      name="ACTUAL GOLD"
-                      stroke={ct.axisColor}
-                      strokeWidth={1.5}
-                      strokeDasharray="4 4"
-                      dot={false}
-                    />
-                  )}
-
-                  <Line
-                    type="monotone"
-                    dataKey="experimental_health"
-                    name={
-                      profileMode === "ab"
-                        ? "PROFILE A"
-                        : "FUSED VEHICLE HEALTH"
-                    }
-                    stroke="#1976d2"
-                    strokeWidth={4}
-                    dot={false}
-                    activeDot={{ r: 8 }}
-                  />
-
-                  {profileMode === "ab" && (
-                    <Line
-                      type="monotone"
-                      dataKey="profile_b_health"
-                      name="PROFILE B"
-                      stroke="#7b1fa2"
+                      dataKey="experimental_health"
+                      name={
+                        profileMode === "ab" ? "PROFILE A" : "FUSED VEHICLE HEALTH"
+                      }
+                      stroke="#3b82f6"
                       strokeWidth={4}
                       dot={false}
                       activeDot={{ r: 8 }}
                     />
-                  )}
-                </LineChart>
-              </ResponsiveContainer>
-            </Paper>
+
+                    {profileMode === "ab" && (
+                      <Line
+                        type="monotone"
+                        dataKey="profile_b_health"
+                        name="PROFILE B"
+                        stroke="#8b5cf6"
+                        strokeWidth={4}
+                        dot={false}
+                        activeDot={{ r: 8 }}
+                      />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+            </Card>
           </Box>
         </Box>
       )}

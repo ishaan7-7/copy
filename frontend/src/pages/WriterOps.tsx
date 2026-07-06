@@ -13,9 +13,20 @@ import {
   Divider,
   Button,
   Grid,
+  Stack,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, alpha } from "@mui/material/styles";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
+import SignalCellularAltOutlinedIcon from "@mui/icons-material/SignalCellularAltOutlined";
+import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
+import DirectionsCarOutlinedIcon from "@mui/icons-material/DirectionsCarOutlined";
+import PlaylistAddCheckOutlinedIcon from "@mui/icons-material/PlaylistAddCheckOutlined";
+import FilterListOutlinedIcon from "@mui/icons-material/FilterListOutlined";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { ModuleRegistry, ClientSideRowModelModule } from "ag-grid-community";
@@ -31,7 +42,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   LineChart,
@@ -39,6 +50,8 @@ import {
 } from "recharts";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
+
+const CHART_FONT = '"Inter", "Segoe UI", Roboto, Arial, sans-serif';
 
 const fetchWriterMetrics = async () => {
   const { data } = await axios.get("http://127.0.0.1:8005/api/writer/metrics");
@@ -59,10 +72,164 @@ const fetchObserverSnapshot = async () => {
   return data;
 };
 
+const Card = ({
+  children,
+  sx,
+}: {
+  children: React.ReactNode;
+  sx?: object;
+}) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 2,
+        overflow: "hidden",
+        bgcolor: isDark ? alpha("#0b1724", 0.9) : "#ffffff",
+        border: `1px solid ${
+          isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.1)
+        }`,
+        boxShadow: isDark
+          ? `0 18px 42px ${alpha("#000", 0.22)}`
+          : `0 12px 30px ${alpha("#334155", 0.08)}`,
+        ...sx,
+      }}
+    >
+      {children}
+    </Paper>
+  );
+};
+
+const SectionTitle = ({
+  title,
+  action,
+}: {
+  title: string;
+  action?: React.ReactNode;
+}) => (
+  <Box
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 1,
+      mb: 1,
+    }}
+  >
+    <Typography sx={{ fontSize: "12px", fontWeight: 800 }}>{title}</Typography>
+    {action}
+  </Box>
+);
+
+const MetricTile = ({
+  label,
+  value,
+  icon,
+  color,
+  delta,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: string;
+  delta?: string;
+}) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  return (
+    <Box
+      sx={{
+        p: 1,
+        borderRadius: 1.5,
+        border: `1px solid ${alpha(color, isDark ? 0.22 : 0.18)}`,
+        bgcolor: alpha(color, isDark ? 0.07 : 0.05),
+        display: "flex",
+        flexDirection: "column",
+        gap: 0.35,
+        position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "3px",
+          height: "100%",
+          bgcolor: color,
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: "16px",
+            fontWeight: 800,
+            lineHeight: 1,
+            pl: 0.5,
+            color: isDark ? "#f1f5f9" : "#0f172a",
+          }}
+        >
+          {value}
+        </Typography>
+        <Box
+          sx={{
+            width: 24,
+            height: 24,
+            borderRadius: "6px",
+            bgcolor: alpha(color, isDark ? 0.2 : 0.12),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </Box>
+      </Box>
+      <Typography
+        sx={{
+          fontSize: "10px",
+          fontWeight: 600,
+          color: "text.secondary",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px",
+          pl: 0.5,
+          lineHeight: 1,
+        }}
+      >
+        {label}
+      </Typography>
+      {delta && (
+        <Typography
+          sx={{
+            fontSize: "9px",
+            color,
+            fontWeight: 700,
+            pl: 0.5,
+            lineHeight: 1,
+          }}
+        >
+          {delta}
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
 export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
   const { autoRefresh, darkMode } = useStore();
   const wasActiveRef = useRef(false);
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const ct = useChartTheme();
 
   const [viewMode, setViewMode] = useState<"operations" | "inspector" | "live">(
@@ -83,7 +250,8 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
   } = useQuery({
     queryKey: ["writerMetrics"],
     queryFn: fetchWriterMetrics,
-    refetchInterval: isActive && viewMode === "operations" && autoRefresh ? 3000 : false,
+    refetchInterval:
+      isActive && viewMode === "operations" && autoRefresh ? 3000 : false,
   });
 
   const {
@@ -97,11 +265,12 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
     staleTime: 60000,
   });
 
-  const { data: observerData, refetch: refetchObserver } = useQuery({
+  const { data: observerData } = useQuery({
     queryKey: ["observerSnapshot"],
     queryFn: fetchObserverSnapshot,
     enabled: viewMode === "live",
-    refetchInterval: isActive && viewMode === "live" && autoRefresh ? 3000 : false,
+    refetchInterval:
+      isActive && viewMode === "live" && autoRefresh ? 3000 : false,
   });
 
   useEffect(() => {
@@ -121,7 +290,7 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
         );
       }
       return rows;
-    } catch (e) {
+    } catch {
       return [];
     }
   }, [metricsData, filterModule]);
@@ -172,21 +341,50 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
         flex: 1,
         minWidth: 140,
         cellRenderer: (params: any) => {
-          let color: "success" | "error" | "warning" = "error";
-          if (params.value === "RUNNING") color = "success";
-          if (params.value === "STALLED") color = "warning";
+          let color = "#ef4444";
+          let bg = alpha("#ef4444", isDark ? 0.18 : 0.1);
+          if (params.value === "RUNNING") {
+            color = "#22c55e";
+            bg = alpha("#22c55e", isDark ? 0.18 : 0.1);
+          }
+          if (params.value === "STALLED") {
+            color = "#f59e0b";
+            bg = alpha("#f59e0b", isDark ? 0.18 : 0.1);
+          }
           return (
-            <Chip
-              label={params.value || "UNKNOWN"}
-              color={color}
-              size="small"
+            <Box
               sx={{
-                borderRadius: "2px",
-                height: "20px",
-                fontSize: "10px",
-                fontWeight: "bold",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                px: 0.8,
+                py: "2px",
+                borderRadius: 1,
+                bgcolor: bg,
+                border: `1px solid ${alpha(color, 0.25)}`,
               }}
-            />
+            >
+              <Box
+                sx={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: "50%",
+                  bgcolor: color,
+                  flexShrink: 0,
+                }}
+              />
+              <Typography
+                sx={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {params.value || "UNKNOWN"}
+              </Typography>
+            </Box>
           );
         },
       },
@@ -209,7 +407,7 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
             return {
               color: theme.palette.error.main,
               fontWeight: "bold",
-              backgroundColor: darkMode ? "rgba(211,47,47,0.20)" : "#ffebee",
+              backgroundColor: isDark ? "rgba(239,68,68,0.18)" : "#fee2e2",
             };
           return { color: theme.palette.success.main };
         },
@@ -237,7 +435,7 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
         type: "numericColumn",
       },
     ],
-    [theme, darkMode]
+    [theme, isDark]
   );
 
   const availableSims = useMemo<string[]>(() => {
@@ -349,544 +547,423 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
     [theme]
   );
 
-  const agTheme = darkMode ? "ag-theme-balham-dark" : "ag-theme-balham";
+  const agTheme = isDark ? "ag-theme-balham-dark" : "ag-theme-balham";
+
+  const agGridContainerSx: object = {
+    "--ag-background-color": "transparent",
+    "--ag-odd-row-background-color": isDark ? alpha("#7dd3fc", 0.04) : "#f8fafc",
+    "--ag-row-hover-color": isDark ? alpha("#7dd3fc", 0.09) : alpha("#3b82f6", 0.05),
+    "--ag-selected-row-background-color": isDark ? alpha("#3b82f6", 0.22) : alpha("#3b82f6", 0.1),
+    "--ag-foreground-color": isDark ? "#e2e8f0" : "#0f172a",
+    "--ag-data-color": isDark ? "#e2e8f0" : "#1f2937",
+    "--ag-secondary-foreground-color": isDark ? "#94a3b8" : "#64748b",
+    "--ag-border-color": isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1),
+    "--ag-row-border-color": isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.07),
+    "--ag-input-focus-border-color": isDark ? alpha("#7dd3fc", 0.5) : alpha("#3b82f6", 0.5),
+    "& .ag-header": {
+      backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important`,
+    },
+    "& .ag-header-cell": {
+      backgroundColor: `${isDark ? "#0d2137" : "#1e3a5f"} !important`,
+      color: "#fff !important",
+      fontSize: "11px !important",
+      fontWeight: "700 !important",
+      letterSpacing: "0.04em !important",
+    },
+    "& .ag-header-cell-label": { color: "#fff !important" },
+    "& .ag-icon": { color: "#fff !important" },
+    "& .ag-header-icon": { color: "#fff !important" },
+    "& .ag-sort-ascending-icon": { color: "#fff !important" },
+    "& .ag-sort-descending-icon": { color: "#fff !important" },
+    "& .ag-sort-none-icon": { color: "#fff !important" },
+    "& .ag-cell": { fontSize: "10px !important" },
+    "& .ag-row": {
+      fontSize: "10px !important",
+      borderColor: `${isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.08)} !important`,
+    },
+    "& .ag-root-wrapper": { borderRadius: "6px", border: "none !important" },
+    "& .ag-root-wrapper-body": { borderRadius: "6px" },
+  };
+
   const chartAxisStyle = {
-    fontSize: "11px",
+    fontSize: "10px",
     fill: ct.axisColor,
-    fontWeight: 600,
+    fontFamily: CHART_FONT,
   };
+
   const tooltipStyle = {
-    borderRadius: 0,
-    fontSize: "12px",
-    padding: "5px",
-    backgroundColor: ct.tooltipBg,
-    border: `1px solid ${ct.tooltipBorder}`,
-    color: ct.tooltipText,
+    borderRadius: 4,
+    fontSize: "11px",
+    padding: "6px 10px",
+    backgroundColor: isDark ? "#0f1e2e" : "#ffffff",
+    border: `1px solid ${isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.12)}`,
+    color: isDark ? "#e2e8f0" : "#1f2937",
+    boxShadow: isDark
+      ? `0 8px 24px ${alpha("#000", 0.4)}`
+      : `0 4px 16px ${alpha("#334155", 0.12)}`,
   };
+
+  const selectSx = {
+    borderRadius: 1,
+    fontSize: "10px",
+    height: 28,
+    bgcolor: isDark ? alpha("#0b1724", 0.6) : "#ffffff",
+    "& .MuiSelect-select": { fontSize: "10px", py: 0.5 },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.18),
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: isDark ? alpha("#7dd3fc", 0.4) : alpha("#1f2937", 0.35),
+    },
+  };
+
+  const menuPropsSx = {
+    PaperProps: {
+      sx: {
+        borderRadius: 1.5,
+        bgcolor: isDark ? "#0f1e2e" : "#ffffff",
+        border: `1px solid ${isDark ? alpha("#7dd3fc", 0.14) : alpha("#1f2937", 0.1)}`,
+        "& .MuiMenuItem-root": {
+          fontSize: "10px",
+          minHeight: 28,
+          "&:hover": {
+            bgcolor: isDark ? alpha("#7dd3fc", 0.08) : alpha("#3b82f6", 0.08),
+          },
+        },
+      },
+    },
+  };
+
+  const inputLabelSx = { fontSize: "10px" };
 
   return (
     <Box
       sx={{
-        height: "calc(100vh - 80px)", // slightly more available space
-        minHeight: 0, // prevents flex children from shrinking
+        height: "calc(100vh - 64px)",
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         gap: 1,
-        padding: "0 8px",
-        bgcolor: "background.default",
-        // pb: 10,
-        // overflow: "hidden", // avoids nested overflow issues
+        p: 1,
+        background: isDark
+          ? "linear-gradient(145deg, #06111d 0%, #0b1724 52%, #0d1b2a 100%)"
+          : "linear-gradient(145deg, #f8fafc 0%, #eef6ff 52%, #f7fbff 100%)",
       }}
     >
+      {/* Page Header */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center", // changed from flex-end
-          borderBottom: `2px solid ${theme.palette.divider}`,
+          alignItems: "center",
           pb: 1,
+          borderBottom: `1px solid ${
+            isDark ? alpha("#7dd3fc", 0.12) : alpha("#1f2937", 0.1)
+          }`,
         }}
       >
         <Typography
-          variant="h5"
           sx={{
-            fontWeight: 600,
-            color: "text.secondary",
-            letterSpacing: "-0.5px",
-            fontSize: "14px",
+            fontWeight: 700,
+            fontSize: "16px",
+            letterSpacing: "-0.3px",
+            background: isDark
+              ? "linear-gradient(135deg, #e2e8f0, #7dd3fc)"
+              : "linear-gradient(135deg, #0f172a, #1e40af)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
           }}
         >
           BRONZE LAYER WRITER PIPELINE
         </Typography>
 
-        <Box
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(_e, val) => val && setViewMode(val)}
+          size="small"
           sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
+            bgcolor: isDark ? alpha("#020c16", 0.7) : alpha("#dde6ef", 0.6),
+            borderRadius: "10px",
+            border: `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#94a3b8", 0.2)}`,
+            p: "3px",
+            "& .MuiToggleButtonGroup-grouped": {
+              border: "none !important",
+              borderRadius: "7px !important",
+            },
+            "& .MuiToggleButton-root": {
+              py: "5px",
+              px: "14px",
+              fontSize: "10px",
+              fontWeight: 600,
+              lineHeight: 1,
+              textTransform: "none",
+              letterSpacing: "0.015em",
+              whiteSpace: "nowrap",
+              color: isDark ? alpha("#94a3b8", 0.8) : "#64748b",
+              transition: "background-color 0.15s, color 0.15s, box-shadow 0.15s",
+              "&.Mui-selected": {
+                color: isDark ? "#f1f5f9" : "#0f172a",
+                fontWeight: 700,
+                bgcolor: isDark ? "#0d2137" : "#ffffff",
+                boxShadow: isDark
+                  ? `0 1px 4px ${alpha("#000", 0.45)}, 0 0 0 1px ${alpha("#7dd3fc", 0.06)}`
+                  : `0 1px 3px ${alpha("#334155", 0.16)}, 0 1px 2px ${alpha("#334155", 0.1)}`,
+              },
+              "&:hover:not(.Mui-selected)": {
+                bgcolor: isDark ? alpha("#7dd3fc", 0.05) : alpha("#94a3b8", 0.12),
+                color: isDark ? "#cbd5e1" : "#374151",
+              },
+            },
           }}
         >
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={(_e, val) => val && setViewMode(val)}
-            size="small"
-            sx={{
-              bgcolor: "background.paper",
-              height: 28,
-              "& .MuiToggleButton-root": {
-                py: 0.25,
-                px: 1.5,
-                minHeight: 28,
-                fontSize: "10px",
-                fontWeight: 600,
-                lineHeight: 1,
-              },
-            }}
-          >
-            <ToggleButton value="operations">OPERATIONS METRICS</ToggleButton>
-
-            <ToggleButton value="inspector">DATA INSPECTOR</ToggleButton>
-
-            <ToggleButton value="live">LIVE STREAM MONITOR</ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
+          <ToggleButton value="operations">Operations Metrics</ToggleButton>
+          <ToggleButton value="inspector">Data Inspector</ToggleButton>
+          <ToggleButton value="live">Live Stream Monitor</ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
+      {/* ── OPERATIONS TAB ── */}
       {viewMode === "operations" && (
         <Box
           sx={{
             display: "flex",
             flexDirection: "column",
-            height: "100%",
+            flex: 1,
+            minHeight: 0,
             gap: 1,
           }}
         >
-          <Grid
-            container
-            columnSpacing={0}
-            rowSpacing={1}
-            sx={{ width: "100%" }}
-          >
-            {/* Left Section */}
-            <Grid
-              item
-              xs={12}
-              md={3}
-              sx={{
-                pr: 1, // only creates separation from table
-              }}
-            >
-              <Paper
-                sx={{
-                  p: 1,
-                  bgcolor: "background.paper",
-                  borderRadius: 0,
-                  height: "100%",
-                }}
-              >
-                <Grid container spacing={1}>
-                  {[
-                    {
-                      label: "ACTIVE WRITERS",
-                      value: `${summaryStats.active} / 5`,
-                      bg: "#EEF6FF",
-                      border: "#4A90E2",
-                    },
-                    {
-                      label: "TOTAL WRITTEN",
-                      value: summaryStats.written.toLocaleString(),
-                      bg: "#F4F1FF",
-                      border: "#6D5BD0",
-                    },
-                    {
-                      label: "GLOBAL LAG",
-                      value: summaryStats.lag.toLocaleString(),
-                      color:
-                        summaryStats.lag > 500
-                          ? theme.palette.error.main
-                          : theme.palette.success.main,
-                      bg: "#EEFCEF",
-                      border: "#2E7D32",
-                    },
-                    {
-                      label: "AVG LATENCY",
-                      value: `${summaryStats.latency.toFixed(1)} ms`,
-                      bg: "#FFF6E8",
-                      border: "#E67E22",
-                    },
-                  ].map((kpi, idx) => (
-                    <Grid item xs={6} key={idx}>
-                      <Paper
-                        elevation={0}
-                        sx={{
-                          p: 1,
-                          borderRadius: 0,
-                          borderLeft: `5px solid ${kpi.border}`,
-                          minHeight: 110,
-                          bgcolor: kpi.bg,
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "center",
-                          // border: `1px solid ${kpi.border}22`,
-                          transition: "0.2s ease",
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "text.secondary",
-                            fontWeight: 700,
-                            fontSize: "10px",
-                            letterSpacing: "0.5px",
-                            mb: 1,
-                          }}
-                        >
-                          {kpi.label}
-                        </Typography>
-
-                        <Typography
-                          variant="h4"
-                          sx={{
-                            fontWeight: 700,
-                            color: kpi.color || "#1F2937",
-                            lineHeight: 1.1,
-                            fontSize: "20px",
-                          }}
-                        >
-                          {kpi.value}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Paper>
-            </Grid>
-
-            {/* Right Section - Table */}
-            <Grid
-              item
-              xs={12}
-              md={9}
-              sx={{
-                pl: 0,
-              }}
-            >
-              <Paper
-                sx={{
-                  p: 0.5,
-                  bgcolor: "background.paper",
-                  borderRadius: 0,
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-
-                  /* Header */
-                  "& .ag-header": {
-                    backgroundColor: "#005071 !important",
-                  },
-
-                  "& .ag-header-cell": {
-                    backgroundColor: "#005071 !important",
-                    color: "#fff !important",
-                    fontSize: "10px !important",
-                    fontWeight: 700,
-                  },
-
-                  "& .ag-header-cell-label": {
-                    color: "#fff !important",
-                  },
-
-                  /* SORT ICONS → WHITE */
-                  "& .ag-icon": {
-                    color: "#fff !important",
-                  },
-
-                  "& .ag-sort-ascending-icon": {
-                    color: "#fff !important",
-                  },
-
-                  "& .ag-sort-descending-icon": {
-                    color: "#fff !important",
-                  },
-
-                  "& .ag-sort-none-icon": {
-                    color: "#fff !important",
-                  },
-
-                  "& .ag-header-icon": {
-                    color: "#fff !important",
-                  },
-
-                  "& .ag-cell": {
-                    fontSize: "10px",
-                  },
-
-                  "& .ag-row": {
-                    fontSize: "10px",
-                  },
-                }}
-              >
-                {/* Header */}
+          <Grid container spacing={1} sx={{ flexShrink: 0 }}>
+            {/* KPI Tiles */}
+            <Grid item xs={12} md={3}>
+              <Card sx={{ p: 1.25, height: "100%", display: "flex", flexDirection: "column" }}>
+                <SectionTitle title="Pipeline Overview" />
                 <Box
                   sx={{
-                    p: 1,
-                    // bgcolor: "#005071",
-                    borderBottom: `1px solid ${theme.palette.divider}`,
-                    display: "flex",
-                    alignItems: "center",
+                    flex: 1,
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateRows: "1fr 1fr",
                     gap: 1,
                   }}
                 >
-                  <Typography
-                    sx={{
-                      fontWeight: 700,
-                      color: "#333",
-                      fontSize: "10px",
-                    }}
-                  >
-                    FILTER CONTEXT:
-                  </Typography>
-
-                  <FormControl
-                    size="small"
-                    sx={{
-                      minWidth: 200,
-                      bgcolor: "#fff",
-                    }}
-                  >
-                    <Select
-                      value={filterModule}
-                      onChange={(e) => setFilterModule(e.target.value)}
-                      sx={{
-                        borderRadius: 0,
-                        height: 25,
-                        fontSize: "10px",
-
-                        "& .MuiSelect-select": {
-                          fontSize: "10px",
-                          py: 0.5,
-                        },
-                      }}
-                      MenuProps={{
-                        PaperProps: {
-                          sx: {
-                            "& .MuiMenuItem-root": {
-                              fontSize: "10px",
-                              minHeight: 20,
-                            },
-                          },
-                        },
-                      }}
-                    >
-                      <MenuItem value="ALL">ALL MODULES</MenuItem>
-                      <MenuItem value="BATTERY">BATTERY</MenuItem>
-                      <MenuItem value="BODY">BODY</MenuItem>
-                      <MenuItem value="ENGINE">ENGINE</MenuItem>
-                      <MenuItem value="TRANSMISSION">TRANSMISSION</MenuItem>
-                      <MenuItem value="TYRE">TYRE</MenuItem>
-                    </Select>
-                  </FormControl>
+                  <MetricTile
+                    label="Active Writers"
+                    value={`${summaryStats.active} / 5`}
+                    color="#3b82f6"
+                    icon={<StorageOutlinedIcon sx={{ fontSize: 14 }} />}
+                    delta={
+                      summaryStats.active === 5
+                        ? "All operational"
+                        : `${5 - summaryStats.active} inactive`
+                    }
+                  />
+                  <MetricTile
+                    label="Total Written"
+                    value={summaryStats.written.toLocaleString()}
+                    color="#8b5cf6"
+                    icon={
+                      <PlaylistAddCheckOutlinedIcon sx={{ fontSize: 14 }} />
+                    }
+                  />
+                  <MetricTile
+                    label="Global Lag"
+                    value={summaryStats.lag.toLocaleString()}
+                    color={summaryStats.lag > 500 ? "#ef4444" : "#22c55e"}
+                    icon={<SignalCellularAltOutlinedIcon sx={{ fontSize: 14 }} />}
+                    delta={
+                      summaryStats.lag > 500 ? "High — check pipeline" : "Nominal"
+                    }
+                  />
+                  <MetricTile
+                    label="Avg Latency"
+                    value={`${summaryStats.latency.toFixed(1)} ms`}
+                    color="#f59e0b"
+                    icon={<TimerOutlinedIcon sx={{ fontSize: 14 }} />}
+                  />
                 </Box>
+              </Card>
+            </Grid>
 
-                {/* Grid */}
-                <Box
-                  className={agTheme}
-                  sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    mt: 1,
-
-                    "& .ag-root-wrapper": {
-                      fontSize: "10px",
-                    },
-                  }}
-                >
+            {/* Table */}
+            <Grid item xs={12} md={9}>
+              <Card
+                sx={{
+                  p: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <SectionTitle
+                  title="Writer Subsystem Status"
+                  action={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <InputLabel sx={inputLabelSx}>Filter Module</InputLabel>
+                        <Select
+                          value={filterModule}
+                          onChange={(e) => setFilterModule(e.target.value)}
+                          label="Filter Module"
+                          sx={selectSx}
+                          MenuProps={menuPropsSx}
+                        >
+                          <MenuItem value="ALL">All Modules</MenuItem>
+                          <MenuItem value="BATTERY">Battery</MenuItem>
+                          <MenuItem value="BODY">Body</MenuItem>
+                          <MenuItem value="ENGINE">Engine</MenuItem>
+                          <MenuItem value="TRANSMISSION">Transmission</MenuItem>
+                          <MenuItem value="TYRE">Tyre</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <Tooltip title="Refresh metrics">
+                        <IconButton
+                          size="small"
+                          onClick={() => refetchMetrics()}
+                          disabled={metricsLoading}
+                          sx={{ p: 0.4 }}
+                        >
+                          <RestartAltOutlinedIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  }
+                />
+                <Box className={agTheme} sx={agGridContainerSx}>
                   <AgGridReact
                     rowData={metricsRowData}
                     columnDefs={metricsColumnDefs}
+                    domLayout="autoHeight"
                     animateRows={false}
                     rowSelection="single"
-                    defaultColDef={{
-                      resizable: true,
-                      sortable: true,
-                    }}
+                    defaultColDef={{ resizable: true, sortable: true }}
                     overlayLoadingTemplate={
                       metricsLoading
-                        ? '<span class="ag-overlay-loading-center">Fetching Telemetry...</span>'
+                        ? '<span class="ag-overlay-loading-center">Fetching telemetry…</span>'
                         : undefined
                     }
                     overlayNoRowsTemplate={
                       metricsError
-                        ? '<span class="ag-overlay-loading-center">ERROR: Backend Unreachable</span>'
-                        : undefined
+                        ? '<span class="ag-overlay-loading-center">Backend unreachable</span>'
+                        : '<span class="ag-overlay-loading-center">No data</span>'
                     }
                   />
                 </Box>
-              </Paper>
+              </Card>
             </Grid>
           </Grid>
 
-          <Box sx={{ display: "flex", gap: 2, height: "240px" }}>
-            <Paper
-              sx={{
-                flex: 1,
-                p: 1,
-                borderRadius: 0,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary", mb: 1 }}
-              >
-                SYSTEM THROUGHPUT PROFILE (R/S)
-              </Typography>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke={ct.gridColor}
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={chartAxisStyle}
-                    axisLine={{ stroke: ct.tableBorder }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={chartAxisStyle}
-                    axisLine={{ stroke: ct.tableBorder }}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: ct.tableRowEven }}
-                    contentStyle={tooltipStyle}
-                  />
-                  <Bar dataKey="throughput" fill="#1976d2" barSize={30} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Paper>
+          {/* Charts Row */}
+          <Grid container spacing={1} sx={{ flex: 1, minHeight: 0 }}>
+            <Grid item xs={12} md={6} sx={{ display: "flex" }}>
+              <Card sx={{ p: 1.25, flex: 1, display: "flex", flexDirection: "column" }}>
+                <SectionTitle title="System Throughput Profile (r/s)" />
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 6, right: 8, left: -16, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke={ct.gridColor}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <RechartsTooltip
+                        cursor={{
+                          fill: isDark
+                            ? alpha("#7dd3fc", 0.08)
+                            : alpha("#3b82f6", 0.06),
+                        }}
+                        contentStyle={tooltipStyle}
+                      />
+                      <Bar
+                        dataKey="throughput"
+                        fill={isDark ? "#3b82f6" : "#2563eb"}
+                        radius={[3, 3, 0, 0]}
+                        barSize={28}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Card>
+            </Grid>
 
-            <Paper
-              sx={{
-                flex: 1,
-                p: 1,
-                borderRadius: 0,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontWeight: "bold", color: "text.secondary", mb: 1 }}
-              >
-                PROCESSING LATENCY VARIANCE (MS)
-              </Typography>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke={ct.gridColor}
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={chartAxisStyle}
-                    axisLine={{ stroke: ct.tableBorder }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={chartAxisStyle}
-                    axisLine={{ stroke: ct.tableBorder }}
-                    tickLine={false}
-                  />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Line
-                    type="monotone"
-                    dataKey="latency"
-                    stroke="#d32f2f"
-                    strokeWidth={2}
-                    dot={{ r: 4, strokeWidth: 2 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Box>
+            <Grid item xs={12} md={6} sx={{ display: "flex" }}>
+              <Card sx={{ p: 1.25, flex: 1, display: "flex", flexDirection: "column" }}>
+                <SectionTitle title="Processing Latency Variance (ms)" />
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={chartData}
+                      margin={{ top: 6, right: 8, left: -16, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke={ct.gridColor}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <RechartsTooltip contentStyle={tooltipStyle} />
+                      <Line
+                        type="monotone"
+                        dataKey="latency"
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                        dot={{
+                          r: 3,
+                          fill: "#ef4444",
+                          stroke: isDark ? "#0b1724" : "#ffffff",
+                          strokeWidth: 2,
+                        }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Card>
+            </Grid>
+          </Grid>
         </Box>
       )}
 
+      {/* ── DATA INSPECTOR TAB ── */}
       {viewMode === "inspector" && (
-        <Paper
+        <Card
           sx={{
-            flexGrow: 1,
+            flex: 1,
             minHeight: 0,
             display: "flex",
             flexDirection: "column",
-            borderRadius: 0,
-            p: 1,
-
-            /* AG Grid Header */
-            "& .ag-header": {
-              backgroundColor: "#005071 !important",
-            },
-
-            "& .ag-header-cell": {
-              backgroundColor: "#005071 !important",
-              color: "#fff !important",
-              fontSize: "10px !important",
-              fontWeight: 700,
-            },
-
-            "& .ag-header-cell-label": {
-              color: "#fff !important",
-            },
-
-            "& .ag-header-icon": {
-              color: "#fff !important",
-            },
-
-            "& .ag-icon": {
-              color: "#fff !important",
-            },
-
-            "& .ag-sort-ascending-icon": {
-              color: "#fff !important",
-            },
-
-            "& .ag-sort-descending-icon": {
-              color: "#fff !important",
-            },
-
-            "& .ag-sort-none-icon": {
-              color: "#fff !important",
-            },
-
-            "& .ag-cell": {
-              fontSize: "10px !important",
-            },
-
-            "& .ag-row": {
-              fontSize: "10px !important",
-            },
+            p: 1.25,
           }}
         >
-          {/* Filter Header */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              mb: 1,
-              p: 1,
-              bgcolor: "transparent",
-            }}
-          >
-            {/* Module */}
-            <FormControl
-              size="small"
-              sx={{
-                minWidth: 220,
-                bgcolor: "#fff",
-              }}
-            >
-              <InputLabel
-                sx={{
-                  fontSize: "10px",
-                }}
-              >
-                Target Parquet Module
-              </InputLabel>
+          <SectionTitle title="Parquet Data Inspector" />
 
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel sx={inputLabelSx}>Target Parquet Module</InputLabel>
               <Select
                 value={selectedModule}
                 onChange={(e) => {
@@ -894,78 +971,27 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
                   setFilterSim("ALL");
                 }}
                 label="Target Parquet Module"
-                sx={{
-                  borderRadius: 0,
-                  height: 28,
-                  fontSize: "10px",
-
-                  "& .MuiSelect-select": {
-                    fontSize: "10px",
-                    py: 0.5,
-                  },
-                }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      "& .MuiMenuItem-root": {
-                        fontSize: "10px",
-                        minHeight: 28,
-                      },
-                    },
-                  },
-                }}
+                sx={selectSx}
+                MenuProps={menuPropsSx}
               >
-                <MenuItem value="battery">BATTERY</MenuItem>
-                <MenuItem value="body">BODY</MenuItem>
-                <MenuItem value="engine">ENGINE</MenuItem>
-                <MenuItem value="transmission">TRANSMISSION</MenuItem>
-                <MenuItem value="tyre">TYRE</MenuItem>
+                <MenuItem value="battery">Battery</MenuItem>
+                <MenuItem value="body">Body</MenuItem>
+                <MenuItem value="engine">Engine</MenuItem>
+                <MenuItem value="transmission">Transmission</MenuItem>
+                <MenuItem value="tyre">Tyre</MenuItem>
               </Select>
             </FormControl>
 
-            {/* Vehicle */}
-            <FormControl
-              size="small"
-              sx={{
-                minWidth: 180,
-                bgcolor: "#fff",
-              }}
-            >
-              <InputLabel
-                sx={{
-                  fontSize: "10px",
-                }}
-              >
-                Filter Vehicle
-              </InputLabel>
-
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel sx={inputLabelSx}>Filter Vehicle</InputLabel>
               <Select
                 value={filterSim}
                 onChange={(e) => setFilterSim(e.target.value)}
                 label="Filter Vehicle"
-                sx={{
-                  borderRadius: 0,
-                  height: 28,
-                  fontSize: "10px",
-
-                  "& .MuiSelect-select": {
-                    fontSize: "10px",
-                    py: 0.5,
-                  },
-                }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      "& .MuiMenuItem-root": {
-                        fontSize: "10px",
-                        minHeight: 28,
-                      },
-                    },
-                  },
-                }}
+                sx={selectSx}
+                MenuProps={menuPropsSx}
               >
-                <MenuItem value="ALL">ALL VEHICLES</MenuItem>
-
+                <MenuItem value="ALL">All Vehicles</MenuItem>
                 {availableSims.map((sim) => (
                   <MenuItem key={sim} value={sim}>
                     {sim}
@@ -974,58 +1000,53 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
               </Select>
             </FormControl>
 
-            {/* Button */}
             <Button
               variant="contained"
               onClick={() => refetchInspector()}
               disabled={inspectorLoading}
-              startIcon={<RefreshIcon sx={{ fontSize: "12px" }} />}
+              startIcon={<RefreshIcon sx={{ fontSize: "12px !important" }} />}
               sx={{
                 height: 28,
-                borderRadius: 0,
+                borderRadius: 1,
                 fontSize: "10px",
                 fontWeight: 700,
                 boxShadow: "none",
                 whiteSpace: "nowrap",
-                textTransform: "uppercase",
-                bgcolor: "#0A6D94",
-
+                textTransform: "none",
+                bgcolor: isDark ? alpha("#3b82f6", 0.85) : "#1e40af",
                 "&:hover": {
-                  bgcolor: "#095B7A",
-                  boxShadow: "none",
+                  bgcolor: isDark ? "#3b82f6" : "#1e3a8a",
+                  boxShadow: `0 4px 14px ${alpha("#3b82f6", 0.35)}`,
                 },
               }}
             >
-              FETCH LATEST 100 ROWS
+              Fetch Latest 100 Rows
             </Button>
 
-            {/* Info */}
             <Typography
               sx={{
-                ml: 1,
-                color: "#333",
+                ml: 0.5,
                 fontSize: "10px",
+                color: "text.disabled",
+                fontStyle: "italic",
               }}
             >
-              *Inspector reads raw parquet files directly from disk.
-              Auto-refresh disabled.
+              Reads raw parquet files directly from disk. Auto-refresh disabled.
             </Typography>
-          </Box>
+          </Stack>
 
-          <Divider sx={{ mb: 1 }} />
+          <Divider
+            sx={{
+              mb: 1,
+              borderColor: isDark
+                ? alpha("#7dd3fc", 0.1)
+                : alpha("#1f2937", 0.1),
+            }}
+          />
 
-          {/* Grid */}
           <Box
             className={agTheme}
-            sx={{
-              flexGrow: 1,
-              minHeight: 0,
-              width: "100%",
-
-              "& .ag-root-wrapper": {
-                fontSize: "10px",
-              },
-            }}
+            sx={{ flex: 1, minHeight: 0, width: "100%", ...agGridContainerSx }}
           >
             <AgGridReact
               rowData={filteredInspectorData}
@@ -1037,15 +1058,16 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
               }}
               overlayLoadingTemplate={
                 inspectorLoading
-                  ? '<span class="ag-overlay-loading-center">Scanning Parquet...</span>'
+                  ? '<span class="ag-overlay-loading-center">Scanning parquet…</span>'
                   : undefined
               }
-              overlayNoRowsTemplate='<span class="ag-overlay-loading-center">No Parquet Data Available in Bronze Layer</span>'
+              overlayNoRowsTemplate='<span class="ag-overlay-loading-center">No parquet data in Bronze layer</span>'
             />
           </Box>
-        </Paper>
+        </Card>
       )}
 
+      {/* ── LIVE STREAM MONITOR TAB ── */}
       {viewMode === "live" && (
         <Box
           sx={{
@@ -1054,261 +1076,262 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
             gap: 1,
             flex: 1,
             minHeight: 0,
-
-            "& .MuiTypography-root": {
-              fontSize: "10px",
-            },
-
-            "& .MuiInputLabel-root": {
-              fontSize: "10px",
-            },
-
-            "& .MuiSelect-select": {
-              fontSize: "10px",
-            },
-
-            "& .ag-header": {
-              background: "#005071 !important",
-            },
-
-            "& .ag-header-cell": {
-              background: "#005071 !important",
-              color: "#fff !important",
-              fontSize: "10px !important",
-            },
-
-            "& .ag-header-cell-label": {
-              color: "#fff !important",
-            },
-
-            "& .ag-icon": {
-              color: "#fff !important",
-            },
-
-            "& .ag-cell": {
-              fontSize: "10px",
-            },
           }}
         >
-          {/* TOP */}
-          <Grid container spacing={1}>
-            {/* LEFT */}
+          {/* Top Row */}
+          <Grid container spacing={1} sx={{ flexShrink: 0 }}>
+            {/* Left: system health + global KPIs */}
             <Grid item xs={12} md={3}>
-              <Paper sx={{ p: 1, height: "100%", borderRadius: 0 }}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 1,
-                        bgcolor: "#EEF6FF",
-                        borderLeft: "4px solid #005071",
-                      }}
-                    >
-                      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                        {Object.entries(observerHealth).map(
-                          ([name, isUp]: [string, any]) => (
-                            <Chip
-                              key={name}
-                              label={name.toUpperCase()}
-                              size="small"
-                              color={isUp ? "success" : "error"}
-                              sx={{
-                                fontSize: "10px",
-                                height: 20,
-                              }}
-                            />
-                          )
-                        )}
-                      </Box>
-                    </Paper>
-                  </Grid>
-
-                  {[
-                    {
-                      label: "TOTAL THROUGHPUT",
-                      value: observerGlobal.total_rows.toLocaleString(),
-                    },
-                    {
-                      label: "ACTIVE FLEET",
-                      value: observerGlobal.active_vehicles,
-                    },
-                    {
-                      label: "DLQ BACKLOG",
-                      value: observerGlobal.dlq_backlog,
-                    },
-                  ].map((kpi, idx) => (
-                    <Grid item xs={12} key={idx}>
-                      <Paper
-                        elevation={0}
-                        sx={{
-                          p: 1,
-                          bgcolor: "#EEF6FF",
-                          borderLeft: "4px solid #005071",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            color: "text.secondary",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {kpi.label}
-                        </Typography>
-
-                        <Typography
-                          sx={{
-                            fontSize: "18px",
-                            fontWeight: 700,
-                            color: kpi.color,
-                          }}
-                        >
-                          {kpi.value}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Paper>
-            </Grid>
-
-            {/* RIGHT TABLE */}
-            <Grid item xs={12} md={9}>
-              <Paper
-                sx={{
-                  p: 1,
-                  borderRadius: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  height: 280,
-                }}
-              >
+              <Card sx={{ p: 1.25, height: "100%" }}>
+                <SectionTitle title="System Health" />
                 <Box
-                  sx={{
-                    p: 1,
-                    bgcolor: "transparent",
-                  }}
+                  sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mb: 1.5 }}
                 >
-                  <Typography
-                    sx={{
-                      color: "#333",
-                      fontWeight: 700,
-                    }}
-                  >
-                    LIVE VEHICLE STATUS:
-                  </Typography>
+                  {Object.entries(observerHealth).map(
+                    ([name, isUp]: [string, any]) => (
+                      <Tooltip
+                        key={name}
+                        title={isUp ? "Online" : "Offline"}
+                        placement="top"
+                      >
+                        <Box
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                            px: 0.8,
+                            py: "2px",
+                            borderRadius: 1,
+                            bgcolor: isUp
+                              ? alpha("#22c55e", isDark ? 0.15 : 0.08)
+                              : alpha("#ef4444", isDark ? 0.15 : 0.08),
+                            border: `1px solid ${alpha(
+                              isUp ? "#22c55e" : "#ef4444",
+                              0.25
+                            )}`,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 5,
+                              height: 5,
+                              borderRadius: "50%",
+                              bgcolor: isUp ? "#22c55e" : "#ef4444",
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Typography
+                            sx={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              color: isUp ? "#22c55e" : "#ef4444",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            {name}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    )
+                  )}
                 </Box>
 
-                <Box className={agTheme} sx={{ flex: 1 }}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr",
+                    gap: 0.75,
+                  }}
+                >
+                  <MetricTile
+                    label="Total Throughput"
+                    value={observerGlobal.total_rows.toLocaleString()}
+                    color="#3b82f6"
+                    icon={<StorageOutlinedIcon sx={{ fontSize: 13 }} />}
+                  />
+                  <MetricTile
+                    label="Active Fleet"
+                    value={observerGlobal.active_vehicles}
+                    color="#22c55e"
+                    icon={<DirectionsCarOutlinedIcon sx={{ fontSize: 13 }} />}
+                  />
+                  <MetricTile
+                    label="DLQ Backlog"
+                    value={observerGlobal.dlq_backlog}
+                    color={
+                      observerGlobal.dlq_backlog > 0 ? "#ef4444" : "#22c55e"
+                    }
+                    icon={<SignalCellularAltOutlinedIcon sx={{ fontSize: 13 }} />}
+                    delta={
+                      observerGlobal.dlq_backlog > 0
+                        ? "Requires attention"
+                        : "Clear"
+                    }
+                  />
+                </Box>
+              </Card>
+            </Grid>
+
+            {/* Right: live vehicle table */}
+            <Grid item xs={12} md={9}>
+              <Card
+                sx={{
+                  p: 1.25,
+                  height: 280,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <SectionTitle title="Live Vehicle Status" />
+                <Box className={agTheme} sx={{ flex: 1, minHeight: 0, ...agGridContainerSx }}>
                   <AgGridReact
                     rowData={observerVehicles}
                     columnDefs={observerColDefs}
                     animateRows={false}
                     rowSelection="single"
-                    defaultColDef={{
-                      resizable: true,
-                      sortable: true,
-                    }}
-                    overlayNoRowsTemplate="<span>No Stream Data Available</span>"
+                    defaultColDef={{ resizable: true, sortable: true }}
+                    overlayNoRowsTemplate='<span class="ag-overlay-loading-center">No stream data available</span>'
                   />
                 </Box>
-              </Paper>
+              </Card>
             </Grid>
           </Grid>
 
-          {/* BOTTOM */}
-          <Grid container spacing={1}>
-            {/* CHARTS */}
-            <Grid item xs={12} md={6}>
-              <Paper
+          {/* Bottom Row */}
+          <Grid container spacing={1} sx={{ flex: 1, minHeight: 0 }}>
+            {/* Charts */}
+            <Grid item xs={12} md={6} sx={{ display: "flex" }}>
+              <Card
                 sx={{
-                  p: 1,
-                  borderRadius: 0,
-                  height: 450,
+                  p: 1.25,
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
                 }}
               >
-                <Typography sx={{ mb: 1 }}>LATENCY BY VEHICLE (ms)</Typography>
+                <SectionTitle title="Latency by Vehicle (ms)" />
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                  <ResponsiveContainer width="100%" height="50%">
+                    <BarChart
+                      data={observerVehicles}
+                      margin={{ top: 4, right: 8, left: -18, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke={ct.gridColor}
+                      />
+                      <XAxis
+                        dataKey="vehicle_id"
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <RechartsTooltip
+                        cursor={{ fill: isDark ? alpha("#7dd3fc", 0.08) : alpha("#3b82f6", 0.06) }}
+                        contentStyle={tooltipStyle}
+                      />
+                      <Bar
+                        dataKey="avg_latency"
+                        fill="#f59e0b"
+                        radius={[3, 3, 0, 0]}
+                        barSize={20}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
 
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={observerVehicles}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                  <Typography
+                    sx={{
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      mt: 1,
+                      mb: 0.5,
+                    }}
+                  >
+                    Data Quality Distribution
+                  </Typography>
 
-                    <XAxis
-                      dataKey="vehicle_id"
-                      tick={{
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <YAxis
-                      tick={{
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <Tooltip />
-
-                    <Bar dataKey="avg_latency" fill="#fbc02d" />
-                  </BarChart>
-                </ResponsiveContainer>
-
-                <Typography sx={{ mt: 2, mb: 1 }}>
-                  DATA QUALITY DISTRIBUTION
-                </Typography>
-
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={observerVehicles}>
-                    <CartesianGrid strokeDasharray="3 3" />
-
-                    <XAxis
-                      dataKey="vehicle_id"
-                      tick={{
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <YAxis
-                      tick={{
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <Tooltip />
-
-                    <Legend
-                      wrapperStyle={{
-                        fontSize: "10px",
-                      }}
-                    />
-
-                    <Bar dataKey="rows_processed" fill="#2e7d32" stackId="a" />
-
-                    <Bar dataKey="rejected_rows" fill="#c62828" stackId="a" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Paper>
+                  <ResponsiveContainer width="100%" height="40%">
+                    <BarChart
+                      data={observerVehicles}
+                      margin={{ top: 4, right: 8, left: -18, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke={ct.gridColor}
+                      />
+                      <XAxis
+                        dataKey="vehicle_id"
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={chartAxisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                      />
+                      <RechartsTooltip
+                        cursor={{ fill: isDark ? alpha("#7dd3fc", 0.08) : alpha("#3b82f6", 0.06) }}
+                        contentStyle={tooltipStyle}
+                      />
+                      <Legend
+                        wrapperStyle={{
+                          fontSize: "10px",
+                          fontFamily: CHART_FONT,
+                        }}
+                      />
+                      <Bar
+                        dataKey="rows_processed"
+                        name="Processed"
+                        fill="#22c55e"
+                        stackId="a"
+                        radius={[2, 2, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="rejected_rows"
+                        name="Rejected"
+                        fill="#ef4444"
+                        stackId="a"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Card>
             </Grid>
 
-            {/* PAYLOAD */}
-            <Grid item xs={12} md={6}>
-              <Paper
+            {/* Payload inspector */}
+            <Grid item xs={12} md={6} sx={{ display: "flex" }}>
+              <Card
                 sx={{
-                  py: 1.5,
-                  px: 1,
-                  borderRadius: 0,
-                  height: 450,
+                  p: 1.25,
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
-                <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
-                  <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel>Target Vehicle</InputLabel>
+                <SectionTitle title="Payload Inspector" />
 
+                <Stack direction="row" spacing={1} sx={{ mb: 1, flexShrink: 0 }}>
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel sx={inputLabelSx}>Target Vehicle</InputLabel>
                     <Select
                       value={inspectorVid}
                       onChange={(e) => {
                         setInspectorVid(e.target.value);
                         setInspectorSource("ALL (Latest)");
                       }}
+                      label="Target Vehicle"
+                      sx={selectSx}
+                      MenuProps={menuPropsSx}
                     >
                       {observerVehicles.map((v: any) => (
                         <MenuItem key={v.vehicle_id} value={v.vehicle_id}>
@@ -1319,11 +1342,13 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
                   </FormControl>
 
                   <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel>Payload Source</InputLabel>
-
+                    <InputLabel sx={inputLabelSx}>Payload Source</InputLabel>
                     <Select
                       value={inspectorSource}
                       onChange={(e) => setInspectorSource(e.target.value)}
+                      label="Payload Source"
+                      sx={selectSx}
+                      MenuProps={menuPropsSx}
                     >
                       {availableInspectorSources.map((src: string) => (
                         <MenuItem key={src} value={src}>
@@ -1332,41 +1357,45 @@ export default function WriterOps({ isActive = true }: { isActive?: boolean }) {
                       ))}
                     </Select>
                   </FormControl>
-                </Box>
+                </Stack>
 
                 <Box
                   sx={{
-                    bgcolor: "background.default",
-                    border: `1px solid ${theme.palette.divider}`,
-                    p: 1,
-                    height: 375,
+                    flex: 1,
+                    minHeight: 0,
                     overflow: "auto",
+                    borderRadius: 1,
+                    bgcolor: isDark ? alpha("#000", 0.35) : alpha("#f1f5f9", 0.8),
+                    border: `1px solid ${
+                      isDark ? alpha("#7dd3fc", 0.1) : alpha("#1f2937", 0.1)
+                    }`,
+                    p: 1.5,
                   }}
                 >
                   <pre
                     style={{
                       margin: 0,
                       fontSize: "10px",
+                      fontFamily: '"Fira Code", "Cascadia Code", "Consolas", monospace',
                       whiteSpace: "pre-wrap",
+                      wordBreak: "break-all",
+                      color: isDark ? "#a5f3fc" : "#0f172a",
+                      lineHeight: 1.6,
                     }}
                   >
                     {(() => {
                       if (!selectedInspectorV) return "// NO DATA";
-
                       const payload =
                         inspectorSource === "ALL (Latest)"
                           ? selectedInspectorV.latest_payload
-                          : selectedInspectorV.module_payloads?.[
-                              inspectorSource
-                            ];
-
+                          : selectedInspectorV.module_payloads?.[inspectorSource];
                       return payload
                         ? JSON.stringify(payload, null, 2)
                         : "// WAITING FOR PACKET";
                     })()}
                   </pre>
                 </Box>
-              </Paper>
+              </Card>
             </Grid>
           </Grid>
         </Box>
