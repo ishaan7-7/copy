@@ -107,7 +107,8 @@ def run_background_task(cmd_list, name, cwd_path, wait_time=0):
     print(f"--- Starting {name} (Logs: {log_path}) ---")
     log_file = open(log_path, "a", encoding="utf-8")
     open_log_files.append(log_file)
-    proc = subprocess.Popen(cmd_list, cwd=cwd_path, stdout=log_file, stderr=subprocess.STDOUT, env=_make_env())
+    proc = subprocess.Popen(cmd_list, cwd=cwd_path, stdout=log_file, stderr=subprocess.STDOUT,
+                            stdin=subprocess.DEVNULL, env=_make_env())
     running_processes.append({"proc": proc, "name": name, "detached": False})
     if wait_time > 0:
         time.sleep(wait_time)
@@ -199,6 +200,7 @@ def launch_master_frontend():
             vite_cmd,
             shell=True, cwd=frontend_dir,
             stdout=log_file, stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
             env=env,
         )
         running_processes.append({"proc": proc, "name": "Master_Dash_Frontend", "detached": False})
@@ -444,8 +446,17 @@ def _do_hard_reset(infra_is_running):
     hunt_and_kill_port(5173, "Node/Vite")
     time.sleep(2)
 
-    shutil.rmtree(KAFKA_LOG_DIR, ignore_errors=True)
-    shutil.rmtree(ZK_LOG_DIR, ignore_errors=True)
+    for label, log_dir in [("Kafka", KAFKA_LOG_DIR), ("Zookeeper", ZK_LOG_DIR)]:
+        deleted = False
+        for attempt in range(5):
+            shutil.rmtree(log_dir, ignore_errors=True)
+            if not os.path.exists(log_dir):
+                deleted = True
+                break
+            time.sleep(2)
+        if not deleted:
+            print(f"   ⚠️  WARNING: Could not fully delete {label} log dir: {log_dir}")
+            print(f"   Some files may still be locked. Topics will be skipped if they already exist.")
 
     run_detached_console(r"tools\kafka\start_zookeeper.bat", "Zookeeper", ROOT_DIR, 20)
     run_detached_console(r"tools\kafka\start_kafka.bat", "Kafka", ROOT_DIR, 30)
@@ -453,7 +464,7 @@ def _do_hard_reset(infra_is_running):
     print("\n--- Recreating Kafka Topics ---")
     for topic in KAFKA_TOPICS:
         subprocess.run(
-            fr"{KAFKA_BIN_DIR}\kafka-topics.bat --create --topic {topic} --bootstrap-server localhost:9092 --partitions 6 --replication-factor 1",
+            fr"{KAFKA_BIN_DIR}\kafka-topics.bat --create --if-not-exists --topic {topic} --bootstrap-server localhost:9092 --partitions 6 --replication-factor 1",
             shell=True,
             env=_make_env(),
         )
@@ -565,6 +576,11 @@ def main(args):
     print("\n" + "=" * 50)
     print("SYSTEM READY.")
     print("Action: Start replay using the Notebook.")
+    print()
+    print("NOTE: Spark streaming contexts (writer, inference, gold)")
+    print("take 45-90s to fully initialize after a hard reset.")
+    print("SystemOps will show zeroes during this window — this is normal.")
+    print("Start replay AFTER you see non-zero writer metrics on SystemOps.")
     print("=" * 50)
 
     _interactive_loop()
