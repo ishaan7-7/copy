@@ -135,6 +135,10 @@ def _smart_attribution(
     return df_crit, df_noncrit
 
 
+def _norm_peak(peak_ts: str) -> str:
+    return str(peak_ts)[:16].replace(" ", "T")
+
+
 def _append_dtc_history(module: str, source_id: str, peak_ts: str, triggers: list) -> None:
     from datetime import datetime as _dt, timezone as _tz
     DTC_HISTORY.parent.mkdir(parents=True, exist_ok=True)
@@ -142,11 +146,22 @@ def _append_dtc_history(module: str, source_id: str, peak_ts: str, triggers: lis
         entries = json.loads(DTC_HISTORY.read_text()) if DTC_HISTORY.exists() else []
     except Exception:
         entries = []
+
+    norm = _norm_peak(peak_ts)
+    dedup_key = (source_id.lower(), module.lower(), norm)
+    for e in entries:
+        if (
+            str(e.get("source_id", "")).lower() == dedup_key[0]
+            and str(e.get("module", "")).lower() == dedup_key[1]
+            and _norm_peak(str(e.get("peak_ts", ""))) == dedup_key[2]
+        ):
+            return
+
     entries.append({
         "run_ts":    _dt.now(_tz.utc).isoformat(),
         "module":    module,
         "source_id": source_id,
-        "peak_ts":   peak_ts,
+        "peak_ts":   norm,
         "triggers":  triggers,
     })
     if len(entries) > _DTC_HISTORY_MAX:
@@ -227,7 +242,7 @@ def health() -> dict:
 
 @app.get("/api/dtc/analyze")
 async def analyze_dtc(module: str, source_id: str, peak_ts: str) -> dict:
-    cache_key = (source_id, module, peak_ts)
+    cache_key = (source_id.lower(), module.lower(), _norm_peak(peak_ts))
     if cache_key in _dtc_cache:
         return _dtc_cache[cache_key]
     try:

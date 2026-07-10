@@ -31,11 +31,11 @@ async function fetchHeartbeat(): Promise<HeartbeatData> {
   return data;
 }
 
-export function useHeartbeat(enabled = true) {
+export function useHeartbeat(enabled = true, isActive = true) {
   const { data } = useQuery<HeartbeatData>({
     queryKey:       ['heartbeat'],
     queryFn:        fetchHeartbeat,
-    refetchInterval: enabled ? 2000 : false,
+    refetchInterval: enabled && isActive ? 2000 : false,
     placeholderData: FALLBACK,
   });
 

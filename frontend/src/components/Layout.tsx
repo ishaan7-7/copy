@@ -19,67 +19,30 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
 import HomeIcon from "@mui/icons-material/Home";
-import SpeedIcon from "@mui/icons-material/Speed";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import BugReportIcon from "@mui/icons-material/BugReport";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
+import MonitorHeartRoundedIcon from "@mui/icons-material/MonitorHeartRounded";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import { useStore } from "../store";
 import exlLogo from "../images/exl-logo.png";
 import CockpitView from "../pages/CockpitView";
-import WriterOps from "../pages/WriterOps";
-import DashboardInference from "../pages/DashboardInference";
-import GoldHealth from "../pages/GoldHealth";
-import DashboardAlerts from "../pages/DashboardAlerts";
+import FleetHealth from "../pages/FleetHealth";
 import AutomotiveDive from "../pages/AutomotiveDive";
 import DtcInvestigation from "../pages/DtcInvestigation";
+import DataScience from "../pages/DataScience";
 import KnowledgeRepo from "../pages/KnowledgeRepo";
 
 const DRAWER_WIDTH = 240;
 
 const menuItems = [
-  { text: "Cockpit View", path: "/", icon: <HomeIcon />, index: 0 },
-  { text: "System Ops", path: "/writer-ops", icon: <SpeedIcon />, index: 1 },
-  {
-    text: "Inference Engine",
-    path: "/inference",
-    icon: <PsychologyIcon />,
-    index: 2,
-  },
-  {
-    text: "Vehicle Health",
-    path: "/gold",
-    icon: <HealthAndSafetyIcon />,
-    index: 3,
-  },
-  {
-    text: "Alerts Management",
-    path: "/alerts",
-    icon: <WarningAmberIcon />,
-    index: 4,
-  },
-  {
-    text: "Automotive Dive",
-    path: "/automotive",
-    icon: <DirectionsCarIcon />,
-    index: 5,
-  },
-  {
-    text: "DTC Investigation",
-    path: "/dtc",
-    icon: <BugReportIcon />,
-    index: 6,
-  },
-  {
-    text: "Knowledge Repo",
-    path: "/knowledge-repo",
-    icon: <MenuBookIcon />,
-    index: 7,
-  },
+  { text: "Cockpit View", path: "/cockpit-view", icon: <HomeIcon />, index: 0 },
+  { text: "Fleet Health", path: "/fleet-health", icon: <MonitorHeartRoundedIcon />, index: 1 },
+  { text: "Vehicle Deep Dive", path: "/automotive", icon: <DirectionsCarIcon />, index: 2 },
+  { text: "DTC Investigation", path: "/dtc", icon: <BugReportIcon />, index: 3 },
+  { text: "Systems Ops", path: "/datascience", icon: <AnalyticsRoundedIcon />, index: 4 },
 ];
 
 export default function Layout() {
@@ -115,12 +78,10 @@ export default function Layout() {
   const isCockpit =
     location.pathname === "/" ||
     location.pathname.startsWith("/cockpit-view");
-  const isWriter = location.pathname.startsWith("/writer-ops");
-  const isInference = location.pathname.startsWith("/inference");
-  const isGold = location.pathname.startsWith("/gold");
-  const isAlerts = location.pathname.startsWith("/alerts");
+  const isFleetHealth = location.pathname.startsWith("/fleet-health");
   const isAuto = location.pathname.startsWith("/automotive");
   const isDtc = location.pathname.startsWith("/dtc");
+  const isDataScience = location.pathname.startsWith("/datascience");
   const isKnowledge = location.pathname.startsWith("/knowledge-repo");
 
   const handleNavigation = (path: string, index: number) => {
@@ -140,7 +101,7 @@ export default function Layout() {
           zIndex: (theme) => theme.zIndex.drawer + 1,
         }}
       >
-        <Toolbar
+         <Toolbar
           disableGutters
           sx={{
             minHeight: "36px !important",
@@ -152,28 +113,70 @@ export default function Layout() {
           {/* Left Section */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 4 }}>
             {/* Logo */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2.5 }}>
-              <img src={exlLogo} alt="exl-logo" width={70} />
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  fontSize: 16,
-                  color: darkMode ? "#e2e8f0" : "#333",
-                  width: "max-content",
-                }}
-              >
-                Streaming Emulator / Master Control
-              </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 2.5,
+                cursor: "pointer",
+              }}
+              onClick={() => navigate("/")}
+            >
+              <img src={exlLogo} alt="EXL Logo" width={72} />
+ 
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: "20px",
+                    fontWeight: 800,
+                    color: darkMode ? "#fff" : "#005071",
+                    lineHeight: 1,
+                    letterSpacing: "-0.4px",
+                    display: "flex",
+                    alignItems: "baseline",
+                  }}
+                >
+                  Telemetri
+                  <Box
+                    component="span"
+                    sx={{
+                      fontSize: "22px",
+                      color: "#ed6c02", // EXL Orange
+                      fontWeight: 900,
+                      fontStyle: "italic",
+                      fontFamily: "Arial Black, Arial, sans-serif",
+                      ml: "1px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    X
+                  </Box>
+                </Typography>
+ 
+                <Typography
+                  sx={{
+                    fontSize: "8px",
+                    color: darkMode ? "#94A3B8" : "#64748B",
+                    fontWeight: 500,
+                    letterSpacing: "0.08em",
+                    lineHeight: 1.2,
+                    whiteSpace: "nowrap", // Keep in a single line
+                    mt: 0.2,
+                  }}
+                >
+                  Vehicle Intelligence Platform
+                </Typography>
+              </Box>
             </Box>
-
+ 
             {/* Menu */}
             <Box sx={{ display: "flex", gap: 1, height: "100%" }}>
               {menuItems.map((item) => {
                 const isSelected =
                   item.path === "/"
-                    ? isCockpit
+                    ? location.pathname === "/"
                     : location.pathname.startsWith(item.path);
-
+ 
                 return (
                   <Box
                     key={item.text}
@@ -190,33 +193,33 @@ export default function Layout() {
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
-
+ 
                       borderRadius: "8px 8px 0 0",
-
+ 
                       color: isSelected
                         ? darkMode
-                          ? "#e2e8f0"
+                          ? "#fff"
                           : "#FB4E0B"
                         : darkMode
-                        ? "#94a3b8"
+                        ? "#fff"
                         : "#333",
-
+ 
                       bgcolor: isSelected
                         ? darkMode
-                          ? "rgba(56,189,248,.10)"
+                          ? "rgba(255,255,255,.20)"
                           : "rgb(251 78 11 / 7%)"
                         : "transparent",
-
+ 
                       transition: "all .25s ease",
-
+ 
                       "&:hover": {
-                        color: darkMode ? "#e2e8f0" : "#FB4E0B",
-
+                        color: darkMode ? "#fff" : "#FB4E0B",
+ 
                         bgcolor: darkMode
-                          ? "rgba(56,189,248,.07)"
+                          ? "rgba(255,255,255,.13)"
                           : "rgba(251,78,11,.05)",
                       },
-
+ 
                       "&::after": {
                         content: '""',
                         position: "absolute",
@@ -225,26 +228,34 @@ export default function Layout() {
                         bottom: 0,
                         height: "2px",
                         borderRadius: "999px",
-
+ 
                         backgroundColor: darkMode
-                          ? "#38bdf8"
+                          ? "rgb(255 255 255)" // hover underline
                           : isSelected
                           ? "#FB4E0B"
                           : "rgba(251,78,11,.45)",
-
+ 
                         transform: isSelected ? "scaleX(1)" : "scaleX(0)",
-
+ 
                         transition:
                           "transform .25s ease, background-color .25s ease",
                       },
-
+ 
                       "&:hover::after": {
                         transform: "scaleX(1)",
-
+ 
                         backgroundColor: darkMode
-                          ? "rgba(56,189,248,.5)"
+                          ? "rgba(255,255,255,.55)" // lighter white on hover
                           : "rgba(251,78,11,.45)",
                       },
+ 
+                      // "&:hover::after": {
+                      //   transform: "scaleX(1)",
+ 
+                      //   backgroundColor: darkMode
+                      //     ? "#fff"
+                      //     : "rgba(251,78,11,.45)",
+                      // },
                     }}
                   >
                     {/* Width reserver */}
@@ -258,7 +269,7 @@ export default function Layout() {
                     >
                       {item.text}
                     </Box>
-
+ 
                     {/* Actual text */}
                     <Typography
                       sx={{
@@ -276,9 +287,22 @@ export default function Layout() {
               })}
             </Box>
           </Box>
-
+ 
           {/* Right Actions */}
           <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <Tooltip title="Knowledge Repo">
+              <IconButton
+                size="small"
+                onClick={() => navigate("/knowledge-repo")}
+                sx={{
+                  color: isKnowledge
+                    ? darkMode ? "#fff" : "#FB4E0B"
+                    : darkMode ? "#94a3b8" : "#64748b",
+                }}
+              >
+                <MenuBookIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
             <Tooltip
               title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
@@ -292,6 +316,7 @@ export default function Layout() {
             </Tooltip>
           </Box>
         </Toolbar>
+ 
       </AppBar>
 
       {/* <Drawer
@@ -361,7 +386,7 @@ export default function Layout() {
         component="main"
         sx={{
           flexGrow: 1,
-          p: isKnowledge ? 0 : 1,
+          p: isKnowledge || isDataScience || isFleetHealth ? 0 : 1,
           bgcolor: "background.default",
           mt: "45px",
           overflow: "auto",
@@ -372,24 +397,9 @@ export default function Layout() {
             <CockpitView isActive={isCockpit} />
           </Box>
         )}
-        {visited("/writer-ops") && (
-          <Box sx={hide(isWriter)}>
-            <WriterOps isActive={isWriter} />
-          </Box>
-        )}
-        {visited("/inference") && (
-          <Box sx={hide(isInference)}>
-            <DashboardInference isActive={isInference} />
-          </Box>
-        )}
-        {visited("/gold") && (
-          <Box sx={hide(isGold)}>
-            <GoldHealth isActive={isGold} />
-          </Box>
-        )}
-        {visited("/alerts") && (
-          <Box sx={hide(isAlerts)}>
-            <DashboardAlerts isActive={isAlerts} />
+        {visited("/fleet-health") && (
+          <Box sx={hide(isFleetHealth)}>
+            <FleetHealth isActive={isFleetHealth} />
           </Box>
         )}
         {visited("/automotive") && (
@@ -397,7 +407,16 @@ export default function Layout() {
             <AutomotiveDive isActive={isAuto} />
           </Box>
         )}
-        {isDtc && <DtcInvestigation />}
+        {visited("/dtc") && (
+          <Box sx={hide(isDtc)}>
+            <DtcInvestigation isActive={isDtc} />
+          </Box>
+        )}
+        {visited("/datascience") && (
+          <Box sx={hide(isDataScience)}>
+            <DataScience isActive={isDataScience} />
+          </Box>
+        )}
         {visited("/knowledge-repo") && (
           <Box sx={hide(isKnowledge)}>
             <KnowledgeRepo />

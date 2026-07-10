@@ -163,7 +163,7 @@ async def get_inference_tail(module: str, request: Request):
 # 3. Gold Health
 @app.get("/api/gold/metrics")
 async def get_gold_metrics(request: Request):
-    fallback = {"active_sims": [], "total_gold_rows": 0, "processing_lags": {}}
+    fallback = {"active_sims": [], "total_gold_rows": 0, "processing_lags": {}, "global_max_lag": 0, "fleet_vehicle_health_pct": None}
     return await proxy_request("gold", "/api/gold/metrics", request, fallback_data=fallback)
 
 @app.get("/api/gold/config")

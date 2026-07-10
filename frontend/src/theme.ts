@@ -49,8 +49,8 @@ export const darkTheme = createTheme({
   palette: {
     mode: "dark",
     background: {
-      default: "#0f1923",
-      paper: "#1a2535",
+      default: "#080c12",
+      paper: "#0d1117",
     },
     primary: { main: "#5c85a8" },
     error: { main: "#ef5350" },
@@ -60,7 +60,7 @@ export const darkTheme = createTheme({
       primary: "#e8ecf0",
       secondary: "#8a9bb0",
     },
-    divider: "#2a3a4a",
+    divider: "#1e2433",
   },
   typography: baseTypography,
   shape: { borderRadius: 0 },
@@ -69,7 +69,7 @@ export const darkTheme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          border: "1px solid #2a3a4a",
+          border: "1px solid #1e2433",
           boxShadow: "none",
         },
       },

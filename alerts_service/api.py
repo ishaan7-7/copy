@@ -12,6 +12,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 SILVER_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "silver")
 ALERTS_ROOT = os.path.join(PROJECT_ROOT, "data", "delta", "gold", "alerts")
 ALERTS_CHECKPOINT = os.path.join(CURRENT_DIR, "state", "checkpoints.json")
+DTC_HISTORY_FILE = os.path.join(PROJECT_ROOT, "data", "dtc_history.json")
 
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
@@ -109,8 +110,37 @@ def _sync_update_alerts():
 
             active_alerts = len(open_df)
             crit_vehicles = open_df['source_id'].nunique() if not open_df.empty else 0
-            open_alerts = open_df.to_dict(orient="records")
-            closed_alerts = closed_df.to_dict(orient="records")
+            dtc_lookup = {}
+            try:
+                if os.path.exists(DTC_HISTORY_FILE):
+                    with open(DTC_HISTORY_FILE, "r") as _fh:
+                        _runs = json.load(_fh)
+                    for _r in _runs:
+                        _norm = str(_r.get("peak_ts", ""))[:16].replace(" ", "T")
+                        _k = (
+                            str(_r.get("source_id", "")).lower(),
+                            str(_r.get("module", "")).lower(),
+                            _norm,
+                        )
+                        dtc_lookup[_k] = _r
+            except Exception:
+                pass
+
+            def _enrich(alert: dict) -> dict:
+                _norm = str(alert.get("peak_anomaly_ts", ""))[:16].replace(" ", "T")
+                _k = (
+                    str(alert.get("source_id", "")).lower(),
+                    str(alert.get("module", "")).lower(),
+                    _norm,
+                )
+                _run = dtc_lookup.get(_k)
+                alert["analyzed"] = _run is not None
+                alert["dtc_run_ts"] = _run["run_ts"] if _run else None
+                alert["dtc_triggers"] = _run["triggers"] if _run else None
+                return alert
+
+            open_alerts = [_enrich(a) for a in open_df.to_dict(orient="records")]
+            closed_alerts = [_enrich(a) for a in closed_df.to_dict(orient="records")]
 
         ALERTS_METRICS_CACHE["active_alerts_count"] = active_alerts
         ALERTS_METRICS_CACHE["critical_vehicles"] = crit_vehicles

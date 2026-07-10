@@ -43,6 +43,7 @@ export function GoldStreamProvider({ children }: { children: React.ReactNode }) 
   const ringBuffer = useRef<Map<string, HealthPoint[]>>(new Map());
   const esRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttempts = useRef(0);
   const disconnectedAt = useRef<number | null>(null);
   const fallbackTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -85,6 +86,7 @@ export function GoldStreamProvider({ children }: { children: React.ReactNode }) 
       es.onopen = () => {
         setConnected(true);
         disconnectedAt.current = null;
+        reconnectAttempts.current = 0;
         stopFallbackPoll();
       };
 
@@ -109,7 +111,9 @@ export function GoldStreamProvider({ children }: { children: React.ReactNode }) 
           startFallbackPoll();
         }
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = setTimeout(connect, 3000);
+        const delay = Math.min(3000 * Math.pow(2, reconnectAttempts.current), 30000);
+        reconnectAttempts.current += 1;
+        reconnectTimerRef.current = setTimeout(connect, delay);
       };
     };
 

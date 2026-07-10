@@ -34,18 +34,18 @@ const LIGHT: ChartTheme = {
 
 const DARK: ChartTheme = {
   axisColor:       '#8a9bb0',
-  gridColor:       '#2a3a4a',
-  splitLineColor:  '#2a3a4a',
-  tooltipBg:       '#1a2535',
-  tooltipBorder:   '#2a3a4a',
+  gridColor:       '#1e2433',
+  splitLineColor:  '#1e2433',
+  tooltipBg:       '#131722',
+  tooltipBorder:   '#1e2433',
   tooltipText:     '#e8ecf0',
-  maskColor:       'rgba(15,25,35,0.7)',
+  maskColor:       'rgba(8,12,18,0.7)',
   loadingColor:    '#5c85a8',
-  tableRowEven:    '#1a2535',
-  tableRowOdd:     '#0f1923',
-  tableHeaderBg:   '#0a1520',
+  tableRowEven:    '#0d1117',
+  tableRowOdd:     '#080c12',
+  tableHeaderBg:   '#060a0f',
   tableHeaderText: '#8a9bb0',
-  tableBorder:     '#2a3a4a',
+  tableBorder:     '#1e2433',
 };
 
 export function useChartTheme(): ChartTheme {

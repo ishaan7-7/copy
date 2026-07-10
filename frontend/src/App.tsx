@@ -5,6 +5,8 @@ import Layout from "./components/Layout";
 import { useStore } from "./store";
 import { lightTheme, darkTheme } from "./theme";
 import { GoldStreamProvider } from "./contexts/GoldStreamContext";
+import TelematrixLandingPage from "./pages/TelematrixLandingPage";
+
 
 const scrollbarStyles = (dark: boolean) => ({
   "*": {
@@ -42,7 +44,8 @@ function App() {
         <CssBaseline />
         <GlobalStyles styles={scrollbarStyles(darkMode)} />
         <HashRouter>
-          <Routes>
+        <Routes>
+            <Route path="/" element={<TelematrixLandingPage />} />
             <Route path="/*" element={<Layout />} />
           </Routes>
         </HashRouter>

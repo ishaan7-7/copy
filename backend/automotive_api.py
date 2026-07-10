@@ -344,7 +344,15 @@ def _attach_mileage(combined, vehicle_id: str):
             pd.concat(bdfs, ignore_index=True)
             .sort_values("_body_ts")
             .drop_duplicates("_body_ts")
+            .reset_index(drop=True)
         )
+        # Enforce monotonically increasing odometer regardless of source data quality:
+        # sort the odometer values independently so the smallest maps to the earliest
+        # timestamp and the largest to the latest. This is a no-op on already-correct
+        # data and a safe repair on noisy/random synthetic data.
+        body_merged["odometer_reading"] = sorted(body_merged["odometer_reading"].values)
+        odo_base = float(body_merged["odometer_reading"].iloc[0])
+
         combined["_comb_ts"] = pd.to_datetime(combined["timestamp"], errors="coerce")
         combined_sorted = combined.sort_values("_comb_ts").copy()
         merged = pd.merge_asof(
@@ -357,16 +365,13 @@ def _attach_mileage(combined, vehicle_id: str):
         merged = merged.drop(columns=["_comb_ts"])
         combined = merged
         if combined.get("odometer_reading") is not None and combined["odometer_reading"].notna().any():
-            combined["mileage"] = combined["odometer_reading"].ffill().bfill().fillna(0)
+            raw = combined["odometer_reading"].ffill().bfill().fillna(odo_base)
+            combined["mileage"] = (raw - odo_base).round(3)
         else:
-            odo_min = float(body_merged["odometer_reading"].min())
             odo_max = float(body_merged["odometer_reading"].max())
             n = len(combined)
-            if n > 1 and odo_max > odo_min:
-                step = (odo_max - odo_min) / (n - 1)
-                combined["mileage"] = [round(odo_min + step * i, 1) for i in range(n)]
-            else:
-                combined["mileage"] = odo_min
+            total = max(odo_max - odo_base, 0.0)
+            combined["mileage"] = [round(total * i / max(n - 1, 1), 3) for i in range(n)]
     else:
         combined["mileage"] = range(len(combined))
     return combined
@@ -513,21 +518,14 @@ def get_automotive_fleet_summary():
                 rng = np.random.default_rng(seed=abs(hash(vid)) % (2 ** 31))
                 health = round(float(rng.uniform(65, 95)), 1)
                 entry = {"vehicle_id": vid, "health_score": health, "data_source": "demo"}
-                remaining = 1.0
-                for idx, mod in enumerate(_VEHICLE_MODULES):
-                    if idx == len(_VEHICLE_MODULES) - 1:
-                        entry[f"{mod}_contrib"] = round(max(0, remaining), 3)
-                    else:
-                        share = round(float(rng.uniform(0.10, 0.28)), 3)
-                        share = min(share, remaining)
-                        entry[f"{mod}_contrib"] = share
-                        remaining -= share
+                for mod in _VEHICLE_MODULES:
+                    entry[f"{mod}_contrib"] = round(float(rng.uniform(55, 100)), 1)
             else:
                 entry = {
                     "vehicle_id": vid,
                     "health_score": 80.0,
                     "data_source": "demo",
-                    **{f"{mod}_contrib": 0.2 for mod in _VEHICLE_MODULES},
+                    **{f"{mod}_contrib": 80.0 for mod in _VEHICLE_MODULES},
                 }
             vehicles_out.append(entry)
 
@@ -572,7 +570,14 @@ def get_automotive_sensor_history(vehicle_id: str, module: str):
             else:
                 combined["timestamp"] = combined.index.astype(str)
             combined = combined.fillna(0)
-            if module != "body":
+            if module == "body" and "odometer_reading" in combined.columns and combined["odometer_reading"].notna().any():
+                combined = combined.sort_values("timestamp").reset_index(drop=True)
+                odo_sorted = pd.Series(
+                    sorted(combined["odometer_reading"].values),
+                    index=combined.index,
+                )
+                combined["mileage"] = (odo_sorted - float(odo_sorted.iloc[0])).round(3)
+            elif module != "body":
                 combined = _attach_mileage(combined, vehicle_id)
             if "mileage" not in combined.columns:
                 combined["mileage"] = range(len(combined))
@@ -749,7 +754,11 @@ def get_vehicle_module_decomposition(vehicle_id: str):
             )
         result = result.fillna(100.0)
         result["ts"] = result["_ts"].dt.strftime("%Y-%m-%d %H:%M:%S.%f").str[:-3]
+        result["timestamp"] = result["ts"]
         result = result.drop(columns=["_ts"]).tail(2000)
+        result = _attach_mileage(result, vehicle_id)
+        if "mileage" in result.columns:
+            result["mileage"] = result["mileage"].fillna(0)
         r = {"data": result.to_dict(orient="records"), "vehicle_id": vehicle_id}
         _set_cache(cache_key, r)
         return r
@@ -757,10 +766,14 @@ def get_vehicle_module_decomposition(vehicle_id: str):
         _log.warning(f"vehicle-decomposition: merge failed for {vehicle_id}: {exc}")
         first = list(mod_series.values())[0].copy()
         first["ts"] = first["_ts"].dt.strftime("%Y-%m-%d %H:%M:%S.%f").str[:-3]
+        first["timestamp"] = first["ts"]
         first = first.drop(columns=["_ts"]).tail(2000)
         for m in _VEHICLE_MODULES:
             if f"{m}_contrib" not in first.columns:
                 first[f"{m}_contrib"] = 100.0
+        first = _attach_mileage(first, vehicle_id)
+        if "mileage" in first.columns:
+            first["mileage"] = first["mileage"].fillna(0)
         r = {"data": first.to_dict(orient="records"), "vehicle_id": vehicle_id}
         _set_cache(cache_key, r)
         return r
@@ -928,7 +941,6 @@ def get_module_fleet_ranking(module: str):
     return result
 
 
-@router.get("/api/automotive/module-fleet-health/{module}")
 def _compute_module_fleet_health(module: str) -> dict:
     """Pure computation — reads Silver, builds per-vehicle health timeseries.
     Separated from the endpoint so the precompute loop can call it directly
@@ -990,6 +1002,7 @@ def _precompute_module_fleet_health(module: str) -> None:
         pass
 
 
+@router.get("/api/automotive/module-fleet-health/{module}")
 def get_module_fleet_health(module: str):
     # Live cache populated by background loop every LIVE_CACHE_INTERVAL_SEC.
     live = _get_live(f"module-fleet-health-{module}")

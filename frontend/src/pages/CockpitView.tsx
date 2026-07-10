@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -87,17 +93,23 @@ import ExploreIcon from "@mui/icons-material/Explore";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import Draggable from "react-draggable";
-import { useStore, type AlertCandidate } from "../store";
-import { pickFour } from "../utils/alertPicker";
-import type { DisplayAlert } from "../utils/alertPicker";
+import { useStore } from "../store";
 import { useGoldStream } from "../contexts/GoldStreamContext";
 const FLEET_API = "http://127.0.0.1:8009/api/fleet";
 const PIPELINE_API = "http://127.0.0.1:8005";
 const _eventIconCache: Record<string, L.DivIcon> = Object.create(null);
 const SCATTER_CAP = 300;
 const VEHICLE_COLORS = [
-  "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981",
-  "#06b6d4", "#f97316", "#6366f1", "#14b8a6", "#a855f7",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#06b6d4",
+  "#f97316",
+  "#6366f1",
+  "#14b8a6",
+  "#a855f7",
 ];
 
 type Severity = "active" | "parked" | "warning" | "critical" | "service";
@@ -141,6 +153,10 @@ interface PipelineVehicle {
   vehicle_id: string;
   health_score: number;
   battery_contrib?: number;
+  engine_contrib?: number;
+  transmission_contrib?: number;
+  body_contrib?: number;
+  tyre_contrib?: number;
 }
 
 interface PipelineFleetSummary {
@@ -458,8 +474,8 @@ const SectionTitle = ({
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 1,
-      mb: 1,
+      gap: 0.5,
+      mb: 0.5,
       fontSize: "14px",
     }}
   >
@@ -516,7 +532,9 @@ function createVehicleIcon(
 
   const hdgBucket = status === "active" ? Math.round(heading / 15) * 15 : 0;
 
-  const cacheKey = `${status}_${outerColor}_${innerColor}_${hdgBucket}_${isDark ? "d" : "l"}`;
+  const cacheKey = `${status}_${outerColor}_${innerColor}_${hdgBucket}_${
+    isDark ? "d" : "l"
+  }`;
 
   if (_iconCache[cacheKey]) {
     return _iconCache[cacheKey];
@@ -546,7 +564,15 @@ function createVehicleIcon(
     iconSize: [total, total],
     iconAnchor: [total / 2, total / 2],
     html: `<div style="position:relative;width:${total}px;height:${total}px;display:flex;align-items:center;justify-content:center;">
-        ${status === "active" ? `<div class="${isDark ? "vc-pulse-dark" : "vc-pulse"}" style="width:${outerSize}px;height:${outerSize}px;border:${isDark ? `1.5px solid #4ade80` : `1.5px solid ${outerColor}`};"></div>` : ""}
+        ${
+          status === "active"
+            ? `<div class="${
+                isDark ? "vc-pulse-dark" : "vc-pulse"
+              }" style="width:${outerSize}px;height:${outerSize}px;border:${
+                isDark ? `1.5px solid #4ade80` : `1.5px solid ${outerColor}`
+              };"></div>`
+            : ""
+        }
         ${arrow}
         <div style="
           width:${outerSize}px;
@@ -625,92 +651,101 @@ function KpiCard({
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const trendColor = trend === "up" ? "#ef4444" : "#22c55e";
+  const trendColor =
+    trend === "up"
+      ? label === "Avg Engine Health"
+        ? "#22c55e"
+        : "#ef4444"
+      : label === "Active Vehicles"
+      ? "#ef4444"
+      : "#22c55e";
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick?.();
+      }}
       style={{ cursor: "pointer", borderRadius: 12 }}
     >
-    <Card
-      sx={{
-        p: 1,
-        minHeight: 80,
-        transition: "all .25s ease",
+      <Card
+        sx={{
+          p: 0.7,
+          minHeight: 80,
+          transition: "all .25s ease",
 
-        border: selected ? `2px solid ${color}` : "1px solid",
+          border: selected ? `2px solid ${color}` : "1px solid",
 
-        borderColor: selected ? color : "divider",
+          borderColor: selected ? color : "divider",
 
-        transform: selected ? "translateY(-2px)" : "none",
+          transform: selected ? "translateY(-2px)" : "none",
 
-        boxShadow: selected ? `0 8px 24px ${alpha(color, 0.3)}` : 2,
+          boxShadow: selected ? `0 8px 24px ${alpha(color, 0.3)}` : 2,
 
-        "&:hover": {
-          transform: "translateY(-3px)",
-          boxShadow: `0 10px 28px ${alpha(color, 0.25)}`,
-        },
+          "&:hover": {
+            transform: "translateY(-3px)",
+            boxShadow: `0 10px 28px ${alpha(color, 0.25)}`,
+          },
 
-        background: isDark
-          ? `linear-gradient(135deg, ${alpha(color, 0.22)}, ${alpha(
-              "#0b1724",
-              0.95
-            )})`
-          : `linear-gradient(135deg, ${alpha(color, 0.11)}, #fff)`,
-      }}
-    >
-      <Stack direction="row" spacing={1.2} alignItems="center">
-        <Box
-          sx={{
-            width: 38,
-            height: 38,
-            borderRadius: "50%",
-            display: "grid",
-            placeItems: "center",
-            bgcolor: alpha(color, isDark ? 0.26 : 0.14),
-            color,
-            flex: "0 0 auto",
-          }}
-        >
-          {icon}
-        </Box>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>
-            {value}
-          </Typography>
-          <Typography
-            sx={{ fontSize: 10, color: "text.secondary", mt: 0.5 }}
-            noWrap
+          background: isDark
+            ? `linear-gradient(135deg, ${alpha(color, 0.22)}, ${alpha(
+                "#0b1724",
+                0.95
+              )})`
+            : `linear-gradient(135deg, ${alpha(color, 0.11)}, #fff)`,
+        }}
+      >
+        <Stack direction="row" spacing={0.6} alignItems="center">
+          <Box
+            sx={{
+              width: 35,
+              height: 35,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              bgcolor: alpha(color, isDark ? 0.26 : 0.14),
+              color,
+              flex: "0 0 auto",
+            }}
           >
-            {label}
-          </Typography>
-          <Stack direction="row" spacing={0.4} alignItems="center" mt={0.7}>
-            {iconLogo === true ? (
-              <>
-                {trend === "up" ? (
-                  <TrendingUpOutlinedIcon
-                    sx={{ fontSize: 10, color: trendColor }}
-                  />
-                ) : (
-                  <TrendingDownOutlinedIcon
-                    sx={{ fontSize: 14, color: trendColor }}
-                  />
-                )}
-              </>
-            ) : (
-              ""
-            )}
-            <Typography
-              sx={{ fontSize: 8, color: trendColor, fontWeight: 700 }}
-            >
-              {delta}
+            {icon}
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>
+              {value}
             </Typography>
-          </Stack>
-        </Box>
-      </Stack>
-    </Card>
+            <Typography
+              sx={{ fontSize: 10, color: "text.secondary", mt: 0.5 }}
+              noWrap
+            >
+              {label}
+            </Typography>
+            <Stack direction="row" spacing={0.4} alignItems="center" mt={0.7}>
+              {iconLogo === true ? (
+                <>
+                  {trend === "up" ? (
+                    <TrendingUpOutlinedIcon
+                      sx={{ fontSize: "10px", color: trendColor }}
+                    />
+                  ) : (
+                    <TrendingDownOutlinedIcon
+                      sx={{ fontSize: "10px", color: trendColor }}
+                    />
+                  )}
+                </>
+              ) : (
+                ""
+              )}
+              <Typography
+                sx={{ fontSize: 8, color: trendColor, fontWeight: 600 }}
+              >
+                {delta}
+              </Typography>
+            </Stack>
+          </Box>
+        </Stack>
+      </Card>
     </div>
   );
 }
@@ -820,7 +855,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
           },
           {
             value: summary.in_service,
-            name: "In Service",
+            name: "In Workshop",
             itemStyle: { color: "#f59e0b" },
           },
           {
@@ -1092,7 +1127,12 @@ function ScoreGauge({ score, label }: { score: number; label: string }) {
           width: 10,
           itemStyle: { color },
         },
-        axisLine: { lineStyle: { width: 10, color: [[1, isDark ? "#1e293b" : "#e5e7eb"]] } },
+        axisLine: {
+          lineStyle: {
+            width: 10,
+            color: [[1, isDark ? "#1e293b" : "#e5e7eb"]],
+          },
+        },
         axisTick: { show: false },
         splitLine: { show: false },
         axisLabel: { show: false },
@@ -1139,7 +1179,12 @@ function ScoreTimeline({ data }: { data: BehaviorData }) {
 
   const option = {
     grid: { top: 20, right: 10, bottom: 30, left: 40 },
-    tooltip: { trigger: "axis" as const, textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" }, backgroundColor: isDark ? "#1e293b" : "#fff", borderColor: isDark ? "#334155" : "#e2e8f0" },
+    tooltip: {
+      trigger: "axis" as const,
+      textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" },
+      backgroundColor: isDark ? "#1e293b" : "#fff",
+      borderColor: isDark ? "#334155" : "#e2e8f0",
+    },
     xAxis: {
       type: "category" as const,
       data: sampled.map((t) => t.distance_km),
@@ -1332,7 +1377,12 @@ function SpeedByRoad({ data }: { data: BehaviorData }) {
 
   const option = {
     grid: { top: 10, right: 10, bottom: 30, left: 60 },
-    tooltip: { trigger: "item" as const, textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" }, backgroundColor: isDark ? "#1e293b" : "#fff", borderColor: isDark ? "#334155" : "#e2e8f0" },
+    tooltip: {
+      trigger: "item" as const,
+      textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" },
+      backgroundColor: isDark ? "#1e293b" : "#fff",
+      borderColor: isDark ? "#334155" : "#e2e8f0",
+    },
     xAxis: {
       type: "value" as const,
       name: "km/h",
@@ -1681,71 +1731,244 @@ function TimelineChart({ history }: { history: HealthHistoryRow[] }) {
   return <ReactECharts option={option} style={{ height: 190 }} />;
 }
 
-function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void }) {
+interface DisplayAlert {
+  source_id: string;
+  module: string;
+  peak_anomaly_ts: string;
+  severity: string;
+  dtcMessage: string | null;
+  relativeTime: string;
+}
+
+type OpenAlert = {
+  source_id: string;
+  module: string;
+  peak_anomaly_ts: string;
+  last_updated_ts?: string;
+  max_composite_score?: number;
+  severity?: string;
+};
+
+function alertRelativeTime(ts: string): string {
+  if (!ts) return "—";
+  const diffMs = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function RecentAlerts({
+  onTotalChange,
+}: {
+  onTotalChange: (n: number) => void;
+}) {
   const navigate = useNavigate();
-  const { alertPool, alertTotal, setAlertCandidates, setDtcResult } = useStore();
+  const [displayed, setDisplayed] = useState<DisplayAlert[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const displayed = useMemo<DisplayAlert[]>(() => pickFour(alertPool), [alertPool]);
-
-  useEffect(() => { onTotalChange(alertTotal); }, [alertTotal, onTotalChange]);
+  const [phase, setPhase] = useState("");
+  const [total, setTotal] = useState<number>(0);
 
   const handleRefresh = async () => {
     if (loading) return;
     setLoading(true);
+    setPhase("Fetching alerts…");
     try {
       const { data } = await axios.get(`${PIPELINE_API}/api/alerts/metrics`);
       const total: number = data.active_alerts_count ?? 0;
-      const open: AlertCandidate[] = data.open_alerts ?? [];
+      onTotalChange(total);
+      setTotal(total);
 
-      setAlertCandidates(open, total);
-      if (!open.length) return;
-
-      const pairLatest = new Map<string, AlertCandidate>();
-      for (const a of open) {
-        const key = `${a.source_id}|${a.module}`;
-        const existing = pairLatest.get(key);
-        if (!existing || a.peak_anomaly_ts > existing.peak_anomaly_ts) pairLatest.set(key, a);
+      const open: OpenAlert[] = data.open_alerts ?? [];
+      if (!open.length) {
+        setDisplayed([]);
+        return;
       }
-      const candidates = Array.from(pairLatest.values()).sort(
-        (a, b) => b.peak_anomaly_ts.localeCompare(a.peak_anomaly_ts)
-      );
 
-      for (const a of candidates) {
+      const moduleLatestPeak = new Map<string, string>();
+      for (const a of open) {
+        const mod = a.module.toLowerCase();
+        const prev = moduleLatestPeak.get(mod);
+        if (!prev || a.peak_anomaly_ts > prev)
+          moduleLatestPeak.set(mod, a.peak_anomaly_ts);
+      }
+
+      const sorted = [...open].sort(
+        (a, b) => (b.max_composite_score ?? 0) - (a.max_composite_score ?? 0)
+      );
+      const vehicleBest = new Map<string, OpenAlert>();
+      for (const a of sorted) {
+        if (!vehicleBest.has(a.source_id)) vehicleBest.set(a.source_id, a);
+      }
+      const candidates = Array.from(vehicleBest.values());
+
+      type PoolItem = {
+        source_id: string;
+        module: string;
+        msg: string;
+        alert: OpenAlert;
+      };
+
+      const pickFour = (p: PoolItem[]): DisplayAlert[] => {
+        const out: DisplayAlert[] = [];
+        const usedSimMod = new Set<string>();
+        const usedSims = new Set<string>();
+        const usedMods = new Set<string>();
+        const usedMsgs = new Set<string>();
+        const add = (item: PoolItem) => {
+          out.push({
+            source_id: item.alert.source_id,
+            module: item.alert.module,
+            peak_anomaly_ts: item.alert.peak_anomaly_ts,
+            severity: (item.alert.severity ?? "warning").toLowerCase(),
+            dtcMessage: item.msg,
+            relativeTime: alertRelativeTime(
+              item.alert.last_updated_ts ?? item.alert.peak_anomaly_ts
+            ),
+          });
+          usedSimMod.add(`${item.source_id}|${item.module}`);
+          usedSims.add(item.source_id);
+          usedMods.add(item.module);
+          usedMsgs.add(item.msg);
+        };
+        for (const item of p) {
+          if (out.length >= 4) break;
+          if (
+            !usedSims.has(item.source_id) &&
+            !usedMods.has(item.module) &&
+            !usedMsgs.has(item.msg)
+          )
+            add(item);
+        }
+        if (out.length < 4) {
+          for (const item of p) {
+            if (out.length >= 4) break;
+            if (
+              !usedSims.has(item.source_id) &&
+              !usedMods.has(item.module) &&
+              !usedSimMod.has(`${item.source_id}|${item.module}`)
+            )
+              add(item);
+          }
+        }
+        if (out.length < 4) {
+          for (const item of p) {
+            if (out.length >= 4) break;
+            if (
+              !usedSims.has(item.source_id) &&
+              !usedSimMod.has(`${item.source_id}|${item.module}`)
+            )
+              add(item);
+          }
+        }
+        if (out.length < 4) {
+          const full = new Set(
+            out.map((r) => `${r.source_id}|${r.module}|${r.dtcMessage}`)
+          );
+          for (const item of p) {
+            if (out.length >= 4) break;
+            const key = `${item.source_id}|${item.module}|${item.msg}`;
+            if (!full.has(key)) {
+              out.push({
+                source_id: item.alert.source_id,
+                module: item.alert.module,
+                peak_anomaly_ts: item.alert.peak_anomaly_ts,
+                severity: (item.alert.severity ?? "warning").toLowerCase(),
+                dtcMessage: item.msg,
+                relativeTime: alertRelativeTime(
+                  item.alert.last_updated_ts ?? item.alert.peak_anomaly_ts
+                ),
+              });
+              full.add(key);
+            }
+          }
+        }
+        return out;
+      };
+
+      const DTC_PER_CALL_TIMEOUT_MS = 15_000;
+
+      const pool: PoolItem[] = [];
+      for (let i = 0; i < candidates.length; i++) {
+        const a = candidates[i];
+        setPhase(`DTC ${i + 1}/${candidates.length}…`);
         try {
           const r = await axios.get(`${PIPELINE_API}/api/dtc/analyze`, {
-            params: { source_id: a.source_id, module: a.module, peak_ts: a.peak_anomaly_ts },
-            timeout: 15_000,
+            params: {
+              source_id: a.source_id,
+              module: a.module,
+              peak_ts:
+                moduleLatestPeak.get(a.module.toLowerCase()) ??
+                a.peak_anomaly_ts,
+            },
+            timeout: DTC_PER_CALL_TIMEOUT_MS,
           });
-          const res = r.data as { success?: boolean; triggers?: { message?: string; code?: string; severity?: string }[] };
-          if (res?.success) setDtcResult(a.source_id, a.module, a.peak_anomaly_ts, res.triggers ?? []);
+          const data = r.data as {
+            success?: boolean;
+            error?: string;
+            triggers?: { message?: string }[];
+          };
+          if (!data?.success || data.error) continue;
+          const triggers = data.triggers ?? [];
+          const usable = triggers.filter((t) => t.message);
+          if (!usable.length) continue;
+          for (const t of usable) {
+            pool.push({
+              source_id: a.source_id,
+              module: a.module.toLowerCase(),
+              msg: t.message!,
+              alert: a,
+            });
+          }
         } catch {
           continue;
         }
+        if (pickFour(pool).length >= 4) break;
       }
+
+      setDisplayed(pickFour(pool));
     } catch {
       // Retain previous displayed on error
     } finally {
       setLoading(false);
+      setPhase("");
     }
   };
 
-  useEffect(() => { handleRefresh(); }, []);
+  useEffect(() => {
+    handleRefresh();
+  }, []);
 
   return (
-    <Card sx={{ p: 1, width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <Card
+      sx={{
+        p: 1,
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       <SectionTitle
         title="Recent Alerts"
         action={
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <IconButton size="small" onClick={handleRefresh} disabled={loading} sx={{ p: 0.2 }}>
+          <Stack direction="row" spacing={0.3} alignItems="center">
+            <IconButton
+              size="small"
+              onClick={handleRefresh}
+              disabled={loading}
+              sx={{ p: 0.2 }}
+            >
               <RestartAltOutlinedIcon sx={{ fontSize: 14 }} />
             </IconButton>
             <Button
               size="small"
               variant="outlined"
               sx={{ fontSize: "8px", py: "1px", px: "6px" }}
-              onClick={() => navigate("/alerts")}
+              onClick={() => navigate("/fleet-health")}
             >
               View All
             </Button>
@@ -1754,52 +1977,108 @@ function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void })
       />
 
       {loading ? (
-        <Stack alignItems="center" justifyContent="center" flex={1}>
-          <CircularProgress size={18} />
+        <Stack direction="row" alignItems="center" spacing={0} sx={{ mt: 0.3 }}>
+          <CircularProgress size={12} />
+          <Typography sx={{ fontSize: "9px", color: "text.secondary" }}>
+            {phase}
+          </Typography>
         </Stack>
       ) : displayed.length === 0 ? (
         <Stack alignItems="center" justifyContent="center" flex={1}>
-          <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No alerts available</Typography>
+          <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>
+            No alerts available
+          </Typography>
         </Stack>
       ) : (
         <Stack spacing={0.2} sx={{ mt: 0.3, overflow: "hidden" }}>
-          {displayed.map((a, i) => {
+          {displayed.map((a) => {
             const sevColor =
-              a.severity === "critical" ? "#ef4444" :
-              a.severity === "active"   ? "#22c55e" : "#f59e0b";
+              a.severity === "critical"
+                ? "#ef4444"
+                : a.severity === "active"
+                ? "#22c55e"
+                : "#f59e0b";
             return (
               <Stack
-                key={`alert-${i}`}
+                key={`${a.source_id}-${a.module}`}
                 direction="row"
                 alignItems="center"
                 spacing={0.75}
                 sx={{
                   pl: 1,
                   pr: 0.75,
-                  py: 0.2,
+                  py: 0.5,
                   borderRadius: 1,
                   borderLeft: `3px solid ${sevColor}`,
                   bgcolor: alpha(sevColor, 0.06),
                   minWidth: 0,
+                  margin: "1px 0px !important",
                 }}
               >
-                <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: sevColor, flexShrink: 0 }} />
+                <Box
+                  sx={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: "50%",
+                    bgcolor: sevColor,
+                    flexShrink: 0,
+                  }}
+                />
                 <Box minWidth={0} flex={1}>
-                  <Stack direction="row" alignItems="center" spacing={0.5}>
-                    <Typography sx={{ fontSize: "10px", fontWeight: 700, lineHeight: 1.15 }} noWrap>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography
+                      sx={{
+                        fontSize: "8px",
+                        fontWeight: 700,
+                        lineHeight: "8px",
+                      }}
+                      noWrap
+                    >
                       {a.source_id.toUpperCase()}
                     </Typography>
-                    <Box sx={{ px: 0.5, py: "1px", borderRadius: 0.5, bgcolor: alpha(sevColor, 0.18), flexShrink: 0 }}>
-                      <Typography sx={{ fontSize: "8px", fontWeight: 600, color: sevColor, textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2 }}>
+                    <Box
+                      sx={{
+                        px: 0.5,
+                        py: "1px",
+                        borderRadius: 0.5,
+                        bgcolor: alpha(sevColor, 0.18),
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "8px",
+                          fontWeight: 600,
+                          color: sevColor,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          lineHeight: "8px",
+                        }}
+                      >
                         {a.module}
                       </Typography>
                     </Box>
                   </Stack>
-                  <Typography sx={{ fontSize: "9px", color: "text.secondary", lineHeight: "11px" }} noWrap title={a.dtcMessage}>
-                    {a.dtcMessage}
+                  <Typography
+                    sx={{
+                      fontSize: "8px",
+                      color: "text.secondary",
+                      lineHeight: "8px",
+                    }}
+                    noWrap
+                    title={a.dtcMessage ?? ""}
+                  >
+                    {a.dtcMessage ?? "—"}
                   </Typography>
                 </Box>
-                <Typography sx={{ fontSize: "9px", color: "text.secondary", whiteSpace: "nowrap", flexShrink: 0 }}>
+                <Typography
+                  sx={{
+                    fontSize: "8px",
+                    color: "text.secondary",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
                   {a.relativeTime}
                 </Typography>
               </Stack>
@@ -1807,13 +2086,26 @@ function RecentAlerts({ onTotalChange }: { onTotalChange: (n: number) => void })
           })}
         </Stack>
       )}
-      {!loading && alertTotal > displayed.length && displayed.length > 0 && (
+      {!loading && total > displayed.length && displayed.length > 0 && (
         <Box
-          onClick={() => navigate("/alerts")}
-          sx={{ mt: 0.4, textAlign: "center", cursor: "pointer", flexShrink: 0 }}
+          onClick={() => navigate("/fleet-health")}
+
+          sx={{
+            mt: 0.3,
+            textAlign: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
         >
-          <Typography sx={{ fontSize: "8px", color: "text.secondary", fontWeight: 600, "&:hover": { color: "text.primary" } }}>
-            +{alertTotal - displayed.length} more unread alerts
+          <Typography
+            sx={{
+              fontSize: "8px",
+              color: "text.secondary",
+              fontWeight: 600,
+              "&:hover": { color: "text.primary" },
+            }}
+          >
+            +{total - displayed.length} more unread alerts
           </Typography>
         </Box>
       )}
@@ -2140,14 +2432,12 @@ function EventMarkers({ events }: { events: TripData["events"] }) {
 
   const sampled = useMemo(() => {
     const precision =
-      zoom >= 12 ? 200 :
-      zoom >= 10 ? 80 :
-      zoom >= 9  ? 30 :
-      zoom >= 8  ? 15 :
-                   7;
+      zoom >= 12 ? 200 : zoom >= 10 ? 80 : zoom >= 9 ? 30 : zoom >= 8 ? 15 : 7;
     const seen = new Set<string>();
     return events.filter((evt) => {
-      const key = `${(evt.lat * precision).toFixed(0)}_${(evt.lng * precision).toFixed(0)}`;
+      const key = `${(evt.lat * precision).toFixed(0)}_${(
+        evt.lng * precision
+      ).toFixed(0)}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -2157,7 +2447,11 @@ function EventMarkers({ events }: { events: TripData["events"] }) {
   return (
     <>
       {sampled.map((evt, i) => (
-        <Marker key={`evt-${i}`} position={[evt.lat, evt.lng]} icon={createEventIcon(evt.type)}>
+        <Marker
+          key={`evt-${i}`}
+          position={[evt.lat, evt.lng]}
+          icon={createEventIcon(evt.type)}
+        >
           <Popup>
             <strong>{evt.type.toUpperCase()}</strong>
             <br />
@@ -2248,10 +2542,27 @@ function HealthGauge({ value, color }: { value: number; color: string }) {
         max: 100,
         radius: "82%",
         center: ["50%", "68%"],
-        progress: { show: true, width: 10, roundCap: true, itemStyle: { color } },
+        progress: {
+          show: true,
+          width: 10,
+          roundCap: true,
+          itemStyle: { color },
+        },
         itemStyle: { color },
-        axisLine: { roundCap: true, lineStyle: { width: 10, color: [[1, isDark ? "#374151" : "#E5E7EB"]] } },
-        detail: { fontSize: 14, fontWeight: 700, offsetCenter: [0, "8%"], color: isDark ? "#fff" : "#1f2937", formatter: "{value}%" },
+        axisLine: {
+          roundCap: true,
+          lineStyle: {
+            width: 10,
+            color: [[1, isDark ? "#374151" : "#E5E7EB"]],
+          },
+        },
+        detail: {
+          fontSize: 14,
+          fontWeight: 700,
+          offsetCenter: [0, "8%"],
+          color: isDark ? "#fff" : "#1f2937",
+          formatter: "{value}%",
+        },
         axisTick: { show: false },
         splitLine: { show: false },
         axisLabel: { show: false },
@@ -2277,68 +2588,161 @@ function getDriverInitials(name: string): string {
 }
 
 function getAvatarColor(name: string): string {
-  const colors = ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#06b6d4", "#f97316", "#6366f1"];
+  const colors = [
+    "#3b82f6",
+    "#8b5cf6",
+    "#ec4899",
+    "#f59e0b",
+    "#10b981",
+    "#06b6d4",
+    "#f97316",
+    "#6366f1",
+  ];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
 }
 
 function SpeedGauge({ speed, isDark }: { speed: number; isDark: boolean }) {
-  const r = 15, cx = 19, cy = 19;
+  const r = 15,
+    cx = 19,
+    cy = 19;
   const halfLen = Math.PI * r;
   const pct = Math.min(speed / 120, 1);
   const color = speed > 90 ? "#ef4444" : speed > 60 ? "#f59e0b" : "#22c55e";
   const trackColor = isDark ? "#1e293b" : "#e2e8f0";
   const arcPath = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <svg width={38} height={22} style={{ display: "block", overflow: "visible" }}>
-        <path d={arcPath} fill="none" stroke={trackColor} strokeWidth={3} strokeLinecap="round" />
-        <path d={arcPath} fill="none" stroke={color} strokeWidth={3} strokeLinecap="round"
-          strokeDasharray={`${pct * halfLen} ${halfLen}`} />
+    <Box
+      sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+    >
+      <svg
+        width={38}
+        height={22}
+        style={{ display: "block", overflow: "visible" }}
+      >
+        <path
+          d={arcPath}
+          fill="none"
+          stroke={trackColor}
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+        <path
+          d={arcPath}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeDasharray={`${pct * halfLen} ${halfLen}`}
+        />
       </svg>
-      <Typography sx={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.1, color, mt: "-1px" }}>{speed}</Typography>
-      <Typography sx={{ fontSize: "7px", color: "text.secondary", lineHeight: 1 }}>km/h</Typography>
+      <Typography
+        sx={{
+          fontSize: "10px",
+          fontWeight: 800,
+          lineHeight: 1.1,
+          color,
+          mt: "-1px",
+        }}
+      >
+        {speed}
+      </Typography>
+      <Typography
+        sx={{ fontSize: "7px", color: "text.secondary", lineHeight: 1 }}
+      >
+        km/h
+      </Typography>
     </Box>
   );
 }
 
 function HealthRing({ score, isDark }: { score: number; isDark: boolean }) {
-  const r = 13, cx = 18, cy = 18;
+  const r = 13,
+    cx = 18,
+    cy = 18;
   const circ = 2 * Math.PI * r;
   const pct = Math.min(score / 100, 1);
   const color = score >= 80 ? "#22c55e" : score >= 60 ? "#f59e0b" : "#ef4444";
   return (
-    <Box sx={{ position: "relative", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg width={36} height={36} style={{ position: "absolute", top: 0, left: 0, transform: "rotate(-90deg)" }}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke={isDark ? "#1e293b" : "#e2e8f0"} strokeWidth={3} />
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={3}
-          strokeDasharray={`${pct * circ} ${(1 - pct) * circ}`} strokeLinecap="round" />
+    <Box
+      sx={{
+        position: "relative",
+        width: 36,
+        height: 36,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <svg
+        width={36}
+        height={36}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          transform: "rotate(-90deg)",
+        }}
+      >
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={isDark ? "#1e293b" : "#e2e8f0"}
+          strokeWidth={3}
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
+          strokeDasharray={`${pct * circ} ${(1 - pct) * circ}`}
+          strokeLinecap="round"
+        />
       </svg>
-      <Typography sx={{ fontSize: "9px", fontWeight: 800, zIndex: 1, color, lineHeight: 1 }}>{score}%</Typography>
+      <Typography
+        sx={{
+          fontSize: "9px",
+          fontWeight: 800,
+          zIndex: 1,
+          color,
+          lineHeight: 1,
+        }}
+      >
+        {score}%
+      </Typography>
     </Box>
   );
 }
 
 const FLEET_TABLE_COLUMNS = [
-  { id: "name",         label: "Vehicle Name",  sortable: true  },
-  { id: "type",         label: "Type",          sortable: true  },
-  { id: "status",       label: "Status",        sortable: true  },
-  { id: "speed",        label: "Speed",         sortable: true  },
-  { id: "health_status",label: "Health Status", sortable: true  },
-  { id: "health",       label: "Health Score",  sortable: true  },
-  { id: "driver",       label: "Driver",        sortable: true  },
-  { id: "driver_score", label: "Driver Score",  sortable: true  },
-  { id: "road_type",    label: "Road Type",     sortable: false },
-  { id: "route_name",   label: "Route",         sortable: false },
+  { id: "name", label: "Vehicle Name", sortable: true },
+  { id: "type", label: "Type", sortable: true },
+  // { id: "status", label: "Status", sortable: true },
+  // { id: "speed", label: "Speed", sortable: true },
+  { id: "health_status", label: "Health Status", sortable: true },
+  { id: "health", label: "Health Score", sortable: true },
+  // { id: "driver", label: "Driver", sortable: true },
+  { id: "driver_score", label: "Driver Score", sortable: true },
+  // { id: "road_type", label: "Road Type", sortable: false },
+  { id: "route_name", label: "Route", sortable: false },
 ] as const;
 
 type FleetTableColId = (typeof FLEET_TABLE_COLUMNS)[number]["id"];
 
-export default function CockpitView({ isActive = true }: { isActive?: boolean }) {
+export default function CockpitView({
+  isActive = true,
+}: {
+  isActive?: boolean;
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-
+  const navigate = useNavigate();
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [vehiclePopoverAnchor, setVehiclePopoverAnchor] = useState(null);
 
@@ -2412,14 +2816,17 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
   const dragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
 
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    dragging.current = true;
-    start.current = {
-      x: e.clientX - dragPos.x,
-      y: e.clientY - dragPos.y,
-    };
-    document.body.style.cursor = "grabbing";
-  }, [dragPos]);
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      dragging.current = true;
+      start.current = {
+        x: e.clientX - dragPos.x,
+        y: e.clientY - dragPos.y,
+      };
+      document.body.style.cursor = "grabbing";
+    },
+    [dragPos]
+  );
 
   const handleDragMove = useCallback((e: MouseEvent) => {
     if (!dragging.current) return;
@@ -2462,10 +2869,12 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     retry: 1,
     refetchInterval: isActive && autoRefresh ? 10000 : false,
   });
-  const { data: positions, refetch: refetchPositions } = useQuery<VehiclePosition[]>({
+  const { data: positions, refetch: refetchPositions } = useQuery<
+    VehiclePosition[]
+  >({
     queryKey: ["fleet-positions"],
     queryFn: () => axios.get(`${FLEET_API}/positions`).then((r) => r.data),
-    refetchInterval: isActive && autoRefresh ? 8000 : false,
+    refetchInterval: isActive && autoRefresh ? 3000 : false,
   });
 
   const rows =
@@ -2481,7 +2890,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     { id: "speed", label: "Speed", width: 75 },
     { id: "heading", label: "Health Status", width: 105 },
     { id: "health", label: "Health Score", width: 100 },
-    { id: "driver", label: "Driver", width: 80 },
+    // { id: "driver", label: "Driver", width: 80 },
     { id: "driver_score", label: "Driver Score", width: 130 },
     { id: "road_type", label: "Road Type", width: 95 },
     { id: "route_name", label: "Route", width: 260 },
@@ -2529,7 +2938,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
     return (
       v.vehicle_id.toLowerCase().includes(text) ||
-      (v.driver_name ?? "").toLowerCase().includes(text) ||
+      (v.driver ?? "").toLowerCase().includes(text) ||
       (v.route_name ?? "").toLowerCase().includes(text)
     );
   });
@@ -2548,7 +2957,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     },
 
     in_service: {
-      label: "In Service",
+      label: "In Workshop",
       color: "#8b5cf6",
       bg: "#ede9fe",
     },
@@ -2594,15 +3003,16 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     return "#ef4444";
   };
 
-  const { data: pipelineFleet, refetch: refetchPipelineFleet } = useQuery<PipelineFleetSummary>({
-    queryKey: ["pipeline-fleet-summary"],
-    queryFn: () =>
-      axios
-        .get(`${PIPELINE_API}/api/automotive/fleet-summary`)
-        .then((r) => r.data),
-    retry: 1,
-    refetchInterval: isActive && autoRefresh ? 8000 : false,
-  });
+  const { data: pipelineFleet, refetch: refetchPipelineFleet } =
+    useQuery<PipelineFleetSummary>({
+      queryKey: ["pipeline-fleet-summary"],
+      queryFn: () =>
+        axios
+          .get(`${PIPELINE_API}/api/automotive/fleet-summary`)
+          .then((r) => r.data),
+      retry: 1,
+      refetchInterval: isActive && autoRefresh ? 8000 : false,
+    });
 
   useEffect(() => {
     if (isActive && !wasActiveRef.current) {
@@ -2630,7 +3040,18 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     refetchInterval: isActive && autoRefresh ? 8000 : false,
   });
 
+  const positionsUpdatedAt: number =
+    queryClient.getQueryState(["fleet-positions"])?.dataUpdatedAt ?? 0;
+
   const vehicles = useMemo<CockpitVehicle[]>(() => {
+    const updatedLabel = (() => {
+      if (!positionsUpdatedAt) return "just now";
+      const diffMs = Date.now() - positionsUpdatedAt;
+      const secs = Math.floor(diffMs / 1000);
+      if (secs < 10) return "just now";
+      if (secs < 60) return `${secs}s ago`;
+      return `${Math.floor(secs / 60)}m ago`;
+    })();
     if (!positions?.length) return fallbackVehicles;
     return positions.slice(0, 12).map((v, index) => {
       const pipeline = pipelineFleet?.vehicles?.find(
@@ -2654,12 +3075,12 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
         driver: v.driver || "Unassigned",
         location: v.route_name || v.road_type || "Live route",
         trip: v.status === "active" ? `Trip #${1280 + index}` : "Idle",
-        updated: `${index + 1} min ago`,
+        updated: updatedLabel,
         lat: v.lat,
         lng: v.lng,
       };
     });
-  }, [pipelineFleet?.vehicles, positions]);
+  }, [pipelineFleet?.vehicles, positions, positionsUpdatedAt]);
 
   //   const summary = useMemo<FleetSummary>(() => {
   //     const base = summary || fallbackSummary;
@@ -2695,15 +3116,21 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
   >({
     queryKey: ["fleet-health-scatter-batch"],
     queryFn: async () => {
-      const r = await axios.get(`${PIPELINE_API}/api/automotive/fleet-health-scatter`);
+      const r = await axios.get(
+        `${PIPELINE_API}/api/automotive/fleet-health-scatter`
+      );
       return r.data.vehicles ?? [];
     },
     enabled: isActive && sseVehicles.length === 0,
-    refetchInterval: isActive && autoRefresh && sseVehicles.length === 0 ? 8000 : false,
+    refetchInterval:
+      isActive && autoRefresh && sseVehicles.length === 0 ? 8000 : false,
     retry: 1,
   });
 
-  const fleetHealthScatter = useMemo((): { vehicle_id: string; data: HealthHistoryRow[] }[] => {
+  const fleetHealthScatter = useMemo((): {
+    vehicle_id: string;
+    data: HealthHistoryRow[];
+  }[] => {
     const cap = (arr: HealthHistoryRow[]): HealthHistoryRow[] => {
       if (arr.length <= SCATTER_CAP) return arr;
       const step = Math.floor(arr.length / SCATTER_CAP);
@@ -2769,7 +3196,11 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
   ).length;
 
   const activePositionIds = useMemo(
-    () => allPositions.filter((v) => v.status === "active").map((v) => v.vehicle_id),
+    () =>
+      allPositions
+        .filter((v) => v.status === "active")
+        .map((v) => v.vehicle_id)
+        .sort(),
     [allPositions]
   );
 
@@ -2778,7 +3209,8 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     queryFn: async () => {
       const results = await Promise.all(
         activePositionIds.map((vid) =>
-          axios.get(`${FLEET_API}/vehicle/${vid}/trip`)
+          axios
+            .get(`${FLEET_API}/vehicle/${vid}/trip`)
             .then((r) => r.data as TripData)
             .catch(() => null)
         )
@@ -2787,6 +3219,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     },
     enabled: activePositionIds.length > 0,
     staleTime: 30000,
+    gcTime: 300_000,
     refetchInterval: isActive && autoRefresh ? 15000 : false,
     retry: 1,
   });
@@ -2795,15 +3228,28 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
   const operationalMetrics = useMemo(() => {
     const activePosns = allPositions.filter((v) => v.status === "active");
-    const totalDistanceKm = (allActiveTrips ?? []).reduce((s, t) => s + (t.distance_completed_km ?? 0), 0);
+    const totalDistanceKm = (allActiveTrips ?? []).reduce(
+      (s, t) => s + (t.distance_completed_km ?? 0),
+      0
+    );
     const fuelConsumedL = totalDistanceKm * ICE_FUEL_L_PER_KM;
-    const tripsInProgress = (allActiveTrips ?? []).filter((t) => (t.progress_pct ?? 0) >= 5).length;
-    const avgSpeedKmh = activePosns.length > 0
-      ? activePosns.reduce((s, v) => s + (v.speed ?? 0), 0) / activePosns.length
-      : 0;
+    const tripsInProgress = (allActiveTrips ?? []).filter(
+      (t) => (t.progress_pct ?? 0) >= 5
+    ).length;
+    const avgSpeedKmh =
+      activePosns.length > 0
+        ? activePosns.reduce((s, v) => s + (v.speed ?? 0), 0) /
+          activePosns.length
+        : 0;
     const total = allPositions.length || 1;
     const fleetUtilPct = (activePosns.length / total) * 100;
-    return { totalDistanceKm, fuelConsumedL, tripsInProgress, avgSpeedKmh, fleetUtilPct };
+    return {
+      totalDistanceKm,
+      fuelConsumedL,
+      tripsInProgress,
+      avgSpeedKmh,
+      fleetUtilPct,
+    };
   }, [allPositions, allActiveTrips]);
 
   const formatStatusLabel = (status: string) =>
@@ -2811,7 +3257,11 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     "Unknown";
 
   const selectedFleetLabel =
-    statusFilter === "all" ? "Total Fleet" : formatStatusLabel(statusFilter);
+    statusFilter === "all"
+      ? "Total Fleet"
+      : statusFilter === "in_service"
+      ? "In Workshop"
+      : formatStatusLabel(statusFilter);
 
   const liveSeverityCounts = useMemo(() => {
     const base = { normal: 0, warning: 0, critical: 0 };
@@ -2840,11 +3290,11 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     const pv = pipelineHealthMap[vehicleId];
     if (!pv) return fallbackModules;
     return {
-      engine: Math.round(pv.engine_contrib),
-      transmission: Math.round(pv.transmission_contrib),
-      battery: Math.round(pv.battery_contrib),
-      body: Math.round(pv.body_contrib),
-      tyre: Math.round(pv.tyre_contrib),
+      engine: Math.round(pv.engine_contrib ?? fallbackModules.engine ?? 0),
+      transmission: Math.round(pv.transmission_contrib ?? fallbackModules.transmission ?? 0),
+      battery: Math.round(pv.battery_contrib ?? fallbackModules.battery ?? 0),
+      body: Math.round(pv.body_contrib ?? fallbackModules.body ?? 0),
+      tyre: Math.round(pv.tyre_contrib ?? fallbackModules.tyre ?? 0),
     };
   };
 
@@ -2869,7 +3319,10 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     return <DirectionsCarFilledOutlinedIcon sx={{ fontSize: 14 }} />;
   };
 
-  const bounds: [[number, number], [number, number]] = [[-90, -180], [90, 180]];
+  const bounds: [[number, number], [number, number]] = [
+    [-90, -180],
+    [90, 180],
+  ];
 
   const commonAxisLabel = {
     fontSize: 10,
@@ -2950,6 +3403,10 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     staleTime: 30000,
   });
 
+  const liveSelectedPosition = useMemo(
+    () => positions?.find((p) => p.vehicle_id === selectedVehicle) ?? null,
+    [positions, selectedVehicle]
+  );
 
   const { data: tripData } = useQuery<TripData>({
     queryKey: ["fleet-trip", selectedVehicle],
@@ -2988,7 +3445,8 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
       .map((p) => [p.lat, p.lng] as [number, number]);
   }, [tripData]);
 
-  const tileUrl = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  const tileUrl =
+    "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
   const tileAttribution =
     '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/">OSM</a>';
 
@@ -3102,15 +3560,38 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
       let aVal: number | string = 0;
       let bVal: number | string = 0;
       switch (orderBy) {
-        case "name":       aVal = a.name ?? a.vehicle_id; bVal = b.name ?? b.vehicle_id; break;
-        case "type":       aVal = a.type ?? ""; bVal = b.type ?? ""; break;
-        case "status":     aVal = a.status ?? ""; bVal = b.status ?? ""; break;
-        case "speed":      aVal = a.speed ?? 0; bVal = b.speed ?? 0; break;
+        case "name":
+          aVal = a.name ?? a.vehicle_id;
+          bVal = b.name ?? b.vehicle_id;
+          break;
+        case "type":
+          aVal = a.type ?? "";
+          bVal = b.type ?? "";
+          break;
+        case "status":
+          aVal = a.status ?? "";
+          bVal = b.status ?? "";
+          break;
+        case "speed":
+          aVal = a.speed ?? 0;
+          bVal = b.speed ?? 0;
+          break;
         case "health_status":
-        case "health":     aVal = getLiveHealth(a); bVal = getLiveHealth(b); break;
-        case "driver":     aVal = a.driver ?? ""; bVal = b.driver ?? ""; break;
-        case "driver_score": aVal = a.driver_score ?? 0; bVal = b.driver_score ?? 0; break;
-        default:           aVal = a.vehicle_id; bVal = b.vehicle_id;
+        case "health":
+          aVal = getLiveHealth(a);
+          bVal = getLiveHealth(b);
+          break;
+        case "driver":
+          aVal = a.driver ?? "";
+          bVal = b.driver ?? "";
+          break;
+        case "driver_score":
+          aVal = a.driver_score ?? 0;
+          bVal = b.driver_score ?? 0;
+          break;
+        default:
+          aVal = a.vehicle_id;
+          bVal = b.vehicle_id;
       }
       if (typeof aVal === "number" && typeof bVal === "number") {
         return order === "asc" ? aVal - bVal : bVal - aVal;
@@ -3165,7 +3646,18 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
     ] as const;
 
     return (
-      <Card sx={{ p: 1, height: "100%", bgcolor: isDark ? "#2c2e35" : "#eef0f4", ...(isDark && { border: "1px solid #3a3c44", opacity: 0.85, filter: "grayscale(22%)" }) }}>
+      <Card
+        sx={{
+          p: 1,
+          height: "100%",
+          bgcolor: isDark ? "#0f172a" : "#ffffff",
+          ...(isDark && {
+            border: "1px solid #3a3c44",
+            opacity: 0.85,
+            filter: "grayscale(22%)",
+          }),
+        }}
+      >
         <SectionTitle
           title="AI Fleet Summary"
           action={
@@ -3232,15 +3724,16 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
           {/* Left */}
           <Box sx={{ minWidth: 220 }}>
             <Typography
+              variant="h5"
               sx={{
-                fontWeight: 600,
-                color: "text.secondary",
+                fontWeight: 700,
+                color: "#005071",
                 letterSpacing: "-0.3px",
-                fontSize: "14px",
-                lineHeight: 1.2,
+                fontSize: "14px !important",
+                whiteSpace: "nowrap",
               }}
             >
-              Fleet Overview
+              FLEET OVERVIEW
             </Typography>
 
             <Typography
@@ -3272,7 +3765,10 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                 size="small"
                 placeholder="Search Vehicle / Driver / Location"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
                 InputProps={{
                   startAdornment: (
                     <SearchOutlinedIcon
@@ -3345,29 +3841,47 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
             iconLogo={false}
             trend="down"
             selected={statusFilter === "all"}
-            onClick={() => { setStatusFilter("all"); setSelectedVehicle(null); setPopoverPosition(null); setVehiclePopoverAnchor(null); setPage(0); }}
+            onClick={() => {
+              setStatusFilter("all");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
           />
           <KpiCard
             label="Active Vehicles"
             value={allPositions.length ? activeCount : summary.active}
-            delta="13 vs yesterday"
+            delta="6 vs Yesterday"
             icon={<HealthAndSafetyOutlinedIcon />}
             color="#22c55e"
-            iconLogo={false}
+            iconLogo={true}
             trend="down"
             selected={statusFilter === "active"}
-            onClick={() => { setStatusFilter(statusFilter === "active" ? "all" : "active"); setSelectedVehicle(null); setPopoverPosition(null); setVehiclePopoverAnchor(null); setPage(0); }}
+            onClick={() => {
+              setStatusFilter(statusFilter === "active" ? "all" : "active");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
           />
           <KpiCard
             label="Parked"
             value={allPositions.length ? parkedCount : summary.parked}
-            delta="Today"
+            delta="6 vs Yesterday"
             icon={<TimelineOutlinedIcon />}
             color="#0ea5e9"
-            iconLogo={false}
-            trend="down"
+            iconLogo={true}
+            trend="up"
             selected={statusFilter === "parked"}
-            onClick={() => { setStatusFilter(statusFilter === "parked" ? "all" : "parked"); setSelectedVehicle(null); setPopoverPosition(null); setVehiclePopoverAnchor(null); setPage(0); }}
+            onClick={() => {
+              setStatusFilter(statusFilter === "parked" ? "all" : "parked");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
           />
           <KpiCard
             label="Due for Service"
@@ -3378,7 +3892,15 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
             iconLogo={false}
             trend="up"
             selected={statusFilter === "in_service"}
-            onClick={() => { setStatusFilter(statusFilter === "in_service" ? "all" : "in_service"); setSelectedVehicle(null); setPopoverPosition(null); setVehiclePopoverAnchor(null); setPage(0); }}
+            onClick={() => {
+              setStatusFilter(
+                statusFilter === "in_service" ? "all" : "in_service"
+              );
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
           />
           <KpiCard
             label="Critical Vehicles"
@@ -3389,7 +3911,13 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
             trend="up"
             iconLogo={true}
             selected={statusFilter === "critical"}
-            onClick={() => { setStatusFilter(statusFilter === "critical" ? "all" : "critical"); setSelectedVehicle(null); setPopoverPosition(null); setVehiclePopoverAnchor(null); setPage(0); }}
+            onClick={() => {
+              setStatusFilter(statusFilter === "critical" ? "all" : "critical");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
           />
           <KpiCard
             label="Warning Vehicles"
@@ -3400,36 +3928,49 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
             trend="down"
             iconLogo={true}
             selected={statusFilter === "warning"}
-            onClick={() => { setStatusFilter(statusFilter === "warning" ? "all" : "warning"); setSelectedVehicle(null); setPopoverPosition(null); setVehiclePopoverAnchor(null); setPage(0); }}
+            onClick={() => {
+              setStatusFilter(statusFilter === "warning" ? "all" : "warning");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
           />
 
           <KpiCard
             label="Avg Engine Health"
             value={`${avgEngineHealth}%`}
-            delta="Up by 2%"
+            delta="by 2% in 24 hours"
             icon={<SpeedOutlinedIcon />}
             color="#f97316"
-            trend="down"
-            iconLogo={false}
+            trend="up"
+            iconLogo={true}
+            // iconLogo={false}
           />
 
           <KpiCard
             label="Active Alerts"
             value={alertTotal !== null ? String(alertTotal) : "—"}
-            delta={alertTotal !== null
-              ? `${Math.max(1, Math.round(alertTotal * 0.18 + 1))} fewer than yesterday`
-              : "fewer than yesterday"}
+            delta={
+              alertTotal !== null
+                ? `${Math.max(
+                    1,
+                    Math.round(alertTotal * 0.18 + 1)
+                  )} fewer than yesterday`
+                : "fewer than yesterday"
+            }
             icon={<ErrorOutlineOutlinedIcon />}
             color="#ef4444"
             trend="down"
             iconLogo={true}
+            onClick={() => navigate("/fleet-health")}
           />
         </Box>
 
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
+            // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
             gap: 1,
             alignItems: "stretch",
           }}
@@ -3457,7 +3998,8 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                       height: "100%",
                       ...(isDark && {
                         "& .leaflet-tile-pane": {
-                          filter: "invert(1) hue-rotate(180deg) contrast(0.82) brightness(1.45) saturate(1.15)",
+                          filter:
+                            "invert(1) hue-rotate(180deg) contrast(0.82) brightness(1.45) saturate(1.15)",
                         },
                         "& .leaflet-control-zoom": {
                           border: "1px solid #1e293b !important",
@@ -3508,29 +4050,39 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                         isActive={isActive}
                       />
 
-                      {filteredPositions?.filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng)).map((v) => {
-                        const liveH =
-                          v.status === "active"
-                            ? getVehicleHealth(v.vehicle_id, v.health)
-                            : v.health;
-                        return (
-                          <Marker
-                            key={v.vehicle_id}
-                            position={[v.lat, v.lng]}
-                            icon={createVehicleIcon(v.status, liveH, v.heading, isDark)}
-                            eventHandlers={{
-                              click: (e) => {
-                                setSelectedVehicle(v.vehicle_id);
-                                setDrawerTab(0);
+                      {tableRows
+                        .filter(
+                          (v) =>
+                            Number.isFinite(v.lat) && Number.isFinite(v.lng)
+                        )
+                        .map((v) => {
+                          const liveH =
+                            v.status === "active"
+                              ? getVehicleHealth(v.vehicle_id, v.health)
+                              : v.health;
+                          return (
+                            <Marker
+                              key={v.vehicle_id}
+                              position={[v.lat, v.lng]}
+                              icon={createVehicleIcon(
+                                v.status,
+                                liveH,
+                                v.heading,
+                                isDark
+                              )}
+                              eventHandlers={{
+                                click: (e) => {
+                                  setSelectedVehicle(v.vehicle_id);
+                                  setDrawerTab(0);
 
-                                setPopoverPosition({
-                                  top: e.originalEvent.clientY,
-                                  left: e.originalEvent.clientX,
-                                });
-                              },
-                            }}
-                          >
-                            {/* <Popup>
+                                  setPopoverPosition({
+                                    top: e.originalEvent.clientY,
+                                    left: e.originalEvent.clientX,
+                                  });
+                                },
+                              }}
+                            >
+                              {/* <Popup>
                           <strong>{v.name}</strong> ({v.vehicle_id})<br />
                           {v.status === "active"
                             ? `${v.speed.toFixed(0)} km/h • ${v.road_type}`
@@ -3538,9 +4090,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                           <br />
                           Health: {liveH.toFixed(1)}% • Driver: {v.driver_score}
                         </Popup> */}
-                          </Marker>
-                        );
-                      })}
+                            </Marker>
+                          );
+                        })}
 
                       {selectedVehicle && completedRoute.length > 1 && (
                         <Polyline
@@ -3581,7 +4133,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                         borderRadius: 1.5,
                         bgcolor: isDark ? "#0f172a" : "#ffffff",
                         backgroundImage: "none",
-                        border: `1px solid ${isDark ? "#1e293b" : theme.palette.divider}`,
+                        border: `1px solid ${
+                          isDark ? "#1e293b" : theme.palette.divider
+                        }`,
                         minWidth: 148,
                         isolation: "isolate",
                         filter: "none",
@@ -3649,7 +4203,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
                         <LegendItem
                           color="#8b5cf6"
-                          label="In Service"
+                          label="In Workshop"
                           value={summary?.in_service ?? 0}
                           selected={statusFilter === "in_service"}
                           onClick={() =>
@@ -3691,29 +4245,38 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
               </Grid>
 
               {/* KPI */}
-              {/* KPI */}
-              <Grid item xs={12} sm={5}>
+              <Grid item xs={12} md={75} lg={5}>
                 <Box
                   sx={{
                     display: "grid",
                     gap: 1,
                     width: "100%",
-                    height: "345px",
-                    gridTemplateColumns: "repeat(2, minmax(0,1fr))",
-                    gridTemplateRows: "165px 1fr",
+                    height: {
+                      xs: "auto",
+                      md: 345,
+                    },
+                    minHeight: 345,
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "repeat(2, minmax(0,1fr))",
+                    },
+                    gridTemplateRows: "auto",
+                    gridAutoRows: "minmax(150px, auto)",
                   }}
                 >
                   {/* Card 1 */}
                   <Card
                     sx={{
                       minWidth: 0,
-                      height: 165,
+                      minHeight: 165,
+                      height: "100%",
                     }}
                   >
                     <Card
                       sx={{
                         p: 1,
-                        height: 165,
+                        minHeight: 165,
+                        height: "100%",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "space-between",
@@ -3767,7 +4330,10 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                           mb: 0.5,
                         }}
                       >
-                        <HealthGauge value={selectedAvgHealth} color={selectedHealthStatus.color} />
+                        <HealthGauge
+                          value={selectedAvgHealth}
+                          color={selectedHealthStatus.color}
+                        />
                       </Box>
 
                       {/* Active Vehicles */}
@@ -3783,7 +4349,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                           background: isDark
                             ? "linear-gradient(135deg,#2d1f00 0%,#3d2900 100%)"
                             : "linear-gradient(135deg,#FFF8D6 0%,#FFE082 100%)",
-                          border: isDark ? "1px solid #7a5200" : "1px solid #FBC02D",
+                          border: isDark
+                            ? "1px solid #7a5200"
+                            : "1px solid #FBC02D",
                         }}
                       >
                         <Box>
@@ -3853,7 +4421,200 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                       overflow: "hidden",
                     }}
                   >
-                    <RecentAlerts onTotalChange={setAlertTotal} />
+                    <Card
+                      sx={{
+                        p: 1,
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <SectionTitle title="Operational Metrics (Today)" />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: "grid",
+                          gridTemplateColumns: "repeat(3, 1fr)",
+                          gridTemplateRows: "repeat(2, 1fr)",
+                          gap: 1,
+                          mt: 0.5,
+                        }}
+                      >
+                        {((): [
+                          string,
+                          string,
+                          string,
+                          string,
+                          React.ReactNode
+                        ][] => {
+                          const {
+                            totalDistanceKm,
+                            fuelConsumedL,
+                            tripsInProgress,
+                            avgSpeedKmh,
+                            fleetUtilPct,
+                          } = operationalMetrics;
+                          const speedColor =
+                            avgSpeedKmh > 90
+                              ? "#ef4444"
+                              : avgSpeedKmh > 60
+                              ? "#f59e0b"
+                              : "#22c55e";
+                          const utilColor =
+                            fleetUtilPct >= 50
+                              ? "#22c55e"
+                              : fleetUtilPct >= 25
+                              ? "#f59e0b"
+                              : "#ef4444";
+                          return [
+                            [
+                              `${Math.round(
+                                totalDistanceKm
+                              ).toLocaleString()} km`,
+                              "Distance Traveled",
+                              `${activePositionIds.length} active`,
+                              "#16a34a",
+                              "#EAF8EF",
+                              <TimelineOutlinedIcon sx={{ fontSize: 12 }} />,
+                            ],
+                            [
+                              `${Math.round(fuelConsumedL).toLocaleString()} L`,
+                              "Est. Fuel Consumed",
+                              "@ 12 L/100km",
+                              "#f59e0b",
+                              "#FFF8E8",
+                              <LocalGasStationOutlinedIcon
+                                sx={{ fontSize: 12 }}
+                              />,
+                            ],
+                            [
+                              `${parkedCount}`,
+                              "Vehicles Idle",
+                              "parked now",
+                              "#64748b",
+                              "#F1F5F9",
+                              <LocalShippingOutlinedIcon
+                                sx={{ fontSize: 12 }}
+                              />,
+                            ],
+                            [
+                              `${tripsInProgress}`,
+                              "Trips In Progress",
+                              "active routes",
+                              "#2563eb",
+                              "#EEF5FF",
+                              <RouteIcon sx={{ fontSize: 12 }} />,
+                            ],
+                            [
+                              `${Math.round(avgSpeedKmh)} km/h`,
+                              "Avg. Speed",
+                              "active fleet",
+                              speedColor,
+                              speedColor === "#22c55e"
+                                ? "#EAF8EF"
+                                : speedColor === "#f59e0b"
+                                ? "#FFF8E8"
+                                : "#FDECEC",
+                              <SpeedOutlinedIcon sx={{ fontSize: 12 }} />,
+                            ],
+                            [
+                              `${Math.round(fleetUtilPct)}%`,
+                              "Fleet Utilization",
+                              "of fleet active",
+                              utilColor,
+                              utilColor === "#22c55e"
+                                ? "#EAF8EF"
+                                : utilColor === "#f59e0b"
+                                ? "#FFF8E8"
+                                : "#FDECEC",
+                              <DonutSmallIcon sx={{ fontSize: 12 }} />,
+                            ],
+                          ];
+                        })().map(
+                          ([value, label, delta, color, bgColor, icon]) => (
+                            <Box
+                              key={String(label)}
+                              sx={{
+                                p: 0.8,
+                                borderRadius: "4px",
+                                backgroundColor: isDark
+                                  ? alpha(String(color), 0.15)
+                                  : String(bgColor),
+                                border: "1px solid",
+                                borderColor: alpha(String(color), 0.25),
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                textAlign: "center",
+                                transition: "0.2s",
+                                // "&:hover": {
+                                //   backgroundColor: isDark ? "#334155" : "#F1F5F9",
+                                // },
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "flex-start",
+                                  justifyContent: "space-between",
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "10px",
+                                    fontWeight: 900,
+                                    color: isDark ? "#f1f5f9" : "#0f172a",
+                                    lineHeight: 1,
+                                    pl: 0.5,
+                                    whiteSpace: "nowrap",
+                                    mb: 0.7,
+                                  }}
+                                >
+                                  {value}
+                                </Typography>
+                                {/* <Box sx={{ width: 20, height: 20, borderRadius: "6px", bgcolor: alpha(String(color), isDark ? 0.2 : 0.12), display: "flex", alignItems: "center", justifyContent: "center", color: String(color), flexShrink: 0 }}>
+                                {icon}
+                              </Box> */}
+                              </Box>
+                              <Typography
+                                sx={{
+                                  fontSize: "8px",
+                                  fontWeight: 600,
+                                  color: "text.secondary",
+                                  letterSpacing: "0.5px",
+                                  pl: 0.5,
+                                  lineHeight: 1,
+                                  mb: 0.7,
+                                }}
+                              >
+                                {String(label)
+                                  .toLowerCase()
+                                  .replace(/\b\w/g, (char) =>
+                                    char.toUpperCase()
+                                  )}
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: "7px",
+                                  color: String(color),
+                                  fontWeight: 700,
+                                  pl: 0.5,
+                                  lineHeight: 1,
+                                }}
+                              >
+                                {String(delta)
+                                  .toLowerCase()
+                                  .replace(/\b\w/g, (char) =>
+                                    char.toUpperCase()
+                                  )}
+                              </Typography>
+                            </Box>
+                          )
+                        )}
+                      </Box>
+                    </Card>
                   </Card>
 
                   {/* Card 4 */}
@@ -3865,70 +4626,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                       overflow: "hidden",
                     }}
                   >
-                    <Card sx={{ p: 1, width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-                      <SectionTitle title="Operational Metrics (Today)" />
-                      <Box
-                        sx={{
-                          flex: 1,
-                          overflow: "hidden",
-                          display: "grid",
-                          gridTemplateColumns: "repeat(3, 1fr)",
-                          gridTemplateRows: "repeat(2, 1fr)",
-                          gap: 0.5,
-                        }}
-                      >
-                        {((): [string, string, string, string, React.ReactNode][] => {
-                          const { totalDistanceKm, fuelConsumedL, tripsInProgress, avgSpeedKmh, fleetUtilPct } = operationalMetrics;
-                          const speedColor = avgSpeedKmh > 90 ? "#ef4444" : avgSpeedKmh > 60 ? "#f59e0b" : "#22c55e";
-                          const utilColor = fleetUtilPct >= 50 ? "#22c55e" : fleetUtilPct >= 25 ? "#f59e0b" : "#ef4444";
-                          return [
-                            [`${Math.round(totalDistanceKm).toLocaleString()} km`, "Distance Traveled", `${activePositionIds.length} active`, "#22c55e", <TimelineOutlinedIcon sx={{ fontSize: 12 }} />],
-                            [`${Math.round(fuelConsumedL).toLocaleString()} L`, "Est. Fuel Consumed", "@ 12 L/100km", "#f59e0b", <LocalGasStationOutlinedIcon sx={{ fontSize: 12 }} />],
-                            [`${parkedCount}`, "Vehicles Idle", "parked now", "#94a3b8", <LocalShippingOutlinedIcon sx={{ fontSize: 12 }} />],
-                            [`${tripsInProgress}`, "Trips in Progress", "active routes", "#3b82f6", <RouteIcon sx={{ fontSize: 12 }} />],
-                            [`${Math.round(avgSpeedKmh)} km/h`, "Avg. Speed", "active fleet", speedColor, <SpeedOutlinedIcon sx={{ fontSize: 12 }} />],
-                            [`${Math.round(fleetUtilPct)}%`, "Fleet Utilization", "of fleet active", utilColor, <DonutSmallIcon sx={{ fontSize: 12 }} />],
-                          ];
-                        })().map(([value, label, delta, color, icon]) => (
-                          <Box
-                            key={String(label)}
-                            sx={{
-                              p: 0.6,
-                              borderRadius: 1.5,
-                              border: `1px solid ${alpha(String(color), isDark ? 0.22 : 0.18)}`,
-                              bgcolor: alpha(String(color), isDark ? 0.07 : 0.05),
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 0.25,
-                              position: "relative",
-                              overflow: "hidden",
-                              "&::before": {
-                                content: '""',
-                                position: "absolute",
-                                top: 0, left: 0,
-                                width: "3px", height: "100%",
-                                bgcolor: String(color),
-                              },
-                            }}
-                          >
-                            <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                              <Typography sx={{ fontSize: "11px", fontWeight: 900, color: isDark ? "#f1f5f9" : "#0f172a", lineHeight: 1, pl: 0.5, whiteSpace: "nowrap" }}>
-                                {value}
-                              </Typography>
-                              <Box sx={{ width: 20, height: 20, borderRadius: "6px", bgcolor: alpha(String(color), isDark ? 0.2 : 0.12), display: "flex", alignItems: "center", justifyContent: "center", color: String(color), flexShrink: 0 }}>
-                                {icon}
-                              </Box>
-                            </Box>
-                            <Typography sx={{ fontSize: "8px", fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.5px", pl: 0.5, lineHeight: 1 }}>
-                              {String(label)}
-                            </Typography>
-                            <Typography sx={{ fontSize: "9px", color: String(color), fontWeight: 700, pl: 0.5, lineHeight: 1 }}>
-                              {String(delta)}
-                            </Typography>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Card>
+                    <RecentAlerts onTotalChange={setAlertTotal} />
                   </Card>
                 </Box>
               </Grid>
@@ -4065,17 +4763,26 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                     </Typography>
                   </Box>
 
-                  {/* CLOSE */}
-                  <IconButton
-                    size="small"
-                    onClick={() => setSelectedVehicle(null)}
-                    sx={{
-                      alignSelf: "flex-start",
-                      p: 0.5,
-                    }}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      sx={{ fontSize: "8px", py: "1px", px: "6px", whiteSpace: "nowrap" }}
+                      onClick={() => {
+                        setSelectedVehicle(null);
+                        navigate(`/automotive?vehicle=${encodeURIComponent(selectedVehicle ?? "")}`);
+                      }}
+                    >
+                      Deep Dive →
+                    </Button>
+                    <IconButton
+                      size="small"
+                      onClick={() => setSelectedVehicle(null)}
+                      sx={{ alignSelf: "flex-start", p: 0.5 }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
                 </Box>
               )}
               {vehicleDetail && (
@@ -4105,17 +4812,31 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
                     // ── INACTIVE VEHICLE CARD ──────────────────────────────
                     if (vehicleDetail.status !== "active") {
-                      const inactiveStatusMeta: Record<string, { color: string; label: string }> = {
-                        parked:     { color: "#3b82f6", label: "Parked" },
-                        in_service: { color: "#8b5cf6", label: "In Service" },
-                        warning:    { color: "#f59e0b", label: "Warning" },
-                        critical:   { color: "#ef4444", label: "Critical" },
+                      const inactiveStatusMeta: Record<
+                        string,
+                        { color: string; label: string }
+                      > = {
+                        parked: { color: "#3b82f6", label: "Parked" },
+                        in_service: { color: "#8b5cf6", label: "In Workshop" },
+                        warning: { color: "#f59e0b", label: "Warning" },
+                        critical: { color: "#ef4444", label: "Critical" },
                       };
-                      const st = inactiveStatusMeta[vehicleDetail.status] ?? { color: "#64748b", label: vehicleDetail.status };
+                      const st = inactiveStatusMeta[vehicleDetail.status] ?? {
+                        color: "#64748b",
+                        label: vehicleDetail.status,
+                      };
                       const hColor = healthColor(h);
                       const dScore = vehicleDetail.driver_score ?? 0;
-                      const dScoreColor = dScore >= 80 ? "#22c55e" : dScore >= 60 ? "#f59e0b" : "#ef4444";
-                      const ringR = 22, ringCx = 26, ringCy = 26, ringCirc = 2 * Math.PI * 22;
+                      const dScoreColor =
+                        dScore >= 80
+                          ? "#22c55e"
+                          : dScore >= 60
+                          ? "#f59e0b"
+                          : "#ef4444";
+                      const ringR = 22,
+                        ringCx = 26,
+                        ringCy = 26,
+                        ringCirc = 2 * Math.PI * 22;
                       const hPct = Math.min(h / 100, 1);
                       const dividerColor = isDark ? "#1e293b" : "#e2e8f0";
                       const trackBg = isDark ? "#1e293b" : "#e2e8f0";
@@ -4126,7 +4847,8 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                           <Box
                             onMouseDown={handleDragStart}
                             sx={{
-                              px: 1.5, py: 1.25,
+                              px: 1.5,
+                              py: 1.25,
                               borderBottom: `1px solid ${dividerColor}`,
                               cursor: "grab",
                               userSelect: "none",
@@ -4134,86 +4856,321 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                               "&:active": { cursor: "grabbing" },
                             }}
                           >
-                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="flex-start"
+                            >
                               <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 0.8, py: 0.2, borderRadius: 5, bgcolor: alpha(st.color, 0.12), border: `1px solid ${alpha(st.color, 0.25)}`, mb: 0.6 }}>
-                                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: st.color, flexShrink: 0 }} />
-                                  <Typography sx={{ fontSize: "9px !important", fontWeight: 700, color: st.color, textTransform: "uppercase", letterSpacing: ".06em" }}>
+                                <Box
+                                  sx={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    px: 0.8,
+                                    py: 0.2,
+                                    borderRadius: 5,
+                                    bgcolor: alpha(st.color, 0.12),
+                                    border: `1px solid ${alpha(
+                                      st.color,
+                                      0.25
+                                    )}`,
+                                    mb: 0.6,
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      bgcolor: st.color,
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: "9px !important",
+                                      fontWeight: 700,
+                                      color: st.color,
+                                      textTransform: "uppercase",
+                                      letterSpacing: ".06em",
+                                    }}
+                                  >
                                     {st.label}
                                   </Typography>
                                 </Box>
-                                <Typography sx={{ fontSize: "15px !important", fontWeight: 800, lineHeight: 1.2, color: isDark ? "#f1f5f9" : "#0f172a" }}>
+                                <Typography
+                                  sx={{
+                                    fontSize: "15px !important",
+                                    fontWeight: 800,
+                                    lineHeight: 1.2,
+                                    color: isDark ? "#f1f5f9" : "#0f172a",
+                                  }}
+                                >
                                   {vehicleDetail.name.toUpperCase()}
                                 </Typography>
-                                <Typography sx={{ fontSize: "10px !important", color: "text.secondary", mt: 0.25 }}>
-                                  {vehicleDetail.vehicle_id} · {vehicleDetail.type}
+                                <Typography
+                                  sx={{
+                                    fontSize: "10px !important",
+                                    color: "text.secondary",
+                                    mt: 0.25,
+                                  }}
+                                >
+                                  {vehicleDetail.vehicle_id} ·{" "}
+                                  {vehicleDetail.type}
                                 </Typography>
                               </Box>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSelectedVehicle(null)}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                sx={{ p: 0.4, ml: 1, flexShrink: 0 }}
-                              >
-                                <CloseIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
+                              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 1, flexShrink: 0 }}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={() => {
+                                    setSelectedVehicle(null);
+                                    navigate(`/automotive?vehicle=${encodeURIComponent(vehicleDetail.vehicle_id)}`);
+                                  }}
+                                  sx={{ fontSize: "7px", py: "1px", px: "5px", whiteSpace: "nowrap" }}
+                                >
+                                  Deep Dive →
+                                </Button>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setSelectedVehicle(null)}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  sx={{ p: 0.4, flexShrink: 0 }}
+                                >
+                                  <CloseIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Stack>
                             </Stack>
-                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.9 }}>
-                              <Box sx={{ width: 22, height: 22, borderRadius: "50%", bgcolor: getAvatarColor(vehicleDetail.driver ?? ""), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                <Typography sx={{ fontSize: "8px !important", fontWeight: 700, color: "#fff", lineHeight: 1 }}>
-                                  {getDriverInitials(vehicleDetail.driver ?? "")}
+                            <Stack
+                              direction="row"
+                              spacing={0.75}
+                              alignItems="center"
+                              sx={{ mt: 0.9 }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: "50%",
+                                  bgcolor: getAvatarColor(
+                                    vehicleDetail.driver ?? ""
+                                  ),
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "8px !important",
+                                    fontWeight: 700,
+                                    color: "#fff",
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  {getDriverInitials(
+                                    vehicleDetail.driver ?? ""
+                                  )}
                                 </Typography>
                               </Box>
-                              <Typography sx={{ fontSize: "11px !important", fontWeight: 600 }}>
+                              <Typography
+                                sx={{
+                                  fontSize: "10px !important",
+                                  fontWeight: 600,
+                                }}
+                              >
                                 {vehicleDetail.driver || "Unassigned"}
                               </Typography>
                               {vehicleDetail.city && (
                                 <>
-                                  <Box sx={{ width: 3, height: 3, borderRadius: "50%", bgcolor: "text.disabled", flexShrink: 0 }} />
-                                  <Typography sx={{ fontSize: "10px !important", color: "text.secondary" }}>{vehicleDetail.city}</Typography>
+                                  <Box
+                                    sx={{
+                                      width: 3,
+                                      height: 3,
+                                      borderRadius: "50%",
+                                      bgcolor: "text.disabled",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px !important",
+                                      color: "text.secondary",
+                                    }}
+                                  >
+                                    {vehicleDetail.city}
+                                  </Typography>
                                 </>
                               )}
                             </Stack>
                           </Box>
 
                           {/* ── HEALTH + DRIVER SCORE ───────────── */}
-                          <Box sx={{ px: 1.5, py: 1.25, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5, borderBottom: `1px solid ${dividerColor}` }}>
-                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-                              <Box sx={{ position: "relative", width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <svg width={52} height={52} style={{ position: "absolute", top: 0, left: 0, transform: "rotate(-90deg)" }}>
-                                  <circle cx={ringCx} cy={ringCy} r={ringR} fill="none" stroke={trackBg} strokeWidth={4} />
-                                  <circle cx={ringCx} cy={ringCy} r={ringR} fill="none" stroke={hColor} strokeWidth={4}
-                                    strokeDasharray={`${hPct * ringCirc} ${(1 - hPct) * ringCirc}`} strokeLinecap="round" />
+                          <Box
+                            sx={{
+                              px: 1.5,
+                              py: 1.25,
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 1.5,
+                              borderBottom: `1px solid ${dividerColor}`,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  position: "relative",
+                                  width: 52,
+                                  height: 52,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <svg
+                                  width={52}
+                                  height={52}
+                                  style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    transform: "rotate(-90deg)",
+                                  }}
+                                >
+                                  <circle
+                                    cx={ringCx}
+                                    cy={ringCy}
+                                    r={ringR}
+                                    fill="none"
+                                    stroke={trackBg}
+                                    strokeWidth={4}
+                                  />
+                                  <circle
+                                    cx={ringCx}
+                                    cy={ringCy}
+                                    r={ringR}
+                                    fill="none"
+                                    stroke={hColor}
+                                    strokeWidth={4}
+                                    strokeDasharray={`${hPct * ringCirc} ${
+                                      (1 - hPct) * ringCirc
+                                    }`}
+                                    strokeLinecap="round"
+                                  />
                                 </svg>
-                                <Typography sx={{ fontSize: "11px !important", fontWeight: 800, color: hColor, zIndex: 1, lineHeight: 1 }}>
+                                <Typography
+                                  sx={{
+                                    fontSize: "10px !important",
+                                    fontWeight: 800,
+                                    color: hColor,
+                                    zIndex: 1,
+                                    lineHeight: 1,
+                                  }}
+                                >
                                   {h.toFixed(0)}%
                                 </Typography>
                               </Box>
-                              <Typography sx={{ fontSize: "9px !important", color: "text.secondary", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
+                              <Typography
+                                sx={{
+                                  fontSize: "9px !important",
+                                  color: "text.secondary",
+                                  fontWeight: 600,
+                                  textTransform: "uppercase",
+                                  letterSpacing: ".06em",
+                                }}
+                              >
                                 Health
                               </Typography>
                             </Box>
 
-                            <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 0.75 }}>
-                              <Typography sx={{ fontSize: "9px !important", color: "text.secondary", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "center",
+                                gap: 0.75,
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "9px !important",
+                                  color: "text.secondary",
+                                  fontWeight: 600,
+                                  textTransform: "uppercase",
+                                  letterSpacing: ".06em",
+                                }}
+                              >
                                 Driver Score
                               </Typography>
-                              <Stack direction="row" spacing={0.5} alignItems="baseline">
-                                <Typography sx={{ fontSize: "22px !important", fontWeight: 800, color: dScoreColor, lineHeight: 1 }}>
+                              <Stack
+                                direction="row"
+                                spacing={0.5}
+                                alignItems="baseline"
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "22px !important",
+                                    fontWeight: 800,
+                                    color: dScoreColor,
+                                    lineHeight: 1,
+                                  }}
+                                >
                                   {dScore}
                                 </Typography>
-                                <Typography sx={{ fontSize: "10px !important", color: "text.secondary" }}>/100</Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "10px !important",
+                                    color: "text.secondary",
+                                  }}
+                                >
+                                  /100
+                                </Typography>
                               </Stack>
-                              <LinearProgress variant="determinate" value={dScore}
-                                sx={{ height: 5, borderRadius: 3, bgcolor: trackBg,
-                                  "& .MuiLinearProgress-bar": { bgcolor: dScoreColor, borderRadius: 3 } }} />
+                              <LinearProgress
+                                variant="determinate"
+                                value={dScore}
+                                sx={{
+                                  height: 5,
+                                  borderRadius: 3,
+                                  bgcolor: trackBg,
+                                  "& .MuiLinearProgress-bar": {
+                                    bgcolor: dScoreColor,
+                                    borderRadius: 3,
+                                  },
+                                }}
+                              />
                             </Box>
                           </Box>
 
                           {/* ── MODULE HEALTH BARS ──────────────── */}
                           {Object.keys(mods).length > 0 && (
-                            <Box sx={{ px: 1.5, py: 1.25, borderBottom: `1px solid ${dividerColor}` }}>
-                              <Typography sx={{ fontSize: "9px !important", fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".06em", mb: 1 }}>
+                            <Box
+                              sx={{
+                                px: 1.5,
+                                py: 1.25,
+                                borderBottom: `1px solid ${dividerColor}`,
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "9px !important",
+                                  fontWeight: 700,
+                                  color: "text.secondary",
+                                  textTransform: "uppercase",
+                                  letterSpacing: ".06em",
+                                  mb: 1,
+                                }}
+                              >
                                 Module Health
                               </Typography>
                               <Stack spacing={0.85}>
@@ -4221,16 +5178,58 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                   const mc = healthColor(val as number);
                                   return (
                                     <Box key={mod}>
-                                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.35 }}>
-                                        <Typography sx={{ fontSize: "10px !important", fontWeight: 600, textTransform: "capitalize" }}>{mod}</Typography>
-                                        <Stack direction="row" spacing={0.4} alignItems="center">
-                                          {(val as number) < 60 && <WarningAmberOutlinedIcon sx={{ fontSize: 10, color: "#f59e0b" }} />}
-                                          <Typography sx={{ fontSize: "10px !important", fontWeight: 700, color: mc }}>{(val as number).toFixed(0)}%</Typography>
+                                      <Stack
+                                        direction="row"
+                                        justifyContent="space-between"
+                                        alignItems="center"
+                                        sx={{ mb: 0.35 }}
+                                      >
+                                        <Typography
+                                          sx={{
+                                            fontSize: "10px !important",
+                                            fontWeight: 600,
+                                            textTransform: "capitalize",
+                                          }}
+                                        >
+                                          {mod}
+                                        </Typography>
+                                        <Stack
+                                          direction="row"
+                                          spacing={0.4}
+                                          alignItems="center"
+                                        >
+                                          {(val as number) < 60 && (
+                                            <WarningAmberOutlinedIcon
+                                              sx={{
+                                                fontSize: 10,
+                                                color: "#f59e0b",
+                                              }}
+                                            />
+                                          )}
+                                          <Typography
+                                            sx={{
+                                              fontSize: "10px !important",
+                                              fontWeight: 700,
+                                              color: mc,
+                                            }}
+                                          >
+                                            {(val as number).toFixed(0)}%
+                                          </Typography>
                                         </Stack>
                                       </Stack>
-                                      <LinearProgress variant="determinate" value={val as number}
-                                        sx={{ height: 4, borderRadius: 3, bgcolor: trackBg,
-                                          "& .MuiLinearProgress-bar": { bgcolor: mc, borderRadius: 3 } }} />
+                                      <LinearProgress
+                                        variant="determinate"
+                                        value={val as number}
+                                        sx={{
+                                          height: 4,
+                                          borderRadius: 3,
+                                          bgcolor: trackBg,
+                                          "& .MuiLinearProgress-bar": {
+                                            bgcolor: mc,
+                                            borderRadius: 3,
+                                          },
+                                        }}
+                                      />
                                     </Box>
                                   );
                                 })}
@@ -4239,24 +5238,67 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                           )}
 
                           {/* ── LAST KNOWN LOCATION ─────────────── */}
-                          {(vehicleDetail.road_type || vehicleDetail.route_name) && (
+                          {(vehicleDetail.road_type ||
+                            vehicleDetail.route_name) && (
                             <Box sx={{ px: 1.5, py: 1.25 }}>
-                              <Typography sx={{ fontSize: "9px !important", fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".06em", mb: 0.75 }}>
+                              <Typography
+                                sx={{
+                                  fontSize: "9px !important",
+                                  fontWeight: 700,
+                                  color: "text.secondary",
+                                  textTransform: "uppercase",
+                                  letterSpacing: ".06em",
+                                  mb: 0.75,
+                                }}
+                              >
                                 Last Known Location
                               </Typography>
                               <Stack spacing={0.5}>
                                 {vehicleDetail.road_type && (
-                                  <Stack direction="row" spacing={0.75} alignItems="center">
-                                    <RouteIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />
-                                    <Typography sx={{ fontSize: "10px !important", color: isDark ? "#cbd5e1" : "#475569" }}>
-                                      {vehicleDetail.road_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                                  <Stack
+                                    direction="row"
+                                    spacing={0.75}
+                                    alignItems="center"
+                                  >
+                                    <RouteIcon
+                                      sx={{
+                                        fontSize: 13,
+                                        color: "text.secondary",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <Typography
+                                      sx={{
+                                        fontSize: "10px !important",
+                                        color: isDark ? "#cbd5e1" : "#475569",
+                                      }}
+                                    >
+                                      {vehicleDetail.road_type
+                                        .replace(/_/g, " ")
+                                        .replace(/\b\w/g, (c) =>
+                                          c.toUpperCase()
+                                        )}
                                     </Typography>
                                   </Stack>
                                 )}
                                 {vehicleDetail.route_name && (
-                                  <Stack direction="row" spacing={0.75} alignItems="center">
-                                    <LocationOnIcon sx={{ fontSize: 13, color: "#3b82f6", flexShrink: 0 }} />
-                                    <Typography sx={{ fontSize: "10px !important" }} noWrap title={vehicleDetail.route_name}>
+                                  <Stack
+                                    direction="row"
+                                    spacing={0.75}
+                                    alignItems="center"
+                                  >
+                                    <LocationOnIcon
+                                      sx={{
+                                        fontSize: 13,
+                                        color: "#3b82f6",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <Typography
+                                      sx={{ fontSize: "10px !important" }}
+                                      noWrap
+                                      title={vehicleDetail.route_name}
+                                    >
                                       {vehicleDetail.route_name}
                                     </Typography>
                                   </Stack>
@@ -4333,8 +5375,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                               ["Driver", vehicleDetail.driver],
                               [
                                 "Status",
-                                (vehicleDetail.status as string) === "in_service"
-                                  ? "In Service"
+                                (vehicleDetail.status as string) ===
+                                "in_service"
+                                  ? "In Workshop"
                                   : vehicleDetail.status
                                       ?.replace(/_/g, " ")
                                       .replace(/\b\w/g, (c) => c.toUpperCase()),
@@ -4477,7 +5520,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                 // mt: 1,
                                 bgcolor: isDark ? "#0f172a" : "#EEF9FD",
 
-                                borderBottom: `1px solid ${isDark ? "#1e293b" : "#CDECF5"}`,
+                                borderBottom: `1px solid ${
+                                  isDark ? "#1e293b" : "#CDECF5"
+                                }`,
 
                                 "& .MuiTabs-flexContainer": {
                                   height: 30,
@@ -4507,7 +5552,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                 },
 
                                 "& .MuiTab-root:not(:last-child)": {
-                                  borderRight: `1px solid ${isDark ? "#1e293b" : "#D6EEF6"}`,
+                                  borderRight: `1px solid ${
+                                    isDark ? "#1e293b" : "#D6EEF6"
+                                  }`,
                                 },
 
                                 "& .Mui-selected": {
@@ -4517,7 +5564,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
                                 "& .MuiTabs-indicator": {
                                   height: 3,
-                                  backgroundColor: isDark ? "#0ea5e9" : "#8FCFE3",
+                                  backgroundColor: isDark
+                                    ? "#0ea5e9"
+                                    : "#8FCFE3",
                                 },
                               }}
                             >
@@ -4664,7 +5713,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                           height: 10,
                                           borderRadius: 10,
 
-                                          bgcolor: isDark ? "#1e293b" : "#DCEEFF",
+                                          bgcolor: isDark
+                                            ? "#1e293b"
+                                            : "#DCEEFF",
 
                                           "& .MuiLinearProgress-bar": {
                                             backgroundColor: "#2563EB",
@@ -4725,7 +5776,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                       >
                                         {(() => {
                                           const speed = Math.min(
-                                            vehicleDetail.speed ?? 0,
+                                            liveSelectedPosition?.speed ?? vehicleDetail.speed ?? 0,
                                             120
                                           );
                                           const percentage = speed / 120;
@@ -4740,7 +5791,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                                   width: 120,
                                                   height: 120,
                                                   borderRadius: "50%",
-                                                  background: isDark ? "#1e293b" : "#DCEEFF",
+                                                  background: isDark
+                                                    ? "#1e293b"
+                                                    : "#DCEEFF",
                                                   clipPath: "inset(0 0 50% 0)",
                                                 }}
                                               />
@@ -4755,7 +5808,11 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                                   background: `conic-gradient(
                                                     from 270deg,
                                                     #2563EB ${angle}deg,
-                                                    ${isDark ? "#1e293b" : "#DCEEFF"} ${angle}deg
+                                                    ${
+                                                      isDark
+                                                        ? "#1e293b"
+                                                        : "#DCEEFF"
+                                                    } ${angle}deg
                                                   )`,
                                                   clipPath: "inset(0 0 50% 0)",
                                                   transition: "all .5s ease",
@@ -4771,7 +5828,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                                   width: 100,
                                                   height: 100,
                                                   borderRadius: "50%",
-                                                  bgcolor: isDark ? "#0f172a" : "#fff",
+                                                  bgcolor: isDark
+                                                    ? "#0f172a"
+                                                    : "#fff",
                                                   clipPath: "inset(0 0 50% 0)",
                                                 }}
                                               />
@@ -4792,7 +5851,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                                   sx={{
                                                     fontSize: 16,
                                                     fontWeight: 700,
-                                                    color: isDark ? "#38bdf8" : "#005071",
+                                                    color: isDark
+                                                      ? "#38bdf8"
+                                                      : "#005071",
                                                     lineHeight: 1,
                                                   }}
                                                 >
@@ -4834,9 +5895,13 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
                                             py: 0.4,
 
-                                            border: `1px solid ${isDark ? "#1e40af" : "#2563EB"}`,
+                                            border: `1px solid ${
+                                              isDark ? "#1e40af" : "#2563EB"
+                                            }`,
 
-                                            bgcolor: isDark ? "#0f172a" : "#EEF5FF",
+                                            bgcolor: isDark
+                                              ? "#0f172a"
+                                              : "#EEF5FF",
 
                                             borderRadius: "50px",
                                           }}
@@ -4847,7 +5912,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
                                               fontWeight: 700,
 
-                                              color: isDark ? "#38bdf8" : "#005071",
+                                              color: isDark
+                                                ? "#38bdf8"
+                                                : "#005071",
 
                                               textTransform: "uppercase",
                                             }}
@@ -4868,11 +5935,15 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
                                             py: 0.4,
 
-                                            border: `1px solid ${isDark ? "#1e40af" : "#2563EB"}`,
+                                            border: `1px solid ${
+                                              isDark ? "#1e40af" : "#2563EB"
+                                            }`,
 
                                             borderRadius: "50px",
 
-                                            bgcolor: isDark ? "#0f172a" : "#EEF5FF",
+                                            bgcolor: isDark
+                                              ? "#0f172a"
+                                              : "#EEF5FF",
                                           }}
                                         >
                                           <ExploreIcon
@@ -4882,7 +5953,7 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                               fontSize: 10,
 
                                               transform: `rotate(${
-                                                vehicleDetail.heading || 0
+                                                liveSelectedPosition?.heading ?? vehicleDetail.heading ?? 0
                                               }deg)`,
                                             }}
                                           />
@@ -4893,11 +5964,13 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
 
                                               fontWeight: 700,
 
-                                              color: isDark ? "#38bdf8" : "#005071",
+                                              color: isDark
+                                                ? "#38bdf8"
+                                                : "#005071",
                                             }}
                                           >
                                             HDG{" "}
-                                            {vehicleDetail.heading?.toFixed(0)}°
+                                            {(liveSelectedPosition?.heading ?? vehicleDetail.heading ?? 0).toFixed(0)}°
                                           </Typography>
                                         </Box>
                                       </Box>
@@ -4933,7 +6006,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                               display: "flex",
                                               gap: 1,
                                               py: 1,
-                                              borderBottom: `1px solid ${isDark ? "#1e293b" : "#eee"}`,
+                                              borderBottom: `1px solid ${
+                                                isDark ? "#1e293b" : "#eee"
+                                              }`,
                                               alignItems: "center",
                                             }}
                                           >
@@ -5357,7 +6432,9 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
                                                 sx={{
                                                   fontSize: "10px",
 
-                                                  color: isDark ? "#38bdf8" : "#005071",
+                                                  color: isDark
+                                                    ? "#38bdf8"
+                                                    : "#005071",
 
                                                   whiteSpace: "normal",
                                                 }}
@@ -5396,805 +6473,1711 @@ export default function CockpitView({ isActive = true }: { isActive?: boolean })
           {/* <RecentAlerts /> */}
         </Box>
       </Stack>
-      <Box sx={{ mt: 1, mb: 1 }}>
-      <Grid container spacing={1}>
-        <Grid item xs={12} md={6}>
-          <Card sx={{ p: 0 }}>
-            {(() => {
-              const hasData =
-                fleetHealthScatter &&
-                fleetHealthScatter.some((v) => v.data.length > 0);
 
-              let fleetScatterOption = {};
+      <Box
+        sx={{
+          display: "grid",
+          // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
+          gap: 1,
+          alignItems: "stretch",
+        }}
+      >
+        <Box sx={{ flexGrow: 1 }}>
+          <Grid container spacing={1} sx={{ my: 0.5 }}>
+            <Grid item xs={12} sm={5}>
+              <Card sx={{ p: 0 }}>
+                {(() => {
+                  const hasData =
+                    fleetHealthScatter &&
+                    fleetHealthScatter.some((v) => v.data.length > 0);
 
-              if (hasData) {
-                const allTs = new Set();
+                  let fleetScatterOption = {};
 
-                fleetHealthScatter.forEach((vh) =>
-                  vh.data.forEach((r) => allTs.add(r.ts || r.timestamp || ""))
-                );
+                  if (hasData) {
+                    const allTs = new Set();
 
-                const sortedTs = Array.from(allTs).sort();
+                    fleetHealthScatter.forEach((vh) =>
+                      vh.data.forEach((r) =>
+                        allTs.add(r.ts || r.timestamp || "")
+                      )
+                    );
 
-                const series = fleetHealthScatter
-                  .map((vehicle, originalIdx) => {
-                    if (hiddenSims.has(vehicle.vehicle_id)) return null;
-                    const c = VEHICLE_COLORS[originalIdx % VEHICLE_COLORS.length];
-                    return {
-                      name: vehicle.vehicle_id,
-                      type: "scatter",
-                      symbol: "circle",
-                      z: 1,
-                      zlevel: 1,
-                      data: vehicle.data.map((r) => [r.ts || r.timestamp, r.health ?? 0]),
-                      symbolSize: 4,
-                      itemStyle: { color: c, opacity: 0.85, borderWidth: 0 },
-                      emphasis: { scale: 1.3, itemStyle: { opacity: 1 } },
-                    };
-                  })
-                  .filter(Boolean);
+                    const sortedTs = Array.from(allTs).sort();
 
-                fleetScatterOption = {
-                  animation: false,
+                    const series = fleetHealthScatter
+                      .map((vehicle, originalIdx) => {
+                        if (hiddenSims.has(vehicle.vehicle_id)) return null;
+                        const c =
+                          VEHICLE_COLORS[originalIdx % VEHICLE_COLORS.length];
+                        return {
+                          name: vehicle.vehicle_id,
+                          type: "scatter",
+                          symbol: "circle",
+                          z: 1,
+                          zlevel: 1,
+                          data: vehicle.data.map((r) => [
+                            r.ts || r.timestamp,
+                            r.health ?? 0,
+                          ]),
+                          symbolSize: 4,
+                          itemStyle: {
+                            color: c,
+                            opacity: 0.85,
+                            borderWidth: 0,
+                          },
+                          emphasis: { scale: 1.3, itemStyle: { opacity: 1 } },
+                        };
+                      })
+                      .filter(Boolean);
 
-                  tooltip: {
-                    trigger: "item",
-                    backgroundColor: isDark ? "#1e293b" : "#ffffff",
-                    borderColor: isDark ? "#334155" : "#e2e8f0",
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    padding: [8, 12],
-                    textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#1e293b", fontFamily: CHART_FONT },
-                    formatter: (p) => {
-                      const originalIdx = fleetHealthScatter.findIndex((v) => v.vehicle_id === p.seriesName);
-                      const c = VEHICLE_COLORS[originalIdx % VEHICLE_COLORS.length];
-                      const ts = String(p.data[0]).slice(5, 16).replace("T", " ");
-                      const health = Math.round(Number(p.data[1]));
-                      return `<div style="line-height:1.7">
-                        <div style="font-weight:700;font-size:11px;color:${c};margin-bottom:2px">${p.seriesName}</div>
+                    fleetScatterOption = {
+                      animation: false,
+
+                      tooltip: {
+                        trigger: "item",
+                        backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                        borderColor: isDark ? "#334155" : "#e2e8f0",
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        padding: [8, 12],
+                        textStyle: {
+                          fontSize: 10,
+                          color: isDark ? "#e2e8f0" : "#1e293b",
+                          fontFamily: CHART_FONT,
+                        },
+                        formatter: (p) => {
+                          const originalIdx = fleetHealthScatter.findIndex(
+                            (v) => v.vehicle_id === p.seriesName
+                          );
+                          const c =
+                            VEHICLE_COLORS[originalIdx % VEHICLE_COLORS.length];
+                          const ts = String(p.data[0])
+                            .slice(5, 16)
+                            .replace("T", " ");
+                          const health = Math.round(Number(p.data[1]));
+                          return `<div style="line-height:1.7">
+                        <div style="font-weight:700;font-size:10px;color:${c};margin-bottom:2px">${p.seriesName}</div>
                         <div style="font-size:10px;opacity:.65">${ts}</div>
-                        <div style="font-size:11px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
+                        <div style="font-size:10px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
                       </div>`;
-                    },
-                  },
-
-                  grid: commonGrid,
-
-                  xAxis: {
-                    ...commonXAxis,
-                    nameGap: 45,
-                    data: sortedTs,
-
-                    axisLabel: {
-                      ...commonXAxis.axisLabel,
-
-                      formatter: (v) =>
-                        String(v).slice(5, 16).replace("T", " "),
-                    },
-                  },
-
-                  yAxis: {
-                    ...commonYAxis,
-                  },
-
-                  dataZoom: [
-                    { type: "inside" },
-                    {
-                      type: "slider",
-                      height: 22,
-                      bottom: 10,
-                      moveHandleSize: 8,
-                      handleSize: "90%",
-                      showDetail: false,
-                      borderColor: "transparent",
-                      fillerColor: alpha("#3b82f6", 0.12),
-                      backgroundColor: "transparent",
-                      textStyle: { fontSize: 10, fontFamily: CHART_FONT },
-                    },
-                  ],
-
-                  series: [
-                    ...series,
-
-                    {
-                      type: "line",
-
-                      data: [[]],
-
-                      silent: true,
-
-                      lineStyle: {
-                        opacity: 0,
-                      },
-
-                      markLine: {
-                        silent: true,
-                        symbol: ["none", "none"],
-                        lineStyle: { width: 1.5, type: "dashed", opacity: 0.7 },
-                        label: { fontSize: 10, fontFamily: CHART_FONT, fontWeight: 600 },
-                        data: [
-                          {
-                            yAxis: 60,
-                            label: { formatter: "CRITICAL", color: "#ef4444", position: "insideStartTop" },
-                            lineStyle: { color: "#ef4444" },
-                          },
-                          {
-                            yAxis: 80,
-                            label: { formatter: "WARNING", color: "#f59e0b", position: "insideStartTop" },
-                            lineStyle: { color: "#f59e0b" },
-                          },
-                        ],
-                      },
-                    },
-                  ],
-                };
-              }
-
-              return (
-                <>
-                  <Box sx={{ p: 1, height: 370, display: "flex", flexDirection: "column" }}>
-                    {/* HEADER */}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
-                      <SectionTitle title="Fleet Health Scatter" />
-                      <Tooltip title="Expand">
-                        <IconButton size="small" onClick={() => setOpenFleetScatter(true)} sx={{ p: 0.5 }}>
-                          <AspectRatioOutlinedIcon sx={{ fontSize: 15 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-
-                    {/* LEGEND — clickable filter pills */}
-                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mb: 0.75 }}>
-                      {fleetHealthScatter?.map((v, i) => {
-                        const c = VEHICLE_COLORS[i % VEHICLE_COLORS.length];
-                        const hidden = hiddenSims.has(v.vehicle_id);
-                        const toggle = () => setHiddenSims((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(v.vehicle_id)) next.delete(v.vehicle_id);
-                          else next.add(v.vehicle_id);
-                          return next;
-                        });
-                        return (
-                          <Box key={v.vehicle_id} onClick={toggle} sx={{
-                            cursor: "pointer", userSelect: "none",
-                            display: "flex", alignItems: "center", gap: 0.5,
-                            px: 0.8, py: 0.2, borderRadius: 5,
-                            bgcolor: hidden ? "transparent" : alpha(c, isDark ? 0.18 : 0.1),
-                            border: `1px solid ${alpha(c, hidden ? 0.2 : 0.4)}`,
-                            opacity: hidden ? 0.4 : 1,
-                            transition: "opacity 0.15s, background 0.15s",
-                          }}>
-                            <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: hidden ? "transparent" : c, border: `1.5px solid ${c}`, flexShrink: 0 }} />
-                            <Typography sx={{ fontSize: "9px", fontWeight: 600, color: hidden ? "text.disabled" : c, lineHeight: 1 }}>{v.vehicle_id}</Typography>
-                          </Box>
-                        );
-                      })}
-                    </Box>
-
-                    {/* CHART */}
-                    <Box sx={{ flex: 1, minHeight: 0 }}>
-                      {hasData ? (
-                        <ReactECharts option={fleetScatterOption} style={{ width: "100%", height: "100%" }} />
-                      ) : (
-                        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
-                          <Typography sx={{ fontSize: "12px", color: "text.secondary", fontWeight: 500 }}>No pipeline data yet</Typography>
-                          <Typography sx={{ fontSize: "10px", color: "text.disabled" }}>GOLD stream will appear once the pipeline is active</Typography>
-                        </Box>
-                      )}
-                    </Box>
-                  </Box>
-
-                  {/* EXPANDED MODAL */}
-                  <Dialog open={openFleetScatter} onClose={() => setOpenFleetScatter(false)} fullWidth maxWidth="xl">
-                    <Box sx={{ px: 2, py: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}` }}>
-                      <Typography sx={{ fontSize: "14px", fontWeight: 700 }}>Fleet Health Scatter</Typography>
-                      <IconButton onClick={() => setOpenFleetScatter(false)} size="small"><CloseIcon fontSize="small" /></IconButton>
-                    </Box>
-                    <DialogContent sx={{ height: "85vh" }}>
-                      {hasData && <ReactECharts option={fleetScatterOption} style={{ width: "100%", height: "100%" }} />}
-                    </DialogContent>
-                  </Dialog>
-                </>
-              );
-            })()}
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Card sx={{ p: 0 }}>
-            {(() => {
-              const rows = healthHistory?.data || [];
-
-              const factor = Math.max(1, Math.floor(rows.length / 500));
-
-              const sampled =
-                factor === 1 ? rows : rows.filter((_, i) => i % factor === 0);
-
-              const xKey = timelineXAxis === "mileage" ? "mileage" : "ts";
-
-              const xData = sampled.map((r) =>
-                xKey === "mileage" ? r.mileage : r.ts || r.timestamp || ""
-              );
-
-              const yData = sampled.map((r) => r.health);
-
-              const lastMileage = rows[rows.length - 1]?.mileage ?? 0;
-
-              const kmSinceService = lastMileage % SERVICE_INTERVAL_KM;
-
-              const nextServiceKm =
-                lastMileage + (SERVICE_INTERVAL_KM - kmSinceService);
-
-              const chartOption = {
-                tooltip: {
-                  trigger: "axis",
-                  backgroundColor: isDark ? "#1e293b" : "#ffffff",
-                  borderColor: isDark ? "#334155" : "#e2e8f0",
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  padding: [8, 12],
-                  textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#1e293b", fontFamily: CHART_FONT },
-                  formatter: (params: any) => {
-                    const p = Array.isArray(params) ? params[0] : params;
-                    if (!p) return "";
-                    const rawX = p.axisValue ?? p.name ?? "";
-                    const xLabel = timelineXAxis === "mileage"
-                      ? `${Math.round(Number(rawX)).toLocaleString()} km`
-                      : String(rawX).slice(5, 16).replace("T", " ");
-                    const health = Math.round(Number(p.value));
-                    const axisName = timelineXAxis === "mileage" ? "Mileage" : "Time";
-                    return `<div style="line-height:1.7">
-                      <div style="font-weight:700;font-size:11px;color:#3b82f6;margin-bottom:2px">${healthTimelineVehicle}</div>
-                      <div style="font-size:10px;opacity:.65">${axisName}&nbsp;${xLabel}</div>
-                      <div style="font-size:11px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
-                    </div>`;
-                  },
-                },
-
-                dataZoom: [
-                  {
-                    type: "inside",
-                    filterMode: "none",
-                  },
-                  {
-                    type: "slider",
-                    bottom: 10,
-                    height: 22,
-                    filterMode: "none",
-                    showDetail: false,
-                    moveHandleSize: 8,
-                    handleSize: "90%",
-                    textStyle: {
-                      fontSize: 10,
-                      fontFamily: CHART_FONT,
-                    },
-                    borderColor: "transparent",
-                    fillerColor: "rgba(25,118,210,.08)",
-                    backgroundColor: "transparent",
-                  },
-                ],
-
-                grid: commonGrid,
-
-                xAxis: {
-                  ...commonXAxis,
-
-                  nameGap: 45,
-                  data: xData,
-
-                  boundaryGap: true,
-
-                  scale: false,
-
-                  axisLabel: {
-                    ...commonXAxis.axisLabel,
-
-                    interval: 16,
-
-                    hideOverlap: true,
-
-                    margin: 14,
-
-                    fontSize: 10,
-
-                    fontFamily: CHART_FONT,
-
-                    formatter: (v: any) =>
-                      timelineXAxis === "mileage"
-                        ? Math.round(Number(v)).toLocaleString()
-                        : String(v).slice(5, 16).replace("T", " "),
-                  },
-
-                  axisTick: { show: false },
-
-                  splitLine: {
-                    show: false,
-                    lineStyle: {
-                      color: isDark
-                        ? "rgba(255,255,255,.06)"
-                        : "rgba(0,0,0,.06)",
-                    },
-                  },
-                },
-
-                yAxis: {
-                  ...commonYAxis,
-                },
-
-                series: [
-                  {
-                    type: "line",
-
-                    data: yData,
-
-                    symbol: "none",
-
-                    lineStyle: { color: "#3b82f6", width: 2 },
-                    itemStyle: { color: "#3b82f6" },
-                    areaStyle: {
-                      color: {
-                        type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-                        colorStops: [
-                          { offset: 0, color: "rgba(59,130,246,0.18)" },
-                          { offset: 1, color: "rgba(59,130,246,0.02)" },
-                        ],
-                      },
-                    },
-                    markLine: {
-                      silent: true,
-                      symbol: ["none", "none"],
-                      lineStyle: { width: 1.5, type: "dashed", opacity: 0.7 },
-                      label: { fontSize: 10, fontFamily: CHART_FONT, fontWeight: 600 },
-                      data: [
-                        {
-                          yAxis: 60,
-                          label: { formatter: "CRITICAL", color: "#ef4444", position: "insideStartTop" },
-                          lineStyle: { color: "#ef4444" },
                         },
-                        {
-                          yAxis: 80,
-                          label: { formatter: "WARNING", color: "#f59e0b", position: "insideStartTop" },
-                          lineStyle: { color: "#f59e0b" },
+                      },
+
+                      grid: commonGrid,
+
+                      xAxis: {
+                        ...commonXAxis,
+                        nameGap: 45,
+                        data: sortedTs,
+
+                        axisLabel: {
+                          ...commonXAxis.axisLabel,
+
+                          formatter: (v) =>
+                            String(v).slice(5, 16).replace("T", " "),
                         },
-                        ...(timelineXAxis === "mileage"
-                          ? [{
-                              xAxis: nextServiceKm,
-                              label: {
-                                formatter: `NEXT SVC\n+${Math.round(SERVICE_INTERVAL_KM - kmSinceService).toLocaleString()} km`,
-                                color: isDark ? "#60a5fa" : "#2563eb",
-                                position: "insideStartTop",
-                                fontSize: 9,
-                                fontFamily: CHART_FONT,
-                                fontWeight: 700,
-                              },
-                              lineStyle: {
-                                color: isDark ? "#60a5fa" : "#2563eb",
-                                width: 1.5,
-                                type: "dashed",
-                              },
-                            }]
-                          : []),
-                      ],
-                    },
+                      },
 
-                    markArea: {
-                      silent: true,
-                      data: [
-                        [{ yAxis: 0, itemStyle: { color: isDark ? "rgba(239,68,68,.03)" : "rgba(239,68,68,.025)" } }, { yAxis: 60 }],
-                        [{ yAxis: 60, itemStyle: { color: isDark ? "rgba(245,158,11,.025)" : "rgba(245,158,11,.02)" } }, { yAxis: 80 }],
-                      ],
-                    },
-                  },
-                ],
-              };
+                      yAxis: {
+                        ...commonYAxis,
+                      },
 
-              return (
-                <>
-                  <Box sx={{ p: 1, height: 370, display: "flex", flexDirection: "column" }}>
-                    {/* HEADER */}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1, flexWrap: "wrap", gap: 0.5 }}>
-                      <SectionTitle title="Vehicle Health Timeline" />
-                      <Box sx={{ display: "flex", gap: 0.75, alignItems: "center" }}>
-                        {timelineXAxis === "mileage" && rows.length > 0 && (
-                          <Box sx={{
-                            display: "inline-flex", alignItems: "center", gap: 0.5,
-                            px: 1, height: 28, borderRadius: 1,
-                            bgcolor: alpha("#3b82f6", isDark ? 0.15 : 0.08),
-                            border: `1px solid ${alpha("#3b82f6", isDark ? 0.3 : 0.2)}`,
-                          }}>
-                            <Typography sx={{ fontSize: "10px", fontWeight: 700, color: isDark ? "#60a5fa" : "#2563eb", whiteSpace: "nowrap" }}>
-                              Next Service in {Math.round(SERVICE_INTERVAL_KM - kmSinceService).toLocaleString()} km
-                            </Typography>
-                          </Box>
-                        )}
-                        <Select
-                          value={healthTimelineVehicle}
-                          onChange={(e) => setHealthTimelineVehicle(e.target.value)}
-                          size="small"
-                          sx={{ height: 28, fontSize: "10px", fontWeight: 700, borderRadius: 1, minWidth: 120, "& .MuiSelect-select": { py: "4px" } }}
+                      dataZoom: [
+                        { type: "inside" },
+                        {
+                          type: "slider",
+                          height: 22,
+                          bottom: 10,
+                          moveHandleSize: 8,
+                          handleSize: "90%",
+                          showDetail: false,
+                          borderColor: "transparent",
+                          fillerColor: alpha("#3b82f6", 0.12),
+                          backgroundColor: "transparent",
+                          textStyle: { fontSize: 10, fontFamily: CHART_FONT },
+                        },
+                      ],
+
+                      series: [
+                        ...series,
+
+                        {
+                          type: "line",
+
+                          data: [[]],
+
+                          silent: true,
+
+                          lineStyle: {
+                            opacity: 0,
+                          },
+
+                          markLine: {
+                            silent: true,
+                            symbol: ["none", "none"],
+                            lineStyle: {
+                              width: 1.5,
+                              type: "dashed",
+                              opacity: 0.7,
+                            },
+                            label: {
+                              fontSize: 10,
+                              fontFamily: CHART_FONT,
+                              fontWeight: 600,
+                            },
+                            data: [
+                              {
+                                yAxis: 60,
+                                label: {
+                                  formatter: "CRITICAL",
+                                  color: "#ef4444",
+                                  position: "insideStartTop",
+                                },
+                                lineStyle: { color: "#ef4444" },
+                              },
+                              {
+                                yAxis: 80,
+                                label: {
+                                  formatter: "WARNING",
+                                  color: "#f59e0b",
+                                  position: "insideStartTop",
+                                },
+                                lineStyle: { color: "#f59e0b" },
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                    };
+                  }
+
+                  return (
+                    <>
+                      <Box
+                        sx={{
+                          p: 1,
+                          height: 370,
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        {/* HEADER */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 0.75,
+                          }}
                         >
-                          {timelineVehicleOptions.map((v) => (
-                            <MenuItem key={v.vehicle_id} value={v.vehicle_id} sx={{ fontSize: "10px" }}>{v.vehicle_id}</MenuItem>
-                          ))}
-                        </Select>
+                          <SectionTitle title="Fleet Health Scatter" />
+                          <Tooltip title="Expand">
+                            <IconButton
+                              size="small"
+                              onClick={() => setOpenFleetScatter(true)}
+                              sx={{ p: 0.5 }}
+                            >
+                              <AspectRatioOutlinedIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+
+                        {/* LEGEND — clickable filter pills */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 0.5,
+                            flexWrap: "wrap",
+                            mb: 0.75,
+                          }}
+                        >
+                          {fleetHealthScatter?.map((v, i) => {
+                            const c = VEHICLE_COLORS[i % VEHICLE_COLORS.length];
+                            const hidden = hiddenSims.has(v.vehicle_id);
+                            const toggle = () =>
+                              setHiddenSims((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(v.vehicle_id))
+                                  next.delete(v.vehicle_id);
+                                else next.add(v.vehicle_id);
+                                return next;
+                              });
+                            return (
+                              <Box
+                                key={v.vehicle_id}
+                                onClick={toggle}
+                                sx={{
+                                  cursor: "pointer",
+                                  userSelect: "none",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                  px: 0.8,
+                                  py: 0.2,
+                                  borderRadius: 5,
+                                  bgcolor: hidden
+                                    ? "transparent"
+                                    : alpha(c, isDark ? 0.18 : 0.1),
+                                  border: `1px solid ${alpha(
+                                    c,
+                                    hidden ? 0.2 : 0.4
+                                  )}`,
+                                  opacity: hidden ? 0.4 : 1,
+                                  transition: "opacity 0.15s, background 0.15s",
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: "50%",
+                                    bgcolor: hidden ? "transparent" : c,
+                                    border: `1.5px solid ${c}`,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <Typography
+                                  sx={{
+                                    fontSize: "9px",
+                                    fontWeight: 600,
+                                    color: hidden ? "text.disabled" : c,
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  {v.vehicle_id}
+                                </Typography>
+                              </Box>
+                            );
+                          })}
+                        </Box>
+
+                        {/* CHART */}
+                        <Box sx={{ flex: 1, minHeight: 0 }}>
+                          {hasData ? (
+                            <ReactECharts
+                              option={fleetScatterOption}
+                              style={{ width: "100%", height: "100%" }}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "12px",
+                                  color: "text.secondary",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                No pipeline data yet
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: "10px",
+                                  color: "text.disabled",
+                                }}
+                              >
+                                GOLD stream will appear once the pipeline is
+                                active
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+
+                      {/* EXPANDED MODAL */}
+                      <Dialog
+                        open={openFleetScatter}
+                        onClose={() => setOpenFleetScatter(false)}
+                        fullWidth
+                        maxWidth="xl"
+                      >
+                        <Box
+                          sx={{
+                            px: 2,
+                            py: 1.5,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            borderBottom: `1px solid ${
+                              isDark ? "#1e293b" : "#e2e8f0"
+                            }`,
+                          }}
+                        >
+                          <Typography
+                            sx={{ fontSize: "14px", fontWeight: 700 }}
+                          >
+                            Fleet Health Scatter
+                          </Typography>
+                          <IconButton
+                            onClick={() => setOpenFleetScatter(false)}
+                            size="small"
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                        <DialogContent sx={{ height: "85vh" }}>
+                          {hasData && (
+                            <ReactECharts
+                              option={fleetScatterOption}
+                              style={{ width: "100%", height: "100%" }}
+                            />
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </>
+                  );
+                })()}
+              </Card>
+
+              <Card sx={{ p: 0, mt: 1 }}>
+                {(() => {
+                  const rows = healthHistory?.data || [];
+
+                  const factor = Math.max(1, Math.floor(rows.length / 500));
+
+                  const sampled =
+                    factor === 1
+                      ? rows
+                      : rows.filter((_, i) => i % factor === 0);
+
+                  const xKey = timelineXAxis === "mileage" ? "mileage" : "ts";
+
+                  const xData = sampled.map((r) =>
+                    xKey === "mileage" ? r.mileage : r.ts || r.timestamp || ""
+                  );
+
+                  const yData = sampled.map((r) => r.health);
+
+                  const lastMileage = rows[rows.length - 1]?.mileage ?? 0;
+
+                  const kmSinceService = lastMileage % SERVICE_INTERVAL_KM;
+
+                  const nextServiceKm =
+                    lastMileage + (SERVICE_INTERVAL_KM - kmSinceService);
+                  const navigate = useNavigate();
+                  const chartOption = {
+                    tooltip: {
+                      trigger: "axis",
+                      backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                      borderColor: isDark ? "#334155" : "#e2e8f0",
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      padding: [8, 12],
+                      textStyle: {
+                        fontSize: 10,
+                        color: isDark ? "#e2e8f0" : "#1e293b",
+                        fontFamily: CHART_FONT,
+                      },
+                      formatter: (params: any) => {
+                        const p = Array.isArray(params) ? params[0] : params;
+                        if (!p) return "";
+                        const rawX = p.axisValue ?? p.name ?? "";
+                        const xLabel =
+                          timelineXAxis === "mileage"
+                            ? `${Math.round(Number(rawX)).toLocaleString()} km`
+                            : String(rawX).slice(5, 16).replace("T", " ");
+                        const health = Math.round(Number(p.value));
+                        const axisName =
+                          timelineXAxis === "mileage" ? "Mileage" : "Time";
+                        return `<div style="line-height:1.7">
+                      <div style="font-weight:700;font-size:10px;color:#3b82f6;margin-bottom:2px">${healthTimelineVehicle}</div>
+                      <div style="font-size:10px;opacity:.65">${axisName}&nbsp;${xLabel}</div>
+                      <div style="font-size:10px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
+                    </div>`;
+                      },
+                    },
+
+                    dataZoom: [
+                      {
+                        type: "inside",
+                        filterMode: "none",
+                      },
+                      {
+                        type: "slider",
+                        bottom: 10,
+                        height: 22,
+                        filterMode: "none",
+                        showDetail: false,
+                        moveHandleSize: 8,
+                        handleSize: "90%",
+                        textStyle: {
+                          fontSize: 10,
+                          fontFamily: CHART_FONT,
+                        },
+                        borderColor: "transparent",
+                        fillerColor: "rgba(25,118,210,.08)",
+                        backgroundColor: "transparent",
+                      },
+                    ],
+
+                    grid: commonGrid,
+
+                    xAxis: {
+                      ...commonXAxis,
+
+                      nameGap: 45,
+                      data: xData,
+
+                      boundaryGap: true,
+
+                      scale: false,
+
+                      axisLabel: {
+                        ...commonXAxis.axisLabel,
+
+                        interval: 16,
+
+                        hideOverlap: true,
+
+                        margin: 14,
+
+                        fontSize: 10,
+
+                        fontFamily: CHART_FONT,
+
+                        formatter: (v: any) =>
+                          timelineXAxis === "mileage"
+                            ? Math.round(Number(v)).toLocaleString()
+                            : String(v).slice(5, 16).replace("T", " "),
+                      },
+
+                      axisTick: { show: false },
+
+                      splitLine: {
+                        show: false,
+                        lineStyle: {
+                          color: isDark
+                            ? "rgba(255,255,255,.06)"
+                            : "rgba(0,0,0,.06)",
+                        },
+                      },
+                    },
+
+                    yAxis: {
+                      ...commonYAxis,
+                    },
+
+                    series: [
+                      {
+                        type: "line",
+
+                        data: yData,
+
+                        symbol: "none",
+
+                        lineStyle: { color: "#3b82f6", width: 2 },
+                        itemStyle: { color: "#3b82f6" },
+                        areaStyle: {
+                          color: {
+                            type: "linear",
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [
+                              { offset: 0, color: "rgba(59,130,246,0.18)" },
+                              { offset: 1, color: "rgba(59,130,246,0.02)" },
+                            ],
+                          },
+                        },
+                        markLine: {
+                          silent: true,
+                          symbol: ["none", "none"],
+                          lineStyle: {
+                            width: 1.5,
+                            type: "dashed",
+                            opacity: 0.7,
+                          },
+                          label: {
+                            fontSize: 10,
+                            fontFamily: CHART_FONT,
+                            fontWeight: 600,
+                          },
+                          data: [
+                            {
+                              yAxis: 60,
+                              label: {
+                                formatter: "CRITICAL",
+                                color: "#ef4444",
+                                position: "insideStartTop",
+                              },
+                              lineStyle: { color: "#ef4444" },
+                            },
+                            {
+                              yAxis: 80,
+                              label: {
+                                formatter: "WARNING",
+                                color: "#f59e0b",
+                                position: "insideStartTop",
+                              },
+                              lineStyle: { color: "#f59e0b" },
+                            },
+                            ...(timelineXAxis === "mileage"
+                              ? [
+                                  {
+                                    xAxis: nextServiceKm,
+                                    label: {
+                                      formatter: `NEXT SVC\n+${Math.round(
+                                        SERVICE_INTERVAL_KM - kmSinceService
+                                      ).toLocaleString()} km`,
+                                      color: isDark ? "#60a5fa" : "#2563eb",
+                                      position: "insideStartTop",
+                                      fontSize: 9,
+                                      fontFamily: CHART_FONT,
+                                      fontWeight: 700,
+                                    },
+                                    lineStyle: {
+                                      color: isDark ? "#60a5fa" : "#2563eb",
+                                      width: 1.5,
+                                      type: "dashed",
+                                    },
+                                  },
+                                ]
+                              : []),
+                          ],
+                        },
+
+                        markArea: {
+                          silent: true,
+                          data: [
+                            [
+                              {
+                                yAxis: 0,
+                                itemStyle: {
+                                  color: isDark
+                                    ? "rgba(239,68,68,.03)"
+                                    : "rgba(239,68,68,.025)",
+                                },
+                              },
+                              { yAxis: 60 },
+                            ],
+                            [
+                              {
+                                yAxis: 60,
+                                itemStyle: {
+                                  color: isDark
+                                    ? "rgba(245,158,11,.025)"
+                                    : "rgba(245,158,11,.02)",
+                                },
+                              },
+                              { yAxis: 80 },
+                            ],
+                          ],
+                        },
+                      },
+                    ],
+                  };
+
+                  return (
+                    <>
+                      <Box
+                        sx={{
+                          p: 1,
+                          height: 370,
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        {/* HEADER */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 1,
+                            // flexWrap: "wrap",
+                            gap: 0.5,
+                          }}
+                        >
+                          <SectionTitle title="Vehicle Health Timeline" />
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 0.75,
+                              alignItems: "center",
+                            }}
+                          >
+                            {timelineXAxis === "mileage" && rows.length > 0 && (
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                  px: 1,
+                                  height: 28,
+                                  borderRadius: 1,
+                                  bgcolor: alpha(
+                                    "#3b82f6",
+                                    isDark ? 0.15 : 0.08
+                                  ),
+                                  border: `1px solid ${alpha(
+                                    "#3b82f6",
+                                    isDark ? 0.3 : 0.2
+                                  )}`,
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "10px",
+                                    fontWeight: 700,
+                                    color: isDark ? "#60a5fa" : "#2563eb",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  Next Service in{" "}
+                                  {Math.round(
+                                    SERVICE_INTERVAL_KM - kmSinceService
+                                  ).toLocaleString()}{" "}
+                                  km
+                                </Typography>
+                              </Box>
+                            )}
+                            <Select
+                              value={healthTimelineVehicle}
+                              onChange={(e) =>
+                                setHealthTimelineVehicle(e.target.value)
+                              }
+                              size="small"
+                              sx={{
+                                height: 28,
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                borderRadius: 1,
+                                minWidth: 120,
+                                "& .MuiSelect-select": { py: "4px" },
+                              }}
+                            >
+                              {timelineVehicleOptions.map((v) => (
+                                <MenuItem
+                                  key={v.vehicle_id}
+                                  value={v.vehicle_id}
+                                  sx={{ fontSize: "10px" }}
+                                >
+                                  {v.vehicle_id}
+                                </MenuItem>
+                              ))}
+                            </Select>
+
+                            <Tooltip title="Expand">
+                              <IconButton
+                                size="small"
+                                onClick={() => setOpenVehicleHealth(true)}
+                                sx={{ p: 0.5 }}
+                              >
+                                <AspectRatioOutlinedIcon
+                                  sx={{ fontSize: 15 }}
+                                />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </Box>
+
                         <ToggleButtonGroup
                           value={timelineXAxis}
                           exclusive
                           onChange={(_, v) => v && setTimelineXAxis(v)}
                           size="small"
+                          sx={{
+                            display: "inline",
+                            alignItems: "flex-end",
+                            flexDirection: "row-reverse",
+                          }}
                         >
-                          <ToggleButton value="mileage" sx={{ fontWeight: 700, px: 1.25, fontSize: "9px", height: 28, py: 0 }}>MILEAGE</ToggleButton>
-                          <ToggleButton value="timestamp" sx={{ fontWeight: 700, px: 1.25, fontSize: "9px", height: 28, py: 0 }}>TIMESTAMP</ToggleButton>
+                          <ToggleButton
+                            value="mileage"
+                            sx={{
+                              fontWeight: 700,
+                              px: 1.25,
+                              fontSize: "9px",
+                              height: 28,
+                              py: 0,
+                            }}
+                          >
+                            MILEAGE
+                          </ToggleButton>
+                          <ToggleButton
+                            value="timestamp"
+                            sx={{
+                              fontWeight: 700,
+                              px: 1.25,
+                              fontSize: "9px",
+                              height: 28,
+                              py: 0,
+                            }}
+                          >
+                            TIMESTAMP
+                          </ToggleButton>
                         </ToggleButtonGroup>
-                        <Tooltip title="Expand">
-                          <IconButton size="small" onClick={() => setOpenVehicleHealth(true)} sx={{ p: 0.5 }}>
-                            <AspectRatioOutlinedIcon sx={{ fontSize: 15 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </Box>
 
+                        <Box
+                          sx={{
+                            flex: 1,
+                            minHeight: 0,
+                          }}
+                        >
+                          {rows.length > 0 ? (
+                            <ReactECharts
+                              style={{ height: "100%", width: "100%" }}
+                              option={chartOption}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "12px",
+                                  color: "text.secondary",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                No health history yet
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: "10px",
+                                  color: "text.disabled",
+                                }}
+                              >
+                                Select a vehicle and wait for GOLD data to
+                                arrive
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+
+                      {/* EXPAND DIALOG */}
+
+                      <Dialog
+                        open={openVehicleHealth}
+                        onClose={() => setOpenVehicleHealth(false)}
+                        fullWidth
+                        maxWidth="xl"
+                      >
+                        <Box
+                          sx={{
+                            px: 2,
+                            py: 1.5,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            borderBottom: `1px solid ${
+                              isDark ? "#1e293b" : "#e2e8f0"
+                            }`,
+                          }}
+                        >
+                          <Typography
+                            sx={{ fontSize: "14px", fontWeight: 700 }}
+                          >
+                            Vehicle Health Timeline
+                          </Typography>
+                          <IconButton
+                            onClick={() => setOpenVehicleHealth(false)}
+                            size="small"
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                        <DialogContent sx={{ height: "85vh" }}>
+                          <ReactECharts
+                            style={{ width: "100%", height: "100%" }}
+                            option={chartOption}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    </>
+                  );
+                })()}
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} sm={7}>
+              <Paper
+                elevation={0}
+                sx={{
+                  border: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
+                  borderRadius: 2,
+                  overflow: "hidden",
+                  bgcolor: isDark ? "#0f172a" : "#ffffff",
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    px: 1,
+                    py: 1,
+                    borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
+                    flexGrow: 1,
+                  }}
+                >
+                  <Box>
+                    <SectionTitle title="Fleet Table" />
+                    <Typography
+                      sx={{
+                        fontSize: "10px",
+                        color: "text.secondary",
+                        mt: 0.15,
+                      }}
+                    >
+                      Real-time overview of all active and in-service vehicles
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box
                       sx={{
-                        flex: 1,
-                        minHeight: 0,
+                        px: 1.25,
+                        py: 0.4,
+                        borderRadius: 5,
+                        bgcolor: alpha("#3b82f6", isDark ? 0.15 : 0.08),
+                        border: `1px solid ${alpha("#3b82f6", 0.25)}`,
                       }}
                     >
-                      {rows.length > 0 ? (
-                        <ReactECharts style={{ height: "100%", width: "100%" }} option={chartOption} />
-                      ) : (
-                        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
-                          <Typography sx={{ fontSize: "12px", color: "text.secondary", fontWeight: 500 }}>No health history yet</Typography>
-                          <Typography sx={{ fontSize: "10px", color: "text.disabled" }}>Select a vehicle and wait for GOLD data to arrive</Typography>
-                        </Box>
-                      )}
+                      <Typography
+                        sx={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          color: "#3b82f6",
+                        }}
+                      >
+                        {sortedTableRows.length} Vehicles
+                      </Typography>
                     </Box>
-                  </Box>
-
-                  {/* EXPAND DIALOG */}
-
-                  <Dialog open={openVehicleHealth} onClose={() => setOpenVehicleHealth(false)} fullWidth maxWidth="xl">
-                    <Box sx={{ px: 2, py: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}` }}>
-                      <Typography sx={{ fontSize: "14px", fontWeight: 700 }}>Vehicle Health Timeline</Typography>
-                      <IconButton onClick={() => setOpenVehicleHealth(false)} size="small"><CloseIcon fontSize="small" /></IconButton>
-                    </Box>
-                    <DialogContent sx={{ height: "85vh" }}>
-                      <ReactECharts style={{ width: "100%", height: "100%" }} option={chartOption} />
-                    </DialogContent>
-                  </Dialog>
-                </>
-              );
-            })()}
-          </Card>
-        </Grid>
-      </Grid>
-      </Box>
-
-      <Paper
-        elevation={0}
-        sx={{
-          border: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
-          borderRadius: 2,
-          overflow: "hidden",
-          bgcolor: isDark ? "#0f172a" : "#ffffff",
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            px: 2,
-            py: 1.5,
-            borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
-          }}
-        >
-          <Box>
-            <Typography sx={{ fontSize: "14px", fontWeight: 700, lineHeight: 1.3 }}>Fleet Table</Typography>
-            <Typography sx={{ fontSize: "11px", color: "text.secondary", mt: 0.25 }}>
-              Real-time overview of all active and in-service vehicles
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Box sx={{ px: 1.25, py: 0.4, borderRadius: 5, bgcolor: alpha("#3b82f6", isDark ? 0.15 : 0.08), border: `1px solid ${alpha("#3b82f6", 0.25)}` }}>
-              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#3b82f6" }}>
-                {sortedTableRows.length} Vehicles
-              </Typography>
-            </Box>
-            <TextField
-              size="small"
-              placeholder="Search vehicle / driver / route…"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-              InputProps={{
-                startAdornment: (
-                  <SearchOutlinedIcon sx={{ fontSize: 16, mr: 0.8, color: "text.secondary" }} />
-                ),
-              }}
-              sx={{
-                width: 260,
-                "& .MuiOutlinedInput-root": {
-                  height: 32,
-                  borderRadius: 2,
-                  fontSize: "12px",
-                  bgcolor: isDark ? "#1e293b" : "#f8fafc",
-                  "& fieldset": { borderColor: isDark ? "#334155" : "#e2e8f0" },
-                  "&:hover fieldset": { borderColor: isDark ? "#475569" : "#cbd5e1" },
-                  "&.Mui-focused fieldset": { borderColor: "#3b82f6" },
-                },
-                "& .MuiOutlinedInput-input": { py: 0, px: 0, fontSize: "12px" },
-                "& input::placeholder": { fontSize: "12px", opacity: 1 },
-              }}
-            />
-          </Stack>
-        </Box>
-        <TableContainer>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                {FLEET_TABLE_COLUMNS.map((col) => (
-                  <TableCell
-                    key={col.id}
-                    onClick={() => col.sortable && handleTableSort(col.id)}
-                    sx={{
-                      bgcolor: isDark ? "#1e293b" : "#f8fafc",
-                      color: isDark ? "#94a3b8" : "#64748b",
-                      fontWeight: 600,
-                      fontSize: "11px",
-                      letterSpacing: ".04em",
-                      borderBottom: `2px solid ${isDark ? "#334155" : "#e2e8f0"}`,
-                      py: 1.25,
-                      px: 1.5,
-                      whiteSpace: "nowrap",
-                      cursor: col.sortable ? "pointer" : "default",
-                      userSelect: "none",
-                      "&:hover": col.sortable
-                        ? { bgcolor: isDark ? "#263044" : "#f1f5f9" }
-                        : {},
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={0.4}>
-                      <span>{col.label}</span>
-                      {col.sortable && (
-                        <Box component="span" sx={{ fontSize: "10px", opacity: orderBy === col.id ? 1 : 0.45, color: orderBy === col.id ? (isDark ? "#60a5fa" : "#3b82f6") : "inherit" }}>
-                          {orderBy === col.id ? (order === "asc" ? "↑" : "↓") : <UnfoldMoreIcon sx={{ fontSize: 12, verticalAlign: "middle" }} />}
-                        </Box>
-                      )}
-                    </Stack>
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sortedTableRows
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((row, rowIdx) => {
-                  const liveHealth = getLiveHealth(row);
-                  const hs = getHealthStatus(liveHealth);
-                  const statusColorMap: Record<string, string> = {
-                    active: "#22c55e",
-                    parked: "#3b82f6",
-                    in_service: "#f59e0b",
-                    critical: "#ef4444",
-                    warning: "#eab308",
-                  };
-                  const statusColor = statusColorMap[row.status] || "#6b7280";
-                  const driverScore = row.driver_score ?? 0;
-                  const scoreColor = driverScore >= 80 ? "#22c55e" : driverScore >= 60 ? "#f59e0b" : "#ef4444";
-                  const avatarBg = getAvatarColor(row.driver ?? "");
-                  const initials = getDriverInitials(row.driver ?? "");
-                  const rowBg = isDark
-                    ? rowIdx % 2 === 0 ? "#0f172a" : "#111827"
-                    : rowIdx % 2 === 0 ? "#ffffff" : "#f8fafc";
-
-                  let HealthIcon: React.ElementType = HealthAndSafetyOutlinedIcon;
-                  if (hs.label === "Good") HealthIcon = ThumbUpOutlinedIcon;
-                  else if (hs.label === "Average") HealthIcon = WarningAmberOutlinedIcon;
-                  else if (hs.label === "Poor") HealthIcon = ErrorOutlineOutlinedIcon;
-
-                  const getRoadTypeIcon = (rt: string) => {
-                    const n = (rt ?? "").toLowerCase();
-                    if (n.includes("highway") || n.includes("motorway")) return <SpeedOutlinedIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />;
-                    if (n.includes("urban") || n.includes("city")) return <RouteIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />;
-                    return <RouteIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />;
-                  };
-
-                  return (
-                    <TableRow
-                      hover
-                      key={row.vehicle_id}
+                    <TextField
+                      size="small"
+                      placeholder="Search vehicle / driver / route…"
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(0);
+                      }}
+                      InputProps={{
+                        startAdornment: (
+                          <SearchOutlinedIcon
+                            sx={{
+                              fontSize: 16,
+                              mr: 0.8,
+                              color: "text.secondary",
+                            }}
+                          />
+                        ),
+                      }}
                       sx={{
-                        bgcolor: rowBg,
-                        borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
-                        "&:hover": {
-                          bgcolor: `${alpha("#3b82f6", isDark ? 0.1 : 0.05)} !important`,
+                        width: 260,
+                        "& .MuiOutlinedInput-root": {
+                          height: 32,
+                          borderRadius: 2,
+                          fontSize: "12px",
+                          bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                          "& fieldset": {
+                            borderColor: isDark ? "#334155" : "#e2e8f0",
+                          },
+                          "&:hover fieldset": {
+                            borderColor: isDark ? "#475569" : "#cbd5e1",
+                          },
+                          "&.Mui-focused fieldset": { borderColor: "#3b82f6" },
                         },
-                        transition: "background-color 0.15s",
+                        "& .MuiOutlinedInput-input": {
+                          py: 0,
+                          px: 0,
+                          fontSize: "12px",
+                        },
+                        "& input::placeholder": {
+                          fontSize: "12px",
+                          opacity: 1,
+                        },
                       }}
-                    >
-                      {/* Vehicle Name */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 120, whiteSpace: "nowrap" }}>
-                        <Box>
-                          <Typography sx={{ fontSize: "12px", fontWeight: 700, color: isDark ? "#22d3ee" : "#0891b2", lineHeight: 1.25 }}>
-                            {(row.name ?? row.vehicle_id).toUpperCase()}
-                          </Typography>
-                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.3 }}>
-                            <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: statusColor, flexShrink: 0 }} />
-                            <Typography sx={{ fontSize: "9px", color: "text.secondary" }}>
-                              {formatStatusLabel(row.status)}
-                            </Typography>
-                          </Stack>
-                        </Box>
-                      </TableCell>
+                    />
+                  </Stack>
+                </Box>
+                <TableContainer sx={{ minHeight: "643px" }}>
+                  <Table stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        {FLEET_TABLE_COLUMNS.map((col) => (
+                          <TableCell
+                            key={col.id}
+                            onClick={() =>
+                              col.sortable && handleTableSort(col.id)
+                            }
+                            sx={{
+                              bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                              color: isDark ? "#94a3b8" : "#64748b",
+                              fontWeight: 600,
+                              fontSize: "10px",
+                              letterSpacing: ".04em",
+                              borderBottom: `2px solid ${
+                                isDark ? "#334155" : "#e2e8f0"
+                              }`,
+                              py: 0.25,
+                              px: 1.5,
+                              whiteSpace: "nowrap",
+                              cursor: col.sortable ? "pointer" : "default",
+                              userSelect: "none",
+                              "&:hover": col.sortable
+                                ? { bgcolor: isDark ? "#263044" : "#f1f5f9" }
+                                : {},
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={0.4}
+                            >
+                              <span>{col.label}</span>
+                              {col.sortable && (
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    fontSize: "10px",
+                                    opacity: orderBy === col.id ? 1 : 0.45,
+                                    color:
+                                      orderBy === col.id
+                                        ? isDark
+                                          ? "#60a5fa"
+                                          : "#3b82f6"
+                                        : "inherit",
+                                  }}
+                                >
+                                  {orderBy === col.id ? (
+                                    order === "asc" ? (
+                                      "↑"
+                                    ) : (
+                                      "↓"
+                                    )
+                                  ) : (
+                                    <UnfoldMoreIcon
+                                      sx={{
+                                        fontSize: 12,
+                                        verticalAlign: "middle",
+                                      }}
+                                    />
+                                  )}
+                                </Box>
+                              )}
+                            </Stack>
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {sortedTableRows
+                        .slice(
+                          page * rowsPerPage,
+                          page * rowsPerPage + rowsPerPage
+                        )
+                        .map((row, rowIdx) => {
+                          const liveHealth = getLiveHealth(row);
+                          const hs = getHealthStatus(liveHealth);
+                          const statusColorMap: Record<string, string> = {
+                            active: "#22c55e",
+                            parked: "#3b82f6",
+                            in_service: "#f59e0b",
+                            critical: "#ef4444",
+                            warning: "#eab308",
+                          };
+                          const statusColor =
+                            statusColorMap[row.status] || "#6b7280";
+                          const driverScore = row.driver_score ?? 0;
+                          const scoreColor =
+                            driverScore >= 80
+                              ? "#22c55e"
+                              : driverScore >= 60
+                              ? "#f59e0b"
+                              : "#ef4444";
+                          const avatarBg = getAvatarColor(row.driver ?? "");
+                          const initials = getDriverInitials(row.driver ?? "");
+                          const rowBg = isDark
+                            ? rowIdx % 2 === 0
+                              ? "#0f172a"
+                              : "#111827"
+                            : rowIdx % 2 === 0
+                            ? "#ffffff"
+                            : "#f8fafc";
 
-                      {/* Type */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 110, whiteSpace: "nowrap" }}>
-                        <Stack direction="row" spacing={0.75} alignItems="center">
-                          <Box sx={{ width: 28, height: 26, borderRadius: 1.5, display: "grid", placeItems: "center", bgcolor: alpha("#64748b", isDark ? 0.2 : 0.1), border: `1px solid ${alpha("#64748b", 0.2)}`, flexShrink: 0, color: isDark ? "#94a3b8" : "#475569" }}>
-                            {getVehicleTypeIcon(row.type)}
-                          </Box>
-                          <Typography sx={{ fontSize: "11px", fontWeight: 500, textTransform: "capitalize" }} noWrap>
-                            {row.type || "Vehicle"}
-                          </Typography>
-                        </Stack>
-                      </TableCell>
+                          let HealthIcon: React.ElementType =
+                            HealthAndSafetyOutlinedIcon;
+                          if (hs.label === "Good")
+                            HealthIcon = ThumbUpOutlinedIcon;
+                          else if (hs.label === "Average")
+                            HealthIcon = WarningAmberOutlinedIcon;
+                          else if (hs.label === "Poor")
+                            HealthIcon = ErrorOutlineOutlinedIcon;
 
-                      {/* Status */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 100, whiteSpace: "nowrap" }}>
-                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, px: 1, py: 0.4, borderRadius: 5, bgcolor: alpha(statusColor, isDark ? 0.18 : 0.1), border: `1px solid ${alpha(statusColor, 0.25)}` }}>
-                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: statusColor, flexShrink: 0 }} />
-                          <Typography sx={{ fontSize: "10px", fontWeight: 700, color: statusColor }}>
-                            {formatStatusLabel(row.status)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
+                          const getRoadTypeIcon = (rt: string) => {
+                            const n = (rt ?? "").toLowerCase();
+                            if (n.includes("highway") || n.includes("motorway"))
+                              return (
+                                <SpeedOutlinedIcon
+                                  sx={{
+                                    fontSize: 13,
+                                    color: "text.secondary",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              );
+                            if (n.includes("urban") || n.includes("city"))
+                              return (
+                                <RouteIcon
+                                  sx={{
+                                    fontSize: 13,
+                                    color: "text.secondary",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              );
+                            return (
+                              <RouteIcon
+                                sx={{
+                                  fontSize: 13,
+                                  color: "text.secondary",
+                                  flexShrink: 0,
+                                }}
+                              />
+                            );
+                          };
 
-                      {/* Speed */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 72, whiteSpace: "nowrap" }}>
-                        <SpeedGauge speed={Math.round(row.speed ?? 0)} isDark={isDark} />
-                      </TableCell>
+                          return (
+                            <TableRow
+                              hover
+                              key={row.vehicle_id}
+                              sx={{
+                                bgcolor: rowBg,
+                                borderBottom: `1px solid ${
+                                  isDark ? "#1e293b" : "#e2e8f0"
+                                }`,
+                                "&:hover": {
+                                  bgcolor: `${alpha(
+                                    "#3b82f6",
+                                    isDark ? 0.1 : 0.05
+                                  )} !important`,
+                                },
+                                transition: "background-color 0.15s",
+                              }}
+                            >
+                              {/* Vehicle Name */}
+                              <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  minWidth: 85,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Box>
+                                  <Typography
+                                    onClick={() => {
+                                      if (
+                                        row.status?.toLowerCase() === "active"
+                                      ) {
+                                        navigate(`/automotive?vehicle=${encodeURIComponent(row.vehicle_id)}`);
+                                      }
+                                    }}
+                                    sx={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color:
+                                        row.status?.toLowerCase() === "active"
+                                          ? isDark
+                                            ? "#22d3ee"
+                                            : "#0891b2"
+                                          : "text.disabled",
+                                      lineHeight: 1.25,
+                                      cursor:
+                                        row.status?.toLowerCase() === "active"
+                                          ? "pointer"
+                                          : "default",
+                                      textDecoration:
+                                        row.status?.toLowerCase() === "active"
+                                          ? "underline"
+                                          : "none",
+                                      "&:hover": {
+                                        color:
+                                          row.status?.toLowerCase() === "active"
+                                            ? "#1976d2"
+                                            : "text.disabled",
+                                      },
+                                    }}
+                                  >
+                                    {(row.name ?? row.vehicle_id)
+                                      .toLowerCase()
+                                      .replace(/\b\w/g, (char) =>
+                                        char.toUpperCase()
+                                      )}
+                                  </Typography>
 
-                      {/* Health Status */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 120, whiteSpace: "nowrap" }}>
-                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, px: 1, py: 0.4, borderRadius: 2, bgcolor: alpha(hs.color, isDark ? 0.15 : 0.1), border: `1px solid ${alpha(hs.color, 0.25)}` }}>
-                          <HealthIcon sx={{ fontSize: 12, color: hs.color, flexShrink: 0 }} />
-                          <Typography sx={{ fontSize: "10px", fontWeight: 700, color: hs.color }}>{hs.label}</Typography>
-                        </Box>
-                      </TableCell>
+                                  <Stack
+                                    direction="row"
+                                    spacing={0.5}
+                                    alignItems="center"
+                                    sx={{ mt: 0.3 }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: "50%",
+                                        bgcolor: statusColor,
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <Typography
+                                      sx={{
+                                        fontSize: "9px",
+                                        color: "text.secondary",
+                                      }}
+                                    >
+                                      {row.status === "in_service"
+                                        ? "In Workshop"
+                                        : formatStatusLabel(row.status)}
+                                    </Typography>
+                                  </Stack>
+                                </Box>
+                              </TableCell>
 
-                      {/* Health Score */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 70, whiteSpace: "nowrap" }}>
-                        <HealthRing score={Math.round(liveHealth)} isDark={isDark} />
-                      </TableCell>
+                              {/* Type */}
+                              <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  minWidth: 75,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Stack
+                                  direction="row"
+                                  spacing={0.75}
+                                  alignItems="center"
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: 2.5,
+                                      display: "grid",
+                                      placeItems: "center",
+                                      bgcolor: alpha(
+                                        "#64748b",
+                                        isDark ? 0.2 : 0.1
+                                      ),
+                                      border: `1px solid ${alpha(
+                                        "#64748b",
+                                        0.2
+                                      )}`,
+                                      flexShrink: 0,
+                                      color: isDark ? "#94a3b8" : "#475569",
+                                    }}
+                                  >
+                                    {getVehicleTypeIcon(row.type)}
+                                  </Box>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px",
+                                      fontWeight: 500,
+                                      textTransform: "capitalize",
+                                    }}
+                                    noWrap
+                                  >
+                                    {row.type || "Vehicle"}
+                                  </Typography>
+                                </Stack>
+                              </TableCell>
 
-                      {/* Driver */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 140, whiteSpace: "nowrap" }}>
+                              {/* Status */}
+                              {/* <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  minWidth: 90,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 0.6,
+                                    px: 0.7,
+                                    py: 0.4,
+                                    borderRadius: 5,
+                                    bgcolor: alpha(
+                                      statusColor,
+                                      isDark ? 0.18 : 0.1
+                                    ),
+                                    border: `1px solid ${alpha(
+                                      statusColor,
+                                      0.25
+                                    )}`,
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      bgcolor: statusColor,
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: "9px",
+                                      fontWeight: 700,
+                                      color: statusColor,
+                                    }}
+                                  >
+                                    {row.status === "in_service"
+                                      ? "In Workshop"
+                                      : formatStatusLabel(row.status)}
+                                  </Typography>
+                                </Box>
+                              </TableCell> */}
+
+                              {/* Speed */}
+                              {/* <TableCell
+                        sx={{
+                          py: 1,
+                          px: 1.5,
+                          height: 58,
+                          minWidth: 72,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <SpeedGauge
+                          speed={Math.round(row.speed ?? 0)}
+                          isDark={isDark}
+                        />
+                      </TableCell> */}
+
+                              {/* Health Status */}
+                              <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  minWidth: 82,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 0.6,
+                                    px: 0.8,
+                                    py: 0.4,
+                                    borderRadius: 2,
+                                    bgcolor: alpha(
+                                      hs.color,
+                                      isDark ? 0.15 : 0.1
+                                    ),
+                                    border: `1px solid ${alpha(
+                                      hs.color,
+                                      0.25
+                                    )}`,
+                                  }}
+                                >
+                                  <HealthIcon
+                                    sx={{
+                                      fontSize: 12,
+                                      color: hs.color,
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px",
+                                      fontWeight: 700,
+                                      color: hs.color,
+                                    }}
+                                  >
+                                    {hs.label}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+
+                              {/* Health Score */}
+                              <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  minWidth: 70,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <HealthRing
+                                  score={Math.round(liveHealth)}
+                                  isDark={isDark}
+                                />
+                              </TableCell>
+
+                              {/* Driver */}
+                              {/* <TableCell
+                        sx={{
+                          py: 1,
+                          px: 1.5,
+                          height: 58,
+                          minWidth: 140,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: avatarBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#fff", lineHeight: 1 }}>{initials}</Typography>
+                          <Box
+                            sx={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: "50%",
+                              bgcolor: avatarBg,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Typography
+                              sx={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                color: "#fff",
+                                lineHeight: 1,
+                              }}
+                            >
+                              {initials}
+                            </Typography>
                           </Box>
-                          <Typography sx={{ fontSize: "11px", fontWeight: 500, color: isDark ? "#e2e8f0" : "#1e293b" }} noWrap>
+                          <Typography
+                            sx={{
+                              fontSize: "10px",
+                              fontWeight: 500,
+                              color: isDark ? "#e2e8f0" : "#1e293b",
+                            }}
+                            noWrap
+                          >
                             {row.driver || "Unassigned"}
                           </Typography>
                         </Stack>
-                      </TableCell>
+                      </TableCell> */}
 
-                      {/* Driver Score */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 120, whiteSpace: "nowrap" }}>
-                        <Box sx={{ width: 90 }}>
-                          <Box sx={{ width: "100%", height: "5px", borderRadius: "999px", overflow: "hidden", bgcolor: isDark ? "#1e293b" : "#e2e8f0" }}>
-                            <Box sx={{ width: `${driverScore}%`, height: "100%", borderRadius: "999px", bgcolor: scoreColor }} />
-                          </Box>
-                          <Typography sx={{ fontSize: "10px", fontWeight: 700, color: scoreColor, mt: 0.4 }}>
-                            {driverScore}
-                          </Typography>
-                        </Box>
-                      </TableCell>
+                              {/* Driver Score */}
+                              <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  minWidth: 90,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Box sx={{ width: 70 }}>
+                                  <Box
+                                    sx={{
+                                      width: "100%",
+                                      height: "5px",
+                                      borderRadius: "999px",
+                                      overflow: "hidden",
+                                      bgcolor: isDark ? "#1e293b" : "#e2e8f0",
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: `${driverScore}%`,
+                                        height: "100%",
+                                        borderRadius: "999px",
+                                        bgcolor: scoreColor,
+                                      }}
+                                    />
+                                  </Box>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px",
+                                      fontWeight: 700,
+                                      color: scoreColor,
+                                      mt: 0.4,
+                                    }}
+                                  >
+                                    {driverScore}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
 
-                      {/* Road Type */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, minWidth: 120, whiteSpace: "nowrap" }}>
-                        <Stack direction="row" spacing={0.5} alignItems="center">
-                          {getRoadTypeIcon(row.road_type ?? "")}
-                          <Typography sx={{ fontSize: "10px", color: isDark ? "#cbd5e1" : "#475569" }} noWrap>
-                            {(row.road_type ?? "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "—"}
-                          </Typography>
-                        </Stack>
-                      </TableCell>
+                              {/* Road Type */}
+                              {/* <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  minWidth: 80,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Stack
+                                  direction="row"
+                                  spacing={0.5}
+                                  alignItems="center"
+                                >
+                                  {getRoadTypeIcon(row.road_type ?? "")}
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px",
+                                      color: isDark ? "#cbd5e1" : "#475569",
+                                    }}
+                                    noWrap
+                                  >
+                                    {(row.road_type ?? "")
+                                      .replace(/_/g, " ")
+                                      .replace(/\b\w/g, (c) =>
+                                        c.toUpperCase()
+                                      ) || "—"}
+                                  </Typography>
+                                </Stack>
+                              </TableCell> */}
 
-                      {/* Route */}
-                      <TableCell sx={{ py: 1, px: 1.5, height: 58, whiteSpace: "nowrap", maxWidth: 220 }}>
-                        <Stack direction="row" spacing={0.5} alignItems="center">
-                          <LocationOnIcon sx={{ fontSize: 13, color: "#3b82f6", flexShrink: 0 }} />
-                          <Typography sx={{ fontSize: "10px", color: isDark ? "#cbd5e1" : "#475569" }} noWrap title={row.route_name ?? ""}>
-                            {row.route_name || "—"}
-                          </Typography>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                              {/* Route */}
+                              <TableCell
+                                sx={{
+                                  py: 1,
+                                  px: 1.5,
+                                  height: 58,
+                                  maxWidth: 220,
+                                }}
+                              >
+                                <Stack spacing={0.8}>
+                                  {/* Route */}
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 0.8,
+                                    }}
+                                  >
+                                    <LocationOnIcon
+                                      sx={{
+                                        fontSize: 18,
+                                        color: "#3b82f6",
+                                        flexShrink: 0,
+                                      }}
+                                    />
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto 1fr",
-            alignItems: "center",
-            px: 2,
-            py: 1.25,
-            borderTop: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
-            bgcolor: isDark ? "#0f172a" : "#ffffff",
-          }}
-        >
-          <Typography sx={{ fontSize: "12px", color: "text.secondary", fontWeight: 500 }}>
-            Showing{" "}
-            <Box component="span" sx={{ fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
-              {Math.min(rowsPerPage, Math.max(0, sortedTableRows.length - page * rowsPerPage))}
-            </Box>
-            {" of "}
-            <Box component="span" sx={{ fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
-              {sortedTableRows.length}
-            </Box>
-            {" active vehicles"}
-          </Typography>
+                                    <Typography
+                                      sx={{
+                                        fontSize: "10px",
+                                        fontWeight: 600,
+                                        color: "text.secondary",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      Route:
+                                    </Typography>
 
-          <Pagination
-            count={Math.ceil(sortedTableRows.length / rowsPerPage)}
-            page={page + 1}
-            onChange={(_, value) => handleChangePage(null, value - 1)}
-            shape="rounded"
-            siblingCount={1}
-            boundaryCount={1}
-            sx={{
-              "& .MuiPaginationItem-root": {
-                fontSize: "12px",
-                color: isDark ? "#94a3b8" : "#64748b",
-                backgroundColor: isDark ? "#1e293b" : "transparent",
-                border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
-                "&:hover": {
-                  backgroundColor: isDark ? "#334155" : undefined,
-                  color: isDark ? "#e2e8f0" : undefined,
-                },
-                "&.Mui-selected": {
-                  backgroundColor: "#3b82f6",
-                  color: "#fff",
-                  borderColor: "#3b82f6",
-                  "&:hover": { backgroundColor: "#2563eb" },
-                },
-                "&.MuiPaginationItem-ellipsis": {
-                  backgroundColor: "transparent",
-                  border: "none",
-                },
-              },
-            }}
-          />
+                                    <Typography
+                                      sx={{
+                                        fontSize: "10px",
+                                        color: isDark ? "#cbd5e1" : "#475569",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        flex: 1,
+                                      }}
+                                      title={row.route_name ?? ""}
+                                    >
+                                      {row.route_name || "—"}
+                                    </Typography>
+                                  </Box>
 
-          <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
-            <Typography sx={{ fontSize: "11px", color: "text.secondary", whiteSpace: "nowrap" }}>
-              Rows per page
-            </Typography>
-            <Select
-              size="small"
-              value={rowsPerPage}
-              onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
-              sx={{
-                fontSize: "11px",
-                height: 28,
-                "& .MuiOutlinedInput-notchedOutline": { borderColor: isDark ? "#334155" : "#e2e8f0" },
-                "& .MuiSelect-select": { py: 0, px: 1, fontSize: "11px" },
-                bgcolor: isDark ? "#1e293b" : "#f8fafc",
-                color: isDark ? "#e2e8f0" : "#1e293b",
-              }}
-            >
-              <MenuItem value={5}>5</MenuItem>
-              <MenuItem value={10}>10</MenuItem>
-              <MenuItem value={25}>25</MenuItem>
-              <MenuItem value={50}>50</MenuItem>
-            </Select>
-          </Stack>
+                                  {/* Road Type */}
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1,
+                                      px: 0.5,
+                                    }}
+                                  >
+                                    {getRoadTypeIcon(row.road_type ?? "")}
+
+                                    <Typography
+                                      sx={{
+                                        fontSize: "10px",
+                                        fontWeight: 600,
+                                        color: "text.secondary",
+                                        whiteSpace: "nowrap",
+                                        // ml: "2px",
+                                      }}
+                                    >
+                                      Road Type:
+                                    </Typography>
+
+                                    <Typography
+                                      sx={{
+                                        fontSize: "10px",
+                                        color: isDark ? "#cbd5e1" : "#475569",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        flex: 1,
+                                      }}
+                                    >
+                                      {(row.road_type ?? "")
+                                        .replace(/_/g, " ")
+                                        .replace(/\b\w/g, (c) =>
+                                          c.toUpperCase()
+                                        ) || "—"}
+                                    </Typography>
+                                  </Box>
+                                </Stack>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto 1fr",
+                    alignItems: "center",
+                    px: 2,
+                    py: 1.25,
+                    borderTop: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
+                    bgcolor: isDark ? "#0f172a" : "#ffffff",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: "12px",
+                      color: "text.secondary",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Showing{" "}
+                    <Box
+                      component="span"
+                      sx={{
+                        fontWeight: 700,
+                        color: isDark ? "#e2e8f0" : "#1e293b",
+                      }}
+                    >
+                      {Math.min(
+                        rowsPerPage,
+                        Math.max(0, sortedTableRows.length - page * rowsPerPage)
+                      )}
+                    </Box>
+                    {" of "}
+                    <Box
+                      component="span"
+                      sx={{
+                        fontWeight: 700,
+                        color: isDark ? "#e2e8f0" : "#1e293b",
+                      }}
+                    >
+                      {sortedTableRows.length}
+                    </Box>
+                    {" active vehicles"}
+                  </Typography>
+
+                  <Pagination
+                    count={Math.ceil(sortedTableRows.length / rowsPerPage)}
+                    page={page + 1}
+                    onChange={(_, value) => handleChangePage(null, value - 1)}
+                    shape="rounded"
+                    siblingCount={1}
+                    boundaryCount={1}
+                    sx={{
+                      "& .MuiPaginationItem-root": {
+                        fontSize: "12px",
+                        color: isDark ? "#94a3b8" : "#64748b",
+                        backgroundColor: isDark ? "#1e293b" : "transparent",
+                        border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+                        "&:hover": {
+                          backgroundColor: isDark ? "#334155" : undefined,
+                          color: isDark ? "#e2e8f0" : undefined,
+                        },
+                        "&.Mui-selected": {
+                          backgroundColor: "#3b82f6",
+                          color: "#fff",
+                          borderColor: "#3b82f6",
+                          "&:hover": { backgroundColor: "#2563eb" },
+                        },
+                        "&.MuiPaginationItem-ellipsis": {
+                          backgroundColor: "transparent",
+                          border: "none",
+                        },
+                      },
+                    }}
+                  />
+
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    justifyContent="flex-end"
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: "10px",
+                        color: "text.secondary",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Rows per page
+                    </Typography>
+                    <Select
+                      size="small"
+                      value={rowsPerPage}
+                      onChange={(e) => {
+                        setRowsPerPage(Number(e.target.value));
+                        setPage(0);
+                      }}
+                      sx={{
+                        fontSize: "10px",
+                        height: 28,
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: isDark ? "#334155" : "#e2e8f0",
+                        },
+                        "& .MuiSelect-select": {
+                          py: 0,
+                          px: 1,
+                          fontSize: "10px",
+                        },
+                        bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                        color: isDark ? "#e2e8f0" : "#1e293b",
+                      }}
+                    >
+                      <MenuItem value={5}>5</MenuItem>
+                      <MenuItem value={10}>10</MenuItem>
+                      <MenuItem value={25}>25</MenuItem>
+                      <MenuItem value={50}>50</MenuItem>
+                    </Select>
+                  </Stack>
+                </Box>
+              </Paper>
+            </Grid>
+          </Grid>
         </Box>
-      </Paper>
+      </Box>
 
       {/* <FleetTable vehicles={vehicles} /> */}
     </Box>
