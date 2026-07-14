@@ -1,7 +1,5 @@
 import asyncio
-import aiohttp
 import json
-import re
 import logging
 import uuid
 from collections import defaultdict, deque
@@ -19,8 +17,6 @@ except ImportError:
     from ingest.app.config_loader import IngestConfig
 
 # --- Configuration ---
-INGEST_METRICS_URL = "http://127.0.0.1:8000/metrics"
-
 PORTS_TO_CHECK = {
     "Zookeeper": 2181,
     "Kafka": 9092,
@@ -28,8 +24,7 @@ PORTS_TO_CHECK = {
     "Replay": 9001,
 }
 
-VALIDATION_REGEX = re.compile(r'ingest_rows_validation_detail(?:_total)?\{.*vehicle_id="([^"]+)".*status="([^"]+)".*\}\s+(\d+\.?\d*)')
-DLQ_GAUGE_REGEX = re.compile(r'dlq_size_files\s+(\d+\.?\d*)')
+DLQ_PATH = Path("ingest/dlq")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("ObserverEngine")
@@ -58,7 +53,7 @@ class HybridObserver:
         logger.info("Starting Industrial Observer Engine (Module Inspector Enabled)...")
         await asyncio.gather(
             self._monitor_ports(),
-            self._poll_http_metrics(),
+            self._poll_dlq_size(),
             self._consume_kafka_stream()
         )
 
@@ -88,42 +83,16 @@ class HybridObserver:
             await asyncio.sleep(2)
 
     # ---------------------------------------------------------
-    # Task B: HTTP Metrics Poller
+    # Task B: DLQ File Counter
     # ---------------------------------------------------------
-    async def _poll_http_metrics(self):
-        async with aiohttp.ClientSession() as session:
-            while self.running:
-                if self.port_health.get("Ingest", False):
-                    try:
-                        async with session.get(INGEST_METRICS_URL, timeout=1) as resp:
-                            if resp.status == 200:
-                                text = await resp.text()
-                                self._parse_metrics(text)
-                    except Exception:
-                        pass
-                await asyncio.sleep(2)
-
-    def _parse_metrics(self, text: str):
-        lines = text.splitlines()
-        temp_dlq = 0
-        for line in lines:
-            if line.startswith("#"): continue
-            
-            v_match = VALIDATION_REGEX.search(line)
-            if v_match:
-                v_id, status, val = v_match.groups()
-                count = int(float(val))
-                if status == "rejected":
-                    if v_id in self.vehicle_data:
-                        self.vehicle_data[v_id]["rejected"] = count
-                continue
-
-            d_match = DLQ_GAUGE_REGEX.search(line)
-            if d_match:
-                temp_dlq = int(float(d_match.group(1)))
-        
-        if self.running:
-             self.global_dlq_size = temp_dlq
+    async def _poll_dlq_size(self):
+        while self.running:
+            try:
+                count = len(list(DLQ_PATH.glob("*.jsonl"))) if DLQ_PATH.exists() else 0
+                self.global_dlq_size = count
+            except Exception:
+                pass
+            await asyncio.sleep(5)
 
     # ---------------------------------------------------------
     # Task C: Kafka Listener
@@ -139,7 +108,7 @@ class HybridObserver:
                 *topics,
                 bootstrap_servers=bootstrap,
                 group_id=unique_group_id,
-                auto_offset_reset="latest",
+                auto_offset_reset="earliest",
             )
             try:
                 await consumer.start()
