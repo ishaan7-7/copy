@@ -43,7 +43,7 @@ import { ModuleRegistry, ClientSideRowModelModule } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-balham.css";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RcTooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
@@ -529,45 +529,318 @@ function ModuleJsonViewer({ isDark }: { isDark: boolean }) {
 
 // ── INSPECTOR CONTENTS ──────────────────────────────────────────────────────
 
+function highlightJson(json: string, isDark: boolean): string {
+  const safe = json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return safe.replace(
+    /("(?:\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+    (m) => {
+      if (/^"/.test(m)) {
+        if (/:$/.test(m)) return `<span style="color:${isDark ? "#f59e0b" : "#b45309"}">${m}</span>`;
+        return `<span style="color:${isDark ? "#4ade80" : "#15803d"}">${m}</span>`;
+      }
+      if (/true|false/.test(m)) return `<span style="color:${isDark ? "#a78bfa" : "#7c3aed"}">${m}</span>`;
+      if (/null/.test(m)) return `<span style="color:#ef4444">${m}</span>`;
+      return `<span style="color:${isDark ? "#38bdf8" : "#0369a1"}">${m}</span>`;
+    }
+  );
+}
+
 function VehiclesInspector({ isDark, observerData }: { isDark: boolean; observerData: any }) {
   const vehicles: any[] = observerData?.vehicles ?? [];
   const gs = observerData?.global_stats ?? {};
   const sh = observerData?.system_health ?? {};
 
+  const sortedVehicles = useMemo(
+    () => [...vehicles].sort((a: any, b: any) => (a.last_seen_sec ?? 999) - (b.last_seen_sec ?? 999)),
+    [vehicles]
+  );
+  const simIds = useMemo(() => vehicles.map((v: any) => v.vehicle_id), [vehicles]);
+
+  const [selectedSim, setSelectedSim] = useState<string>("");
+  const [selectedModule, setSelectedModule] = useState<string>("");
+
+  useEffect(() => {
+    const best = sortedVehicles[0]?.vehicle_id ?? "";
+    if (best && !simIds.includes(selectedSim)) setSelectedSim(best);
+  }, [sortedVehicles]);
+
+  const modulePayloads: Record<string, any> = useMemo(() => {
+    const v = vehicles.find((v: any) => v.vehicle_id === selectedSim);
+    return v?.module_payloads ?? {};
+  }, [vehicles, selectedSim]);
+
+  const availableModules = useMemo(() => Object.keys(modulePayloads), [modulePayloads]);
+
+  useEffect(() => {
+    if (availableModules.length > 0 && !availableModules.includes(selectedModule)) {
+      setSelectedModule(availableModules[0]);
+    }
+  }, [availableModules]);
+
+  const displayPayload = useMemo(() => {
+    if (selectedModule && modulePayloads[selectedModule]) return modulePayloads[selectedModule];
+    return sortedVehicles[0]?.latest_payload ?? null;
+  }, [modulePayloads, selectedModule, sortedVehicles]);
+
+  const jsonHtml = useMemo(
+    () => (displayPayload ? highlightJson(JSON.stringify(displayPayload, null, 2), isDark) : null),
+    [displayPayload, isDark]
+  );
+
   const colDefs = useMemo<ColDef[]>(() => [
-    { field: "vehicle_id", headerName: "VEHICLE ID", flex: 1, minWidth: 120,
-      cellStyle: { fontWeight: "bold" } as any },
-    { field: "rows_processed", headerName: "PROCESSED", flex: 1, minWidth: 110,
-      valueFormatter: (p) => p.value?.toLocaleString() },
-    { field: "rejected_rows", headerName: "REJECTED", flex: 1, minWidth: 100,
+    { field: "vehicle_id", headerName: "VEHICLE", flex: 1, minWidth: 80,
+      cellStyle: { fontWeight: "bold", fontSize: "10px" } as any },
+    { field: "rows_processed", headerName: "ROWS", width: 62,
+      valueFormatter: (p) => p.value != null ? (p.value >= 1000 ? `${(p.value / 1000).toFixed(1)}k` : p.value) : "—" },
+    { field: "rejected_rows", headerName: "REJ", width: 50,
       cellStyle: (p: any) => ({ color: p.value > 0 ? "#ef4444" : undefined }) as any },
-    { field: "validation_rate", headerName: "QUALITY %", flex: 1, minWidth: 100,
-      valueFormatter: (p) => p.value != null ? `${p.value.toFixed(1)}%` : "—",
+    { field: "validation_rate", headerName: "QUAL%", width: 62,
+      valueFormatter: (p) => p.value != null ? `${p.value.toFixed(0)}%` : "—",
       cellStyle: (p: any) => ({
         color: p.value > 95 ? "#22c55e" : p.value > 80 ? "#eab308" : "#ef4444",
         fontWeight: "bold",
       }) as any },
-    { field: "avg_latency", headerName: "AVG LAT (ms)", flex: 1, minWidth: 110,
-      valueFormatter: (p) => p.value?.toFixed(1) },
-    { field: "last_seen_sec", headerName: "LAST SEEN", flex: 1, minWidth: 100,
-      valueFormatter: (p) => p.value != null ? `${p.value.toFixed(1)}s ago` : "—" },
+    { field: "avg_latency", headerName: "LAT", width: 52,
+      valueFormatter: (p) => p.value != null ? `${p.value.toFixed(0)}` : "—" },
+    { field: "last_seen_sec", headerName: "AGO", width: 50,
+      valueFormatter: (p) => p.value != null ? `${Math.round(p.value)}s` : "—" },
   ], []);
 
+  const bd = isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08);
+
+  const chartData = useMemo(
+    () => vehicles.map((v: any) => ({
+      ...v,
+      label: v.vehicle_id?.replace(/^(SIM|V|VEH)[_-]?/i, "").slice(0, 8) ?? v.vehicle_id,
+    })),
+    [vehicles]
+  );
+
+  const axisClr = isDark ? "#475569" : "#94a3b8";
+  const gridClr = isDark ? alpha("#ffffff", 0.04) : alpha("#000000", 0.05);
+  const tipBg   = isDark ? "#0f172a" : "#ffffff";
+  const tipBdr  = isDark ? "#1e293b" : "#e2e8f0";
+  const tipTxt  = isDark ? "#94a3b8" : "#475569";
+  const tipSx   = { background: tipBg, border: `1px solid ${tipBdr}`, borderRadius: 4, fontSize: 10, color: tipTxt, padding: "4px 8px" };
+
+  const chartEmpty = (
+    <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Typography sx={{ fontSize: "9px", color: isDark ? "#334155" : "#cbd5e1" }}>awaiting data</Typography>
+    </Box>
+  );
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <InspectorToolbar isDark={isDark}>
-        {rowChip(`${gs.active_vehicles ?? 0} active`, "#22c55e", isDark)}
-        {rowChip(`${(gs.total_rows ?? 0).toLocaleString()} rows total`, "#38bdf8", isDark)}
-        {rowChip(`${gs.dlq_backlog ?? 0} DLQ events`, gs.dlq_backlog > 0 ? "#ef4444" : "#64748b", isDark)}
-        {Object.entries(sh).map(([mod, status]: [string, any]) => {
-          const up = status === true || status === "UP";
-          return rowChip(`${mod} ${up ? "UP" : "DOWN"}`, up ? "#22c55e" : "#ef4444", isDark);
-        })}
-      </InspectorToolbar>
-      <Box sx={{ flex: "0 0 180px", minHeight: 0 }}>
-        <InspectorGrid isDark={isDark} rowData={vehicles} colDefs={colDefs} />
+    <Box sx={{ display: "flex", height: "100%", minHeight: 0 }}>
+
+      {/* ── LEFT: stats + health + grid (top) + two charts (bottom) ── */}
+      <Box sx={{ flex: "0 0 58%", display: "flex", flexDirection: "column", borderRight: `1px solid ${bd}`, minWidth: 0 }}>
+
+        {/* Stat tiles */}
+        <Box sx={{
+          px: 1.25, py: 0.875, flexShrink: 0,
+          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0.75,
+          borderBottom: `1px solid ${bd}`,
+          bgcolor: isDark ? alpha("#0d1117", 0.6) : "#f8fafc",
+        }}>
+          {[
+            { label: "ACTIVE", value: gs.active_vehicles ?? 0, color: "#22c55e" },
+            { label: "ROWS", value: (gs.total_rows ?? 0) >= 1000 ? `${((gs.total_rows ?? 0) / 1000).toFixed(1)}k` : (gs.total_rows ?? 0), color: "#38bdf8" },
+            { label: "DLQ", value: gs.dlq_backlog ?? 0, color: (gs.dlq_backlog ?? 0) > 0 ? "#ef4444" : "#22c55e" },
+          ].map((tile) => (
+            <Box key={tile.label} sx={{
+              px: 0.75, py: 0.6, borderRadius: "5px", textAlign: "center",
+              bgcolor: isDark ? alpha(tile.color, 0.08) : alpha(tile.color, 0.06),
+              border: `1px solid ${alpha(tile.color, 0.2)}`,
+            }}>
+              <Typography sx={{ fontSize: "16px", fontWeight: 800, color: tile.color, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
+                {tile.value}
+              </Typography>
+              <Typography sx={{ fontSize: "7px", fontWeight: 700, letterSpacing: "0.8px", color: isDark ? "#64748b" : "#94a3b8", mt: 0.2 }}>
+                {tile.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Service health — single row of 4 cards */}
+        <Box sx={{
+          px: 1.25, py: 0.75, flexShrink: 0,
+          display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0.6,
+          borderBottom: `1px solid ${bd}`,
+          bgcolor: isDark ? alpha("#060f1a", 0.5) : "#f1f5f9",
+        }}>
+          {Object.entries(sh).map(([svc, status]: [string, any]) => {
+            const up = status === true || status === "UP";
+            const c = up ? "#22c55e" : "#ef4444";
+            const label = svc === "Zookeeper" ? "ZK" : svc.toUpperCase();
+            return (
+              <Box key={svc} sx={{
+                px: 0.6, py: 0.5, borderRadius: "5px", textAlign: "center",
+                bgcolor: isDark ? alpha(c, 0.07) : alpha(c, 0.05),
+                border: `1px solid ${alpha(c, 0.22)}`,
+              }}>
+                <Typography sx={{ fontSize: "7px", fontWeight: 700, letterSpacing: "0.5px", color: isDark ? "#64748b" : "#94a3b8" }}>
+                  {label}
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.4, mt: 0.25 }}>
+                  <Box sx={{
+                    width: 5, height: 5, borderRadius: "50%", bgcolor: c, flexShrink: 0,
+                    boxShadow: up ? `0 0 4px ${alpha(c, 0.6)}` : "none",
+                  }} />
+                  <Typography sx={{ fontSize: "10px", fontWeight: 800, color: c, lineHeight: 1 }}>
+                    {up ? "UP" : "DN"}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+
+        {/* Per-vehicle grid — takes remaining upper space */}
+        <Box sx={{ flex: "1 1 0", minHeight: 0 }}>
+          {vehicles.length === 0 ? (
+            <InspectorEmpty accent="#22c55e" isDark={isDark}
+              title="No live vehicle feeds"
+              hint="Vehicles appear here once the observer receives Kafka telemetry" />
+          ) : (
+            <InspectorGrid isDark={isDark} rowData={vehicles} colDefs={colDefs} />
+          )}
+        </Box>
+
+        {/* Two charts side-by-side at the bottom */}
+        <Box sx={{
+          flex: "0 0 40%", minHeight: 0,
+          display: "flex", borderTop: `1px solid ${bd}`,
+          bgcolor: isDark ? alpha("#060e18", 0.35) : "#fafafa",
+        }}>
+          {/* Chart 1: Latency */}
+          <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", px: 1.5, pt: 1, pb: 0.75, borderRight: `1px solid ${bd}` }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.5, flexShrink: 0 }}>
+              <Box sx={{ width: 7, height: 7, borderRadius: "2px", bgcolor: isDark ? "#f59e0b" : "#d97706", flexShrink: 0 }} />
+              <Typography sx={{ fontSize: "7.5px", fontWeight: 700, letterSpacing: "0.9px", color: isDark ? "#64748b" : "#94a3b8" }}>
+                LATENCY BY VEHICLE (ms)
+              </Typography>
+            </Box>
+            {vehicles.length === 0 ? chartEmpty : (
+              <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 2, right: 4, left: -26, bottom: 2 }} barCategoryGap="22%">
+                    <CartesianGrid strokeDasharray="2 4" vertical={false} stroke={gridClr} />
+                    <XAxis dataKey="label" tick={{ fontSize: 7.5, fill: axisClr }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 7.5, fill: axisClr }} axisLine={false} tickLine={false} />
+                    <RcTooltip
+                      cursor={{ fill: isDark ? alpha("#ffffff", 0.04) : alpha("#000000", 0.04) }}
+                      contentStyle={tipSx}
+                      formatter={(v: any) => [`${Number(v).toFixed(1)} ms`, "Avg Latency"]}
+                      labelFormatter={(l: string) => vehicles.find((v: any) => v.label === l)?.vehicle_id ?? l}
+                    />
+                    <Bar dataKey="avg_latency" fill={isDark ? "#f59e0b" : "#d97706"} radius={[2, 2, 0, 0]} maxBarSize={22} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            )}
+          </Box>
+
+          {/* Chart 2: Quality */}
+          <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", px: 1.5, pt: 1, pb: 0.75 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25, flexShrink: 0 }}>
+              <Box sx={{ width: 7, height: 7, borderRadius: "2px", bgcolor: "#22c55e", flexShrink: 0 }} />
+              <Typography sx={{ fontSize: "7.5px", fontWeight: 700, letterSpacing: "0.9px", color: isDark ? "#64748b" : "#94a3b8" }}>
+                DATA QUALITY DISTRIBUTION
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", gap: 1.25, mb: 0.25, flexShrink: 0 }}>
+              {[["#22c55e", "Accepted"], ["#ef4444", "Rejected"]].map(([c, lbl]) => (
+                <Box key={lbl} sx={{ display: "flex", alignItems: "center", gap: 0.35 }}>
+                  <Box sx={{ width: 6, height: 6, bgcolor: c, borderRadius: "1px" }} />
+                  <Typography sx={{ fontSize: "7px", color: isDark ? "#64748b" : "#94a3b8" }}>{lbl}</Typography>
+                </Box>
+              ))}
+            </Box>
+            {vehicles.length === 0 ? chartEmpty : (
+              <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 2, right: 4, left: -26, bottom: 2 }} barCategoryGap="22%">
+                    <CartesianGrid strokeDasharray="2 4" vertical={false} stroke={gridClr} />
+                    <XAxis dataKey="label" tick={{ fontSize: 7.5, fill: axisClr }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 7.5, fill: axisClr }} axisLine={false} tickLine={false} />
+                    <RcTooltip
+                      cursor={{ fill: isDark ? alpha("#ffffff", 0.04) : alpha("#000000", 0.04) }}
+                      contentStyle={tipSx}
+                      labelFormatter={(l: string) => vehicles.find((v: any) => v.label === l)?.vehicle_id ?? l}
+                    />
+                    <Bar dataKey="rows_processed" name="Accepted" stackId="q" fill="#22c55e" radius={[0, 0, 0, 0]} maxBarSize={22} />
+                    <Bar dataKey="rejected_rows" name="Rejected" stackId="q" fill="#ef4444" radius={[2, 2, 0, 0]} maxBarSize={22} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            )}
+          </Box>
+        </Box>
       </Box>
-      <ModuleJsonViewer isDark={isDark} />
+
+      {/* ── RIGHT: JSON viewer (narrower) ── */}
+      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        {/* Toolbar */}
+        <Box sx={{
+          px: 1.5, py: 0.75, flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 1,
+          bgcolor: isDark ? alpha("#0d1117", 0.6) : "#f8fafc",
+          borderBottom: `1px solid ${bd}`,
+        }}>
+          <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.2px", color: isDark ? "#64748b" : "#94a3b8", whiteSpace: "nowrap" }}>
+            PAYLOAD
+          </Typography>
+          <FormControl size="small" sx={{ minWidth: 100, ...iSx(isDark) }}>
+            <InputLabel sx={{ fontSize: "10px" }}>Sim</InputLabel>
+            <Select value={selectedSim} label="Sim"
+              onChange={(e) => setSelectedSim(e.target.value)}
+              MenuProps={menuProps(isDark)} sx={{ height: 26, fontSize: "10px" }}>
+              {simIds.map((id: string) => (
+                <MenuItem key={id} value={id} sx={{ fontSize: "10px" }}>{id}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 100, ...iSx(isDark) }}>
+            <InputLabel sx={{ fontSize: "10px" }}>Module</InputLabel>
+            <Select value={selectedModule} label="Module"
+              onChange={(e) => setSelectedModule(e.target.value)}
+              MenuProps={menuProps(isDark)} sx={{ height: 26, fontSize: "10px" }}>
+              {availableModules.map((m: string) => (
+                <MenuItem key={m} value={m} sx={{ fontSize: "10px" }}>{m.toUpperCase()}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Box sx={{ flex: 1 }} />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#22c55e", animation: "ds-pulse 2s ease-in-out infinite" }} />
+            <Typography sx={{ fontSize: "8px", fontWeight: 600, color: isDark ? "#4ade80" : "#16a34a" }}>LIVE</Typography>
+          </Box>
+        </Box>
+
+        {/* JSON body */}
+        {!jsonHtml ? (
+          <InspectorEmpty accent="#22c55e" isDark={isDark}
+            title="Awaiting telemetry"
+            hint="JSON payloads appear here once the observer receives live Kafka messages" />
+        ) : (
+          <Box
+            component="pre"
+            sx={{
+              flex: 1, m: 0, px: 2, py: 1.5,
+              fontSize: "10px",
+              fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+              lineHeight: 1.7,
+              bgcolor: isDark ? "#060e18" : "#ffffff",
+              color: isDark ? "#8899aa" : "#64748b",
+              overflowY: "auto", overflowX: "auto",
+              minHeight: 0,
+              "& span": { transition: "color 0.15s" },
+            }}
+            dangerouslySetInnerHTML={{ __html: jsonHtml }}
+          />
+        )}
+      </Box>
     </Box>
   );
 }
@@ -2393,6 +2666,15 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
     ? vehicleRows.reduce((s: number, v: any) => s + (v.validation_rate ?? 0), 0) / vehicleRows.length
     : null;
 
+  const writerKafkaTotal: number = writerRows.reduce((s: number, r: any) => s + (r.kafka_total ?? 0), 0);
+  const writerDeltaTotal: number = writerRows.reduce((s: number, r: any) => s + (r.delta_total ?? 0), 0);
+  const writerQualityPct: number | null = writerKafkaTotal > 0
+    ? Math.min(100, (writerDeltaTotal / writerKafkaTotal) * 100)
+    : null;
+  const effectiveRowsIn: number = totalRowsProcessed > 0 ? totalRowsProcessed : writerKafkaTotal;
+  const effectiveQuality: number | null = avgQualityPct ?? writerQualityPct;
+  const effectiveFleetSize: number = vehicleList.length || (observerData?.global_stats?.active_vehicles ?? 0);
+
   const maxWriterLag = writerRows.length > 0
     ? Math.max(0, ...writerRows.map((w: any) => w.true_lag ?? 0))
     : 0;
@@ -2554,10 +2836,10 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
                 }
                 metrics={[
                   { label: "AVG QUALITY",
-                    value: avgQualityPct !== null ? `${avgQualityPct.toFixed(1)}%` : "—",
-                    color: avgQualityPct !== null ? (avgQualityPct > 95 ? "#22c55e" : avgQualityPct > 80 ? "#eab308" : "#ef4444") : undefined },
-                  { label: "ROWS IN", value: totalRowsProcessed > 0 ? fmt(totalRowsProcessed) : "—" },
-                  { label: "FLEET SIZE", value: `${vehicleList.length}` },
+                    value: effectiveQuality !== null ? `${effectiveQuality.toFixed(1)}%` : "—",
+                    color: effectiveQuality !== null ? (effectiveQuality > 95 ? "#22c55e" : effectiveQuality > 80 ? "#eab308" : "#ef4444") : undefined },
+                  { label: "ROWS IN", value: effectiveRowsIn > 0 ? fmt(effectiveRowsIn) : "—" },
+                  { label: "FLEET SIZE", value: `${effectiveFleetSize}` },
                 ]}
                 isDark={isDark} onClick={openDrawer} />
 

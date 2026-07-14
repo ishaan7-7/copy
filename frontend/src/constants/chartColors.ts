@@ -7,7 +7,7 @@ export const MODULE_COLORS: Record<string, string> = {
 };
 
 export const SHAP_COLORS_LIGHT = ['#e53935', '#fb8c00', '#8e24aa', '#1e88e5', '#43a047', '#6d4c41'];
-export const SHAP_COLORS_DARK  = ['#ef5350', '#ffa726', '#ab47bc', '#42a5f5', '#66bb6a', '#a1887f'];
+export const SHAP_COLORS_DARK  = ['#ef4444', '#f59e0b', '#a855f7', '#38bdf8', '#22c55e', '#c08457'];
 
 export const SEVERITY_COLORS = {
   CRITICAL: '#d32f2f',
@@ -22,7 +22,7 @@ export const SEVERITY_BG_LIGHT: Record<string, string> = {
 };
 
 export const SEVERITY_BG_DARK: Record<string, string> = {
-  CRITICAL: 'rgba(211,47,47,0.20)',
-  WARNING:  'rgba(237,108,2,0.20)',
-  NORMAL:   'rgba(46,125,50,0.20)',
+  CRITICAL: 'rgba(239,68,68,0.18)',
+  WARNING:  'rgba(245,158,11,0.18)',
+  NORMAL:   'rgba(34,197,94,0.16)',
 };

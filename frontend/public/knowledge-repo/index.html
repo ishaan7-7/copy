@@ -1812,7 +1812,6 @@
         }
       }
 
-
       /* ════════════════════════════════════════════════════════
          DARK MODE — applied when html.dark class is set
          ════════════════════════════════════════════════════════ */
@@ -1837,36 +1836,114 @@
       }
 
       /* ── GLOBAL TABLE / BADGE / MISC ── */
-      html.dark td { border-bottom-color: #2a3a4a; }
-      html.dark tr:hover td { background: #1e3050 !important; }
-      html.dark a { color: #60a5fa; }
-      html.dark code, html.dark pre { background: #1e293b; border-color: #334155; color: #f87171; }
-      html.dark .badge-high { background: #7f1d1d; color: #fca5a5; }
-      html.dark .badge-med  { background: #713f12; color: #fcd34d; }
-      html.dark .badge-low  { background: #14532d; color: #86efac; }
-      html.dark .badge-diag { background: #3b1f6e; color: #c4b5fd; }
-      html.dark .legend span { background: #1e293b; border-color: #334155; color: #cbd5e1; }
-      html.dark .doc-separator { background: #1e293b; color: #94a3b8; }
-      html.dark .sig-name { color: #60a5fa; }
-      html.dark .unit { color: #8a9bb0; }
-      html.dark .toc { background: #162032; border-color: #2a3a4a; }
-      html.dark .toc a { color: #60a5fa; }
-      html.dark .toc-num { color: #64748b; }
-      html.dark .doc-footer { background: #162032; border-color: #2a3a4a; color: #8a9bb0; }
-      html.dark .ecu-desc { color: #93c5fd; }
-      html.dark .section-header { border-color: #2a3a4a; color: #e2e8f0; }
-      html.dark .section-number { background: #1e3a6e; color: #fff; }
+      html.dark td {
+        border-bottom-color: #2a3a4a;
+      }
+      html.dark tr:hover td {
+        background: #1e3050 !important;
+      }
+      html.dark a {
+        color: #60a5fa;
+      }
+      html.dark code,
+      html.dark pre {
+        background: #1e293b;
+        border-color: #334155;
+        color: #f87171;
+      }
+      html.dark .badge-high {
+        background: #7f1d1d;
+        color: #fca5a5;
+      }
+      html.dark .badge-med {
+        background: #713f12;
+        color: #fcd34d;
+      }
+      html.dark .badge-low {
+        background: #14532d;
+        color: #86efac;
+      }
+      html.dark .badge-diag {
+        background: #3b1f6e;
+        color: #c4b5fd;
+      }
+      html.dark .legend span {
+        background: #1e293b;
+        border-color: #334155;
+        color: #cbd5e1;
+      }
+      html.dark .doc-separator {
+        background: #1e293b;
+        color: #94a3b8;
+      }
+      html.dark .sig-name {
+        color: #60a5fa;
+      }
+      html.dark .unit {
+        color: #8a9bb0;
+      }
+      html.dark .toc {
+        background: #162032;
+        border-color: #2a3a4a;
+      }
+      html.dark .toc a {
+        color: #60a5fa;
+      }
+      html.dark .toc-num {
+        color: #64748b;
+      }
+      html.dark .doc-footer {
+        background: #162032;
+        border-color: #2a3a4a;
+        color: #8a9bb0;
+      }
+      html.dark .ecu-desc {
+        color: #93c5fd;
+      }
+      html.dark .section-header {
+        border-color: #2a3a4a;
+        color: #e2e8f0;
+      }
+      html.dark .section-number {
+        background: #1e3a6e;
+        color: #fff;
+      }
 
       /* ── DOC 1 (VF-DOC) ── */
-      html.dark .vf-doc { background: #0f1923; color: #e2e8f0; }
-      html.dark .vf-doc h1 { color: #93c5fd; border-bottom-color: #2a4a7a; }
-      html.dark .vf-doc h2 { color: #e2e8f0; background: #1e293b; border-left-color: #3b82f6; }
-      html.dark .vf-doc h3 { color: #60a5fa; border-bottom-color: #2a3a4a; }
-      html.dark .vf-doc h4 { color: #cbd5e1; }
-      html.dark .vf-doc code { background: #1e293b; border-color: #334155; color: #f87171; }
-      html.dark .vf-doc .dtc-list { color: #fcd34d; }
-      html.dark .vf-doc .interp-box { color: #86efac; }
-      html.dark .vf-doc tbody tr:hover td { background: #1e3050 !important; }
+      html.dark .vf-doc {
+        background: #0f1923;
+        color: #e2e8f0;
+      }
+      html.dark .vf-doc h1 {
+        color: #93c5fd;
+        border-bottom-color: #2a4a7a;
+      }
+      html.dark .vf-doc h2 {
+        color: #e2e8f0;
+        background: #1e293b;
+        border-left-color: #3b82f6;
+      }
+      html.dark .vf-doc h3 {
+        color: #60a5fa;
+        border-bottom-color: #2a3a4a;
+      }
+      html.dark .vf-doc h4 {
+        color: #cbd5e1;
+      }
+      html.dark .vf-doc code {
+        background: #1e293b;
+        border-color: #334155;
+        color: #f87171;
+      }
+      html.dark .vf-doc .dtc-list {
+        color: #fcd34d;
+      }
+      html.dark .vf-doc .interp-box {
+        color: #86efac;
+      }
+      html.dark .vf-doc tbody tr:hover td {
+        background: #1e3050 !important;
+      }
 
       /* ── DOC 2 (MQTT-DOC) ── */
       html.dark .mqtt-doc {
@@ -1894,49 +1971,126 @@
         background: #0f1923;
         color: #e2e8f0;
       }
-      html.dark .mqtt-doc .toc-section { background: #162032; border-color: #2a3a4a; }
-      html.dark .mqtt-doc .section-header { border-bottom-color: #1a2840; }
-      html.dark .mqtt-doc tbody tr:nth-child(odd) td { background: #0f1923; }
-      html.dark .mqtt-doc tbody tr:hover td { background: #1a2f50 !important; }
-      html.dark .mqtt-doc .callout.info   { background: #1a2840; border-color: #2a3a55; color: #93c5fd; }
-      html.dark .mqtt-doc .callout.warn   { background: #2d1a0e; border-color: #6b3810; color: #fed7aa; }
-      html.dark .mqtt-doc .callout.tip    { background: #14532d; border-color: #166534; color: #86efac; }
-      html.dark .mqtt-doc .callout.note   { background: #2d1b4e; border-color: #4c1d95; color: #c4b5fd; }
-      html.dark .mqtt-doc .callout.danger { background: #3d1212; border-color: #7f1d1d; color: #fca5a5; }
-      html.dark .mqtt-doc .payload-box { background: #0f172a; border-color: #2a3a4a; }
-      html.dark .mqtt-doc .k { color: #60a5fa; }
-      html.dark .mqtt-doc .s { color: #4ade80; }
-      html.dark .mqtt-doc .c { color: #64748b; }
-      html.dark .mqtt-doc .n { color: #fb923c; }
-      html.dark .mqtt-doc .f { color: #a78bfa; }
-      html.dark .mqtt-doc .h { color: #f87171; }
-      html.dark .mqtt-doc .t { color: #38bdf8; }
-      html.dark .mqtt-doc h3::before { background: #38bdf8; }
+      html.dark .mqtt-doc .toc-section {
+        background: #162032;
+        border-color: #2a3a4a;
+      }
+      html.dark .mqtt-doc .section-header {
+        border-bottom-color: #1a2840;
+      }
+      html.dark .mqtt-doc tbody tr:nth-child(odd) td {
+        background: #0f1923;
+      }
+      html.dark .mqtt-doc tbody tr:hover td {
+        background: #1a2f50 !important;
+      }
+      html.dark .mqtt-doc .callout.info {
+        background: #1a2840;
+        border-color: #2a3a55;
+        color: #93c5fd;
+      }
+      html.dark .mqtt-doc .callout.warn {
+        background: #2d1a0e;
+        border-color: #6b3810;
+        color: #fed7aa;
+      }
+      html.dark .mqtt-doc .callout.tip {
+        background: #14532d;
+        border-color: #166534;
+        color: #86efac;
+      }
+      html.dark .mqtt-doc .callout.note {
+        background: #2d1b4e;
+        border-color: #4c1d95;
+        color: #c4b5fd;
+      }
+      html.dark .mqtt-doc .callout.danger {
+        background: #3d1212;
+        border-color: #7f1d1d;
+        color: #fca5a5;
+      }
+      html.dark .mqtt-doc .payload-box {
+        background: #0f172a;
+        border-color: #2a3a4a;
+      }
+      html.dark .mqtt-doc .k {
+        color: #60a5fa;
+      }
+      html.dark .mqtt-doc .s {
+        color: #4ade80;
+      }
+      html.dark .mqtt-doc .c {
+        color: #64748b;
+      }
+      html.dark .mqtt-doc .n {
+        color: #fb923c;
+      }
+      html.dark .mqtt-doc .f {
+        color: #a78bfa;
+      }
+      html.dark .mqtt-doc .h {
+        color: #f87171;
+      }
+      html.dark .mqtt-doc .t {
+        color: #38bdf8;
+      }
+      html.dark .mqtt-doc h3::before {
+        background: #38bdf8;
+      }
 
       /* ── DOC 3 (VM-DOC — Derived Metrics) ── */
-      html.dark .vm-doc { background: #0f1923; color: #e2e8f0; }
-      html.dark .vm-doc tbody tr:hover td { background: #1a2f50 !important; }
-      html.dark .vm-doc td.name { color: #60a5fa; }
+      html.dark .vm-doc {
+        background: #0f1923;
+        color: #e2e8f0;
+      }
+      html.dark .vm-doc tbody tr:hover td {
+        background: #1a2f50 !important;
+      }
+      html.dark .vm-doc td.name {
+        color: #60a5fa;
+      }
       html.dark .vm-doc td.formula {
         color: #c4b5fd;
         background: #1e1b3a;
         border: 1px solid #3730a3;
       }
-      html.dark .vm-doc td.signals { color: #94a3b8; }
-      html.dark .vm-doc .D   { background: #1e3a6e; color: #93c5fd; }
-      html.dark .vm-doc .P   { background: #14532d; color: #86efac; }
-      html.dark .vm-doc .Perf{ background: #713f12; color: #fcd34d; }
-      html.dark .vm-doc .C   { background: #3b1f6e; color: #c4b5fd; }
-      html.dark .vm-doc .tag { border-color: #334155; color: #94a3b8; }
+      html.dark .vm-doc td.signals {
+        color: #94a3b8;
+      }
+      html.dark .vm-doc .D {
+        background: #1e3a6e;
+        color: #93c5fd;
+      }
+      html.dark .vm-doc .P {
+        background: #14532d;
+        color: #86efac;
+      }
+      html.dark .vm-doc .Perf {
+        background: #713f12;
+        color: #fcd34d;
+      }
+      html.dark .vm-doc .C {
+        background: #3b1f6e;
+        color: #c4b5fd;
+      }
+      html.dark .vm-doc .tag {
+        border-color: #334155;
+        color: #94a3b8;
+      }
 
       /* ── DOC 4 (PERSONA-DOC) ── */
-      html.dark .persona-doc { background: #0f1923; color: #e2e8f0; }
+      html.dark .persona-doc {
+        background: #0f1923;
+        color: #e2e8f0;
+      }
       html.dark .persona-doc .sticky-nav {
         background: #0d1929;
         border-bottom-color: #1e293b;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
       }
-      html.dark .persona-doc .nav-link { color: #64748b; }
+      html.dark .persona-doc .nav-link {
+        color: #64748b;
+      }
       html.dark .persona-doc .overview {
         background: #162032;
         border-left-color: #3b82f6;
@@ -1944,56 +2098,710 @@
       }
       html.dark .persona-doc .persona-card {
         background: #162032;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
       }
-      html.dark .persona-doc .persona-body { background: #162032; }
-      html.dark .persona-doc .use-cases { background: #0f1923; border-color: #2a3a4a; }
-      html.dark .persona-doc .use-cases h3 { color: #e2e8f0; border-bottom-color: #2a3a4a; }
-      html.dark .persona-doc .uc-chip { background: #1e293b; border-color: #334155; color: #94a3b8; }
-      html.dark .persona-doc .section-title { color: #e2e8f0; border-bottom-color: #2a3a4a; }
-      html.dark .persona-doc .tbl-wrap { background: #162032; border-color: #2a3a4a; }
-      html.dark .persona-doc thead th { background: #1e3a6e; color: #e2e8f0; }
-      html.dark .persona-doc tbody tr:nth-child(even) td { background: #0f1923; }
-      html.dark .persona-doc tbody tr:hover td { background: #1a2f50 !important; }
-      html.dark .persona-doc tbody td { border-bottom-color: #2a3a4a; color: #cbd5e1; }
-      html.dark .persona-doc .pid { background: #1e293b; border-color: #334155; color: #60a5fa; }
-      html.dark .persona-doc .metric-group { background: #162032; border-color: #2a3a4a; }
-      html.dark .persona-doc .metric-group h4 { color: #60a5fa; border-bottom-color: #2a3a4a; }
-      html.dark .persona-doc .metric-name { color: #38bdf8; }
-      html.dark .persona-doc .insight-item { background: #0f1923; border-color: #2a3a4a; }
-      html.dark .persona-doc .insight-item strong { color: #60a5fa; }
-      html.dark .persona-doc .xref-section { background: #162032; border-color: #2a3a4a; }
-      html.dark .persona-doc .xref-section h2 { color: #93c5fd; border-bottom-color: #2a3a4a; }
-      html.dark .persona-doc .doc-footer { background: #162032; color: #64748b; border-color: #2a3a4a; }
-      html.dark .persona-doc .check { color: #4ade80; }
+      html.dark .persona-doc .persona-body {
+        background: #162032;
+      }
+      html.dark .persona-doc .use-cases {
+        background: #0f1923;
+        border-color: #2a3a4a;
+      }
+      html.dark .persona-doc .use-cases h3 {
+        color: #e2e8f0;
+        border-bottom-color: #2a3a4a;
+      }
+      html.dark .persona-doc .uc-chip {
+        background: #1e293b;
+        border-color: #334155;
+        color: #94a3b8;
+      }
+      html.dark .persona-doc .section-title {
+        color: #e2e8f0;
+        border-bottom-color: #2a3a4a;
+      }
+      html.dark .persona-doc .tbl-wrap {
+        background: #162032;
+        border-color: #2a3a4a;
+      }
+      html.dark .persona-doc thead th {
+        background: #1e3a6e;
+        color: #e2e8f0;
+      }
+      html.dark .persona-doc tbody tr:nth-child(even) td {
+        background: #0f1923;
+      }
+      html.dark .persona-doc tbody tr:hover td {
+        background: #1a2f50 !important;
+      }
+      html.dark .persona-doc tbody td {
+        border-bottom-color: #2a3a4a;
+        color: #cbd5e1;
+      }
+      html.dark .persona-doc .pid {
+        background: #1e293b;
+        border-color: #334155;
+        color: #60a5fa;
+      }
+      html.dark .persona-doc .metric-group {
+        background: #162032;
+        border-color: #2a3a4a;
+      }
+      html.dark .persona-doc .metric-group h4 {
+        color: #60a5fa;
+        border-bottom-color: #2a3a4a;
+      }
+      html.dark .persona-doc .metric-name {
+        color: #38bdf8;
+      }
+      html.dark .persona-doc .insight-item {
+        background: #0f1923;
+        border-color: #2a3a4a;
+      }
+      html.dark .persona-doc .insight-item strong {
+        color: #60a5fa;
+      }
+      html.dark .persona-doc .xref-section {
+        background: #162032;
+        border-color: #2a3a4a;
+      }
+      html.dark .persona-doc .xref-section h2 {
+        color: #93c5fd;
+        border-bottom-color: #2a3a4a;
+      }
+      html.dark .persona-doc .doc-footer {
+        background: #162032;
+        color: #64748b;
+        border-color: #2a3a4a;
+      }
+      html.dark .persona-doc .check {
+        color: #4ade80;
+      }
 
       /* ── VM-DOC Metric/Formula/Use column color coding ── */
-      html.dark .vm-doc thead th:nth-child(1) { background: #1e293b; color: #94a3b8; }
-      .vm-doc td.name  { background: rgba(30,58,110,0.08); }
-      .vm-doc td.formula { border-left: 3px solid #6366f1; }
-      html.dark .vm-doc td.name { background: rgba(96,165,250,0.08); color: #60a5fa; }
-      html.dark .vm-doc td.formula { background: #1e1b3a; color: #c4b5fd; border-left: 3px solid #818cf8; }
-      html.dark .vm-doc td.desc { color: #cbd5e1; }
-    </style>
-  <script>
-    (function () {
-      function applyTheme(dark) {
-        if (dark) {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
+      html.dark .vm-doc thead th:nth-child(1) {
+        background: #1e293b;
+        color: #94a3b8;
+      }
+      .vm-doc td.name {
+        background: rgba(30, 58, 110, 0.08);
+      }
+      .vm-doc td.formula {
+        border-left: 3px solid #6366f1;
+      }
+      html.dark .vm-doc td.name {
+        background: rgba(96, 165, 250, 0.08);
+        color: #60a5fa;
+      }
+      html.dark .vm-doc td.formula {
+        background: #1e1b3a;
+        color: #c4b5fd;
+        border-left: 3px solid #818cf8;
+      }
+      html.dark .vm-doc td.desc {
+        color: #cbd5e1;
+      }
+
+      /* ── MASTER INDEX ── */
+      .master-index .index-cover {
+        background: var(--accent);
+        color: #fff;
+        padding: 80px 60px 60px;
+        min-height: 220px;
+        margin: -30px -60px 36px;
+      }
+      .master-index .index-cover-label {
+        font-size: 11px;
+        opacity: 0.5;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 18px;
+      }
+      .master-index .index-cover h1 {
+        font-size: 32px;
+        font-weight: 700;
+        color: #fff;
+        border: none;
+        padding: 0;
+        margin-bottom: 10px;
+        letter-spacing: -0.5px;
+      }
+      .master-index .index-cover-sub {
+        font-size: 15px;
+        opacity: 0.8;
+        margin-bottom: 24px;
+        line-height: 1.5;
+      }
+      .master-index .index-cover-meta {
+        font-size: 12px;
+        opacity: 0.6;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        padding-top: 16px;
+      }
+      .index-stats {
+        display: flex;
+        margin-bottom: 28px;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+        overflow: hidden;
+      }
+      .index-stat {
+        flex: 1;
+        padding: 18px 12px;
+        text-align: center;
+        border-right: 1px solid var(--border);
+      }
+      .index-stat:last-child {
+        border-right: none;
+      }
+      .index-stat-num {
+        display: block;
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--accent);
+        line-height: 1;
+        margin-bottom: 4px;
+      }
+      .index-stat-label {
+        display: block;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--muted);
+      }
+      .index-heading {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 16px;
+        letter-spacing: 0.02em;
+      }
+      .index-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 18px;
+      }
+      .index-doc-card {
+        background: #fff;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+        display: flex;
+        flex-direction: column;
+      }
+      .index-doc-header {
+        padding: 18px 22px 16px;
+        color: #fff;
+      }
+      .index-doc-num {
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        opacity: 0.75;
+        margin-bottom: 5px;
+        font-family: "Roboto Mono", monospace;
+      }
+      .index-doc-title {
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.25;
+        margin-bottom: 6px;
+      }
+      .index-doc-desc {
+        font-size: 11.5px;
+        opacity: 0.85;
+        line-height: 1.45;
+      }
+      .index-doc-body {
+        padding: 14px 18px 12px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .index-section-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        flex: 1;
+      }
+      .index-section-list li {
+        font-size: 12px;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        line-height: 1.4;
+      }
+      .index-section-list li:last-child {
+        border-bottom: none;
+      }
+      .index-section-list a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .index-section-list a:hover {
+        text-decoration: underline;
+      }
+      .index-section-num {
+        font-size: 10px;
+        color: var(--muted);
+        min-width: 30px;
+        padding-top: 1px;
+        font-family: "Roboto Mono", monospace;
+        flex-shrink: 0;
+      }
+      .index-doc-footer {
+        font-size: 10.5px;
+        color: var(--muted);
+        padding-top: 9px;
+        margin-top: 8px;
+        border-top: 1px solid var(--border);
+        font-family: "Roboto Mono", monospace;
+        line-height: 1.4;
+      }
+      @media print {
+        .index-doc-header {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .master-index .index-cover {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          page-break-after: always;
         }
       }
-      var params = new URLSearchParams(window.location.search);
-      applyTheme(params.get("theme") === "dark");
-      window.addEventListener("message", function (e) {
-        if (e.data === "theme:dark") applyTheme(true);
-        if (e.data === "theme:light") applyTheme(false);
-      });
-    })();
-  </script>
+    </style>
+    <script>
+      (function () {
+        function applyTheme(dark) {
+          if (dark) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        }
+        var params = new URLSearchParams(window.location.search);
+        applyTheme(params.get("theme") === "dark");
+        window.addEventListener("message", function (e) {
+          if (e.data === "theme:dark") applyTheme(true);
+          if (e.data === "theme:light") applyTheme(false);
+        });
+      })();
+    </script>
   </head>
   <body>
+    <!-- ════════════════════════════════════════ MASTER INDEX ════════════════════════════════════════ -->
+    <div class="master-index">
+      <!-- INDEX COVER -->
+      <div class="index-cover">
+        <!-- <div class="exl-logo">
+          <svg
+            width="96"
+            height="48"
+            viewBox="0 0 96 48"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <text
+              x="2"
+              y="41"
+              font-family="'Varela Round',Arial,sans-serif"
+              font-weight="400"
+              font-size="46"
+              fill="#FF4500"
+              letter-spacing="1"
+            >
+              EXL
+            </text>
+          </svg>
+        </div> -->
+        <div class="index-cover-label">Consolidated Technical Reference</div>
+        <h1>Vehicle Telemetry<br />Master Document Index</h1>
+        <div class="index-cover-sub">
+          5 Technical Documents &nbsp;&middot;&nbsp; ECU Signal Catalog
+          &nbsp;&middot;&nbsp; MQTT Protocol &nbsp;&middot;&nbsp; Fault
+          Diagnostics &nbsp;&middot;&nbsp; Derived Metrics &nbsp;&middot;&nbsp;
+          Persona Analytics
+        </div>
+        <div class="index-cover-meta">
+          MQTT in Vehicle Telemetry &bull; Vehicle Telemetry Signal Reference
+          &bull; Vehicle Faults &amp; Diagnostic Signals &bull; Derived Metrics
+          Reference &bull; Persona-Wise Applications
+        </div>
+      </div>
+
+      <!-- STATS BAR -->
+      <div class="index-stats">
+        <div class="index-stat">
+          <span class="index-stat-num">5</span
+          ><span class="index-stat-label">Documents</span>
+        </div>
+        <div class="index-stat">
+          <span class="index-stat-num">50+</span
+          ><span class="index-stat-label">Major Sections</span>
+        </div>
+        <div class="index-stat">
+          <span class="index-stat-num">600+</span
+          ><span class="index-stat-label">ECU Signals</span>
+        </div>
+        <div class="index-stat">
+          <span class="index-stat-num">105</span
+          ><span class="index-stat-label">Derived Metrics</span>
+        </div>
+        <div class="index-stat">
+          <span class="index-stat-num">7</span
+          ><span class="index-stat-label">User Personas</span>
+        </div>
+      </div>
+
+      <!-- DOCUMENT CARDS -->
+      <p class="index-heading">
+        Click any section to navigate directly within this document
+      </p>
+      <div class="index-grid">
+        <!-- DOC 1: MQTT -->
+        <div class="index-doc-card">
+          <div
+            class="index-doc-header"
+            style="background: linear-gradient(135deg, #1e3a5f, #0369a1)"
+          >
+            <div class="index-doc-num">Document 01</div>
+            <div class="index-doc-title">MQTT in Vehicle Telemetry</div>
+            <div class="index-doc-desc">
+              CAN signal acquisition &middot; ETU processing pipeline &middot;
+              Pub/Sub data transfer
+            </div>
+          </div>
+          <div class="index-doc-body">
+            <ul class="index-section-list">
+              <li>
+                <span class="index-section-num">§1</span
+                ><a href="#s1">Introduction &amp; Why MQTT</a>
+              </li>
+              <li>
+                <span class="index-section-num">§2</span
+                ><a href="#s2">Raw Vehicle Data (CAN / GPS / IMU / ADC)</a>
+              </li>
+              <li>
+                <span class="index-section-num">§3</span
+                ><a href="#s3">Edge Telematic Unit — 7-Step Pipeline</a>
+              </li>
+              <li>
+                <span class="index-section-num">§4</span
+                ><a href="#s4">MQTT Protocol Deep Dive</a>
+              </li>
+              <li>
+                <span class="index-section-num">§5</span
+                ><a href="#s5">Data Transfer to Subscribers</a>
+              </li>
+              <li>
+                <span class="index-section-num">§6</span
+                ><a href="#s6">End-to-End Example — Hard Braking Event</a>
+              </li>
+              <li>
+                <span class="index-section-num">§7</span
+                ><a href="#s7">Quality of Service (QoS) Levels</a>
+              </li>
+              <li>
+                <span class="index-section-num">§8</span
+                ><a href="#s8">Security &amp; mTLS</a>
+              </li>
+              <li>
+                <span class="index-section-num">§9</span
+                ><a href="#s9"
+                  >Advanced Patterns (Sparkplug B / OTA / Bridge)</a
+                >
+              </li>
+              <li>
+                <span class="index-section-num">§10</span
+                ><a href="#s10">Failure Scenarios &amp; Resilience</a>
+              </li>
+              <li>
+                <span class="index-section-num">§11</span
+                ><a href="#s11">Glossary</a>
+              </li>
+            </ul>
+            <div class="index-doc-footer">
+              MQTT v3.1.1 / v5.0 &nbsp;|&nbsp; CAN ISO 11898 &nbsp;|&nbsp;
+              OBD-II SAE J1979
+            </div>
+          </div>
+        </div>
+
+        <!-- DOC 2: VT SIGNAL REFERENCE -->
+        <div class="index-doc-card">
+          <div
+            class="index-doc-header"
+            style="background: linear-gradient(135deg, #1e2d5e, #2d3a8c)"
+          >
+            <div class="index-doc-num">Document 02</div>
+            <div class="index-doc-title">
+              Vehicle Telemetry Exhaustive Signal Reference
+            </div>
+            <div class="index-doc-desc">
+              ECU-classified signal catalog &middot; ICE &middot; Hybrid
+              &middot; BEV architectures
+            </div>
+          </div>
+          <div class="index-doc-body">
+            <ul class="index-section-list">
+              <li>
+                <span class="index-section-num">§1</span
+                ><a href="#doc-vt">Engine Control Module (ECM)</a>
+              </li>
+              <li>
+                <span class="index-section-num">§2</span>Transmission Control
+                Module (TCM)
+              </li>
+              <li>
+                <span class="index-section-num">§3</span>Anti-lock Braking /
+                Electronic Stability (ABS/ESP)
+              </li>
+              <li>
+                <span class="index-section-num">§4</span>Body Control Module
+                (BCM)
+              </li>
+              <li>
+                <span class="index-section-num">§5</span>Advanced Driver
+                Assistance Systems (ADAS)
+              </li>
+              <li>
+                <span class="index-section-num">§6</span>Battery Management
+                System (BMS / HV)
+              </li>
+              <li>
+                <span class="index-section-num">§7</span>Electric Drive / Motor
+                Control Unit (MCU)
+              </li>
+              <li>
+                <span class="index-section-num">§8</span>Airbag / Restraint
+                Control Module (RCM)
+              </li>
+              <li>
+                <span class="index-section-num">§9</span>Telematics Control Unit
+                &amp; Gateway
+              </li>
+              <li>
+                <span class="index-section-num">§10</span>Infotainment / HMI
+                Systems
+              </li>
+              <li>
+                <span class="index-section-num">§11</span>Thermal Management
+                System (TMS)
+              </li>
+              <li>
+                <span class="index-section-num">§12–14</span>Chassis, Suspension
+                &amp; Auxiliary ECUs
+              </li>
+            </ul>
+            <div class="index-doc-footer">
+              SAE J1979 &nbsp;|&nbsp; SAE J1939 &nbsp;|&nbsp; ISO 14229 (UDS)
+              &nbsp;|&nbsp; ISO 26262
+            </div>
+          </div>
+        </div>
+
+        <!-- DOC 3: VEHICLE FAULTS -->
+        <div class="index-doc-card">
+          <div
+            class="index-doc-header"
+            style="background: linear-gradient(135deg, #7f1d1d, #b91c1c)"
+          >
+            <div class="index-doc-num">Document 03</div>
+            <div class="index-doc-title">
+              Vehicle Faults &amp; Diagnostic Signals
+            </div>
+            <div class="index-doc-desc">
+              DTC catalog &middot; OBD-II modes &middot; ECU fault
+              classification &middot; Diagnostic protocols
+            </div>
+          </div>
+          <div class="index-doc-body">
+            <ul class="index-section-list">
+              <li>
+                <span class="index-section-num">§1</span
+                ><a href="#doc-vf">DTC Structure &amp; Classification</a>
+              </li>
+              <li>
+                <span class="index-section-num">§2</span>OBD-II Diagnostic Modes
+                (Mode 01–0A)
+              </li>
+              <li>
+                <span class="index-section-num">§3</span>Engine &amp; Fuel
+                System Faults (P0xxx)
+              </li>
+              <li>
+                <span class="index-section-num">§4</span>Emissions &amp; Exhaust
+                System Faults
+              </li>
+              <li>
+                <span class="index-section-num">§5</span>Transmission &amp;
+                Drivetrain Faults
+              </li>
+              <li>
+                <span class="index-section-num">§6</span>Chassis &amp; Braking
+                System Faults
+              </li>
+              <li>
+                <span class="index-section-num">§7</span>Body &amp; Comfort
+                System Faults (B-codes)
+              </li>
+              <li>
+                <span class="index-section-num">§8</span>Network &amp;
+                Communication Faults (U-codes)
+              </li>
+              <li>
+                <span class="index-section-num">§9</span>ADAS &amp; Safety
+                System Faults
+              </li>
+              <li>
+                <span class="index-section-num">§10</span>Battery &amp;
+                High-Voltage System Faults (EV/HEV)
+              </li>
+              <li>
+                <span class="index-section-num">§11–14</span>Freeze Frame Data,
+                Readiness Monitors &amp; Appendices
+              </li>
+            </ul>
+            <div class="index-doc-footer">
+              SAE J2012 (DTC) &nbsp;|&nbsp; ISO 15765 (CAN OBD) &nbsp;|&nbsp;
+              ISO 14229 (UDS)
+            </div>
+          </div>
+        </div>
+
+        <!-- DOC 4: DERIVED METRICS -->
+        <div class="index-doc-card">
+          <div
+            class="index-doc-header"
+            style="background: linear-gradient(135deg, #064e3b, #059669)"
+          >
+            <div class="index-doc-num">Document 04</div>
+            <div class="index-doc-title">
+              Vehicle Telemetry Derived Metrics Reference
+            </div>
+            <div class="index-doc-desc">
+              105 computed metrics &middot; 12 categories &middot; Formulas
+              &middot; Input signals &middot; Use-case tags
+            </div>
+          </div>
+          <div class="index-doc-body">
+            <ul class="index-section-list">
+              <li>
+                <span class="index-section-num">ENG</span
+                ><a href="#doc-vm">Engine Performance Metrics</a>
+              </li>
+              <li>
+                <span class="index-section-num">BAT</span>Battery &amp; Energy
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">FC</span>Fuel Consumption
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">TRN</span>Transmission &amp;
+                Drivetrain Metrics
+              </li>
+              <li>
+                <span class="index-section-num">DYN</span>Vehicle Dynamics
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">BRK</span>Braking Performance
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">THM</span>Thermal Management
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">ELEC</span>Electrical System
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">DRV</span>Driver Behavior
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">PM</span>Predictive Maintenance
+                Metrics
+              </li>
+              <li>
+                <span class="index-section-num">EMI</span>Emissions &amp;
+                Compliance Metrics
+              </li>
+              <li>
+                <span class="index-section-num">ADA</span>ADAS &amp; Safety
+                Metrics
+              </li>
+            </ul>
+            <div class="index-doc-footer">
+              105 metrics &nbsp;|&nbsp; Tags: D &middot; P &middot; Perf
+              &middot; C (Diagnostic &middot; Predictive &middot; Performance
+              &middot; Compliance)
+            </div>
+          </div>
+        </div>
+
+        <!-- DOC 5: PERSONA APPLICATIONS -->
+        <div class="index-doc-card">
+          <div
+            class="index-doc-header"
+            style="background: linear-gradient(135deg, #3b0764, #6d28d9)"
+          >
+            <div class="index-doc-num">Document 05</div>
+            <div class="index-doc-title">Persona-Wise Applications</div>
+            <div class="index-doc-desc">
+              7 user personas &middot; ECU signals &middot; KPIs &middot;
+              Analytical insights &middot; Signal cross-reference
+            </div>
+          </div>
+          <div class="index-doc-body">
+            <ul class="index-section-list">
+              <li>
+                <span class="index-section-num">P1</span
+                ><a href="#p1">Fleet Operations Manager</a>
+              </li>
+              <li>
+                <span class="index-section-num">P2</span
+                ><a href="#p2">Driver / Performance Coach</a>
+              </li>
+              <li>
+                <span class="index-section-num">P3</span
+                ><a href="#p3">Automotive Technician / Maintenance Engineer</a>
+              </li>
+              <li>
+                <span class="index-section-num">P4</span
+                ><a href="#p4">Insurance / UBI Analyst</a>
+              </li>
+              <li>
+                <span class="index-section-num">P5</span
+                ><a href="#p5">OEM Product / Development Engineer</a>
+              </li>
+              <li>
+                <span class="index-section-num">P6</span
+                ><a href="#p6">Logistics / Supply Chain Manager</a>
+              </li>
+              <li>
+                <span class="index-section-num">P7</span
+                ><a href="#p7">EV Fleet Manager</a>
+              </li>
+              <li>
+                <span class="index-section-num">XRef</span
+                ><a href="#xref">Signal Cross-Reference — All 7 Personas</a>
+              </li>
+            </ul>
+            <div class="index-doc-footer">
+              Covers: ICE &bull; Hybrid &bull; BEV &bull; Commercial Fleet
+              &bull; Insurance &bull; OEM R&amp;D
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ═══════════════════════════════════════════════════════════════════════════════════════════════ -->
     <div class="mqtt-doc">
       <div class="cover">
         <!-- <div>

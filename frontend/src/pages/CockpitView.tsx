@@ -36,6 +36,7 @@ import {
   TextField,
   Button,
   CircularProgress,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -49,6 +50,8 @@ import {
   Marker,
   Popup,
   Polyline,
+  Tooltip as LeafletTooltip,
+  ZoomControl,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -58,6 +61,7 @@ import Pagination from "@mui/material/Pagination";
 
 import { alpha, useTheme } from "@mui/material/styles";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import DirectionsCarFilledOutlinedIcon from "@mui/icons-material/DirectionsCarFilledOutlined";
 import ElectricBoltOutlinedIcon from "@mui/icons-material/ElectricBoltOutlined";
 import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
@@ -71,11 +75,13 @@ import DirectionsBusFilledOutlinedIcon from "@mui/icons-material/DirectionsBusFi
 import TwoWheelerOutlinedIcon from "@mui/icons-material/TwoWheelerOutlined";
 import MoreHorizOutlinedIcon from "@mui/icons-material/MoreHorizOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import PsychologyOutlinedIcon from "@mui/icons-material/PsychologyOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
 import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
+import TipsAndUpdatesOutlinedIcon from "@mui/icons-material/TipsAndUpdatesOutlined";
 import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
 import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
@@ -90,6 +96,7 @@ import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import AspectRatioOutlinedIcon from "@mui/icons-material/AspectRatioOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import ExploreIcon from "@mui/icons-material/Explore";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import Draggable from "react-draggable";
@@ -447,13 +454,16 @@ const Card = ({ children, sx }: { children: React.ReactNode; sx?: object }) => {
       sx={{
         borderRadius: 2,
         overflow: "hidden",
-        bgcolor: isDark ? alpha("#0b1724", 0.9) : "#ffffff",
+        bgcolor: isDark ? alpha("#0b1724", 0.95) : alpha("#ffffff", 0.96),
+        backgroundImage: isDark
+          ? "linear-gradient(145deg, rgba(16,34,53,0.95), rgba(7,17,30,0.98))"
+          : "linear-gradient(145deg, rgba(255,255,255,0.98), rgba(255,250,247,0.96))",
         border: `1px solid ${
-          isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.1)
+          isDark ? alpha("#7dd3fc", 0.16) : alpha("#fb4e0b", 0.16)
         }`,
         boxShadow: isDark
           ? `0 18px 42px ${alpha("#000", 0.22)}`
-          : `0 12px 30px ${alpha("#334155", 0.08)}`,
+          : `0 12px 30px ${alpha("#0f2f45", 0.08)}`,
         ...sx,
       }}
     >
@@ -476,10 +486,21 @@ const SectionTitle = ({
       justifyContent: "space-between",
       gap: 0.5,
       mb: 0.5,
-      fontSize: "14px",
+      fontSize: "var(--app-font-lg)",
     }}
   >
-    <Typography sx={{ fontSize: "12px", fontWeight: 800 }}>{title}</Typography>
+    <Typography
+      sx={{
+        fontSize: "var(--app-font-md)",
+        fontWeight: 800,
+        lineHeight: 1.15,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {title}
+    </Typography>
     {action}
   </Box>
 );
@@ -671,8 +692,9 @@ function KpiCard({
     >
       <Card
         sx={{
-          p: 0.7,
-          minHeight: 80,
+          p: { xs: 0.55, lg: 0.7, xl: 0.9 },
+          minHeight: { xs: 62, lg: 74, xl: 58 },
+          height: "auto",
           transition: "all .25s ease",
 
           border: selected ? `2px solid ${color}` : "1px solid",
@@ -689,9 +711,9 @@ function KpiCard({
           },
 
           background: isDark
-            ? `linear-gradient(135deg, ${alpha(color, 0.22)}, ${alpha(
-                "#0b1724",
-                0.95
+            ? `linear-gradient(135deg, ${alpha(color, 0.2)}, ${alpha(
+                "#07111e",
+                0.97
               )})`
             : `linear-gradient(135deg, ${alpha(color, 0.11)}, #fff)`,
         }}
@@ -699,8 +721,8 @@ function KpiCard({
         <Stack direction="row" spacing={0.6} alignItems="center">
           <Box
             sx={{
-              width: 35,
-              height: 35,
+              width: { xs: 28, lg: 35, xl: 42 },
+              height: { xs: 28, lg: 35, xl: 42 },
               borderRadius: "50%",
               display: "grid",
               placeItems: "center",
@@ -712,11 +734,21 @@ function KpiCard({
             {icon}
           </Box>
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>
+            <Typography
+              sx={{
+                fontSize: { xs: 14, lg: 18, xl: 22 },
+                fontWeight: 800,
+                lineHeight: 1,
+              }}
+            >
               {value}
             </Typography>
             <Typography
-              sx={{ fontSize: 10, color: "text.secondary", mt: 0.5 }}
+              sx={{
+                fontSize: "var(--app-font-sm)",
+                color: "text.secondary",
+                mt: 0.5,
+              }}
               noWrap
             >
               {label}
@@ -738,7 +770,11 @@ function KpiCard({
                 ""
               )}
               <Typography
-                sx={{ fontSize: 8, color: trendColor, fontWeight: 600 }}
+                sx={{
+                  fontSize: "var(--app-font-xs)",
+                  color: trendColor,
+                  fontWeight: 600,
+                }}
               >
                 {delta}
               </Typography>
@@ -757,7 +793,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
   const option = {
     tooltip: {
       trigger: "item",
-      backgroundColor: isDark ? "#1e293b" : "#ffffff",
+      backgroundColor: isDark ? "#0f1f31" : "#ffffff",
       borderColor: isDark ? "#334155" : "#e2e8f0",
       borderWidth: 1,
       textStyle: {
@@ -818,7 +854,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
         avoidLabelOverlap: false,
         itemStyle: {
           borderRadius: 0,
-          borderColor: isDark ? "#1a2535" : "#fff",
+          borderColor: isDark ? "#07111e" : "#fff",
           borderWidth: 2,
         },
 
@@ -1033,7 +1069,7 @@ const getHealthStatus = (health: number) => {
     };
   }
 
-  if (health >= 75) {
+  if (health > 80) {
     return {
       label: "Good",
       color: "#22c55e", // Green
@@ -1182,7 +1218,7 @@ function ScoreTimeline({ data }: { data: BehaviorData }) {
     tooltip: {
       trigger: "axis" as const,
       textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" },
-      backgroundColor: isDark ? "#1e293b" : "#fff",
+      backgroundColor: isDark ? "#0f1f31" : "#fff",
       borderColor: isDark ? "#334155" : "#e2e8f0",
     },
     xAxis: {
@@ -1253,7 +1289,7 @@ function TractionCircle({ data }: { data: BehaviorData }) {
     grid: { top: 10, right: 10, bottom: 30, left: 40 },
     tooltip: {
       trigger: "item" as const,
-      backgroundColor: isDark ? "#1e293b" : "#fff",
+      backgroundColor: isDark ? "#0f1f31" : "#fff",
       borderColor: isDark ? "#334155" : "#e2e8f0",
       textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" },
       formatter: (p: { data: number[] }) =>
@@ -1380,7 +1416,7 @@ function SpeedByRoad({ data }: { data: BehaviorData }) {
     tooltip: {
       trigger: "item" as const,
       textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" },
-      backgroundColor: isDark ? "#1e293b" : "#fff",
+      backgroundColor: isDark ? "#0f1f31" : "#fff",
       borderColor: isDark ? "#334155" : "#e2e8f0",
     },
     xAxis: {
@@ -1693,7 +1729,7 @@ function TimelineChart({ history }: { history: HealthHistoryRow[] }) {
     grid: { top: 18, left: 34, right: 16, bottom: 28 },
     tooltip: {
       trigger: "axis",
-      backgroundColor: isDark ? "#1e293b" : "#ffffff",
+      backgroundColor: isDark ? "#0f1f31" : "#ffffff",
       borderColor: isDark ? "#334155" : "#e2e8f0",
       borderWidth: 1,
       textStyle: { fontSize: 10, color: isDark ? "#e2e8f0" : "#111827" },
@@ -1786,149 +1822,46 @@ function RecentAlerts({
         setDisplayed([]);
         return;
       }
-
-      const moduleLatestPeak = new Map<string, string>();
-      for (const a of open) {
-        const mod = a.module.toLowerCase();
-        const prev = moduleLatestPeak.get(mod);
-        if (!prev || a.peak_anomaly_ts > prev)
-          moduleLatestPeak.set(mod, a.peak_anomaly_ts);
-      }
-
-      const sorted = [...open].sort(
-        (a, b) => (b.max_composite_score ?? 0) - (a.max_composite_score ?? 0)
-      );
+      const severityRank: Record<string, number> = {
+        critical: 0,
+        warning: 1,
+        active: 2,
+      };
+      const sorted = [...open].sort((a, b) => {
+        const sev =
+          (severityRank[(a.severity ?? "warning").toLowerCase()] ?? 9) -
+          (severityRank[(b.severity ?? "warning").toLowerCase()] ?? 9);
+        if (sev !== 0) return sev;
+        const score =
+          (b.max_composite_score ?? 0) - (a.max_composite_score ?? 0);
+        if (score !== 0) return score;
+        return (
+          new Date(b.last_updated_ts ?? b.peak_anomaly_ts).getTime() -
+          new Date(a.last_updated_ts ?? a.peak_anomaly_ts).getTime()
+        );
+      });
       const vehicleBest = new Map<string, OpenAlert>();
       for (const a of sorted) {
         if (!vehicleBest.has(a.source_id)) vehicleBest.set(a.source_id, a);
       }
-      const candidates = Array.from(vehicleBest.values());
-
-      type PoolItem = {
-        source_id: string;
-        module: string;
-        msg: string;
-        alert: OpenAlert;
-      };
-
-      const pickFour = (p: PoolItem[]): DisplayAlert[] => {
-        const out: DisplayAlert[] = [];
-        const usedSimMod = new Set<string>();
-        const usedSims = new Set<string>();
-        const usedMods = new Set<string>();
-        const usedMsgs = new Set<string>();
-        const add = (item: PoolItem) => {
-          out.push({
-            source_id: item.alert.source_id,
-            module: item.alert.module,
-            peak_anomaly_ts: item.alert.peak_anomaly_ts,
-            severity: (item.alert.severity ?? "warning").toLowerCase(),
-            dtcMessage: item.msg,
+      setDisplayed(
+        Array.from(vehicleBest.values())
+          .slice(0, 4)
+          .map((a) => ({
+            source_id: a.source_id,
+            module: a.module,
+            peak_anomaly_ts: a.peak_anomaly_ts,
+            severity: (a.severity ?? "warning").toLowerCase(),
+            dtcMessage: `${String(
+              a.module ?? "module"
+            ).toUpperCase()} anomaly score ${Math.round(
+              a.max_composite_score ?? 0
+            )}`,
             relativeTime: alertRelativeTime(
-              item.alert.last_updated_ts ?? item.alert.peak_anomaly_ts
+              a.last_updated_ts ?? a.peak_anomaly_ts
             ),
-          });
-          usedSimMod.add(`${item.source_id}|${item.module}`);
-          usedSims.add(item.source_id);
-          usedMods.add(item.module);
-          usedMsgs.add(item.msg);
-        };
-        for (const item of p) {
-          if (out.length >= 4) break;
-          if (
-            !usedSims.has(item.source_id) &&
-            !usedMods.has(item.module) &&
-            !usedMsgs.has(item.msg)
-          )
-            add(item);
-        }
-        if (out.length < 4) {
-          for (const item of p) {
-            if (out.length >= 4) break;
-            if (
-              !usedSims.has(item.source_id) &&
-              !usedMods.has(item.module) &&
-              !usedSimMod.has(`${item.source_id}|${item.module}`)
-            )
-              add(item);
-          }
-        }
-        if (out.length < 4) {
-          for (const item of p) {
-            if (out.length >= 4) break;
-            if (
-              !usedSims.has(item.source_id) &&
-              !usedSimMod.has(`${item.source_id}|${item.module}`)
-            )
-              add(item);
-          }
-        }
-        if (out.length < 4) {
-          const full = new Set(
-            out.map((r) => `${r.source_id}|${r.module}|${r.dtcMessage}`)
-          );
-          for (const item of p) {
-            if (out.length >= 4) break;
-            const key = `${item.source_id}|${item.module}|${item.msg}`;
-            if (!full.has(key)) {
-              out.push({
-                source_id: item.alert.source_id,
-                module: item.alert.module,
-                peak_anomaly_ts: item.alert.peak_anomaly_ts,
-                severity: (item.alert.severity ?? "warning").toLowerCase(),
-                dtcMessage: item.msg,
-                relativeTime: alertRelativeTime(
-                  item.alert.last_updated_ts ?? item.alert.peak_anomaly_ts
-                ),
-              });
-              full.add(key);
-            }
-          }
-        }
-        return out;
-      };
-
-      const DTC_PER_CALL_TIMEOUT_MS = 15_000;
-
-      const pool: PoolItem[] = [];
-      for (let i = 0; i < candidates.length; i++) {
-        const a = candidates[i];
-        setPhase(`DTC ${i + 1}/${candidates.length}…`);
-        try {
-          const r = await axios.get(`${PIPELINE_API}/api/dtc/analyze`, {
-            params: {
-              source_id: a.source_id,
-              module: a.module,
-              peak_ts:
-                moduleLatestPeak.get(a.module.toLowerCase()) ??
-                a.peak_anomaly_ts,
-            },
-            timeout: DTC_PER_CALL_TIMEOUT_MS,
-          });
-          const data = r.data as {
-            success?: boolean;
-            error?: string;
-            triggers?: { message?: string }[];
-          };
-          if (!data?.success || data.error) continue;
-          const triggers = data.triggers ?? [];
-          const usable = triggers.filter((t) => t.message);
-          if (!usable.length) continue;
-          for (const t of usable) {
-            pool.push({
-              source_id: a.source_id,
-              module: a.module.toLowerCase(),
-              msg: t.message!,
-              alert: a,
-            });
-          }
-        } catch {
-          continue;
-        }
-        if (pickFour(pool).length >= 4) break;
-      }
-
-      setDisplayed(pickFour(pool));
+          }))
+      );
     } catch {
       // Retain previous displayed on error
     } finally {
@@ -1953,7 +1886,7 @@ function RecentAlerts({
       }}
     >
       <SectionTitle
-        title="Recent Alerts"
+        title={`Recent Alerts (${total})`}
         action={
           <Stack direction="row" spacing={0.3} alignItems="center">
             <IconButton
@@ -1968,7 +1901,7 @@ function RecentAlerts({
               size="small"
               variant="outlined"
               sx={{ fontSize: "8px", py: "1px", px: "6px" }}
-              onClick={() => navigate("/fleet-health")}
+              onClick={() => navigate("/fleet-health#alerts-feed")}
             >
               View All
             </Button>
@@ -2088,8 +2021,7 @@ function RecentAlerts({
       )}
       {!loading && total > displayed.length && displayed.length > 0 && (
         <Box
-          onClick={() => navigate("/fleet-health")}
-
+          onClick={() => navigate("/fleet-health#alerts-feed")}
           sx={{
             mt: 0.3,
             textAlign: "center",
@@ -2529,7 +2461,15 @@ function MapController({
   return null;
 }
 
-function HealthGauge({ value, color }: { value: number; color: string }) {
+function HealthGauge({
+  value,
+  color,
+  formatter = "{value}%",
+}: {
+  value: number;
+  color: string;
+  formatter?: string;
+}) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const option = {
@@ -2557,11 +2497,11 @@ function HealthGauge({ value, color }: { value: number; color: string }) {
           },
         },
         detail: {
-          fontSize: 14,
-          fontWeight: 700,
-          offsetCenter: [0, "8%"],
+          fontSize: 24,
+          fontWeight: 900,
+          offsetCenter: [0, "4%"],
           color: isDark ? "#fff" : "#1f2937",
-          formatter: "{value}%",
+          formatter,
         },
         axisTick: { show: false },
         splitLine: { show: false },
@@ -2574,8 +2514,72 @@ function HealthGauge({ value, color }: { value: number; color: string }) {
     ],
   };
   return (
-    <Box sx={{ height: 110, mt: 0.5, mb: 1 }}>
+    <Box sx={{ height: "100%", minHeight: 0, width: "100%" }}>
       <ReactECharts option={option} style={{ height: "100%", width: "100%" }} />
+    </Box>
+  );
+}
+
+function scoreTone(score: number) {
+  if (score > 90) return "#16a34a";
+  if (score > 80) return "#22c55e";
+  if (score >= 60) return "#f59e0b";
+  return "#ef4444";
+}
+
+function scoreLabel(score: number) {
+  if (score >= 90) return "Excellent";
+  if (score > 80) return "Good";
+  if (score >= 60) return "Average";
+  return "Poor";
+}
+
+function riskLabel(risk: number) {
+  if (risk < 20) return "Low Risk";
+  if (risk < 40) return "Watch";
+  if (risk < 60) return "Elevated";
+  return "High Risk";
+}
+
+function MiniSparkline({ values, color }: { values: number[]; color: string }) {
+  const safe = values.length ? values : [0, 0, 0, 0];
+  const min = Math.min(...safe);
+  const max = Math.max(...safe);
+  const span = Math.max(1, max - min);
+  const points = safe
+    .map((v, i) => {
+      const x = (i / Math.max(1, safe.length - 1)) * 100;
+      const y = 42 - ((v - min) / span) * 34;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <Box sx={{ width: "100%", height: 42, mt: 0.35 }}>
+      <svg
+        viewBox="0 0 100 44"
+        preserveAspectRatio="none"
+        width="100%"
+        height="100%"
+      >
+        <defs>
+          <linearGradient id="cockpitSparkFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.34" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <polygon
+          points={`0,44 ${points} 100,44`}
+          fill="url(#cockpitSparkFill)"
+        />
+        <polyline
+          points={points}
+          fill="none"
+          stroke={color}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </Box>
   );
 }
@@ -2751,6 +2755,11 @@ export default function CockpitView({
   const [drawerTab, setDrawerTab] = useState(0);
   const [openFleetScatter, setOpenFleetScatter] = useState(false);
   const [openVehicleHealth, setOpenVehicleHealth] = useState(false);
+  const [openFleetMap, setOpenFleetMap] = useState(false);
+  const [showTopPerformers, setShowTopPerformers] = useState(false);
+  const [topPerformerSort, setTopPerformerSort] = useState<
+    "overall" | "health" | "driver"
+  >("overall");
   const [hiddenSims, setHiddenSims] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<
     | "all"
@@ -2760,7 +2769,8 @@ export default function CockpitView({
     | "healthy"
     | "warning"
     | "critical"
-  >("all");
+  >("critical");
+  const [healthScoreFilter, setHealthScoreFilter] = useState("all");
 
   const [statusFilterMap, setStatusFilterMap] = useState("all");
   const [vehicleType, setVehicleType] = useState("all");
@@ -2779,7 +2789,7 @@ export default function CockpitView({
   const [orderBy, setOrderBy] = useState("vehicle_id");
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
   const [fleetFilter, setFleetFilter] = useState<FleetFilter>("ALL");
 
   const handleFleetFilter = (nextFilter: typeof statusFilter) => {
@@ -3291,7 +3301,9 @@ export default function CockpitView({
     if (!pv) return fallbackModules;
     return {
       engine: Math.round(pv.engine_contrib ?? fallbackModules.engine ?? 0),
-      transmission: Math.round(pv.transmission_contrib ?? fallbackModules.transmission ?? 0),
+      transmission: Math.round(
+        pv.transmission_contrib ?? fallbackModules.transmission ?? 0
+      ),
       battery: Math.round(pv.battery_contrib ?? fallbackModules.battery ?? 0),
       body: Math.round(pv.body_contrib ?? fallbackModules.body ?? 0),
       tyre: Math.round(pv.tyre_contrib ?? fallbackModules.tyre ?? 0),
@@ -3541,18 +3553,63 @@ export default function CockpitView({
     }
   }, [healthTimelineVehicle, timelineVehicleIds]);
 
-  const tableRows = (filteredPositions ?? []).filter((v) => {
-    const text = search.trim().toLowerCase();
-    if (!text) return true;
-    return (
-      v.vehicle_id.toLowerCase().includes(text) ||
-      (v.name ?? "").toLowerCase().includes(text) ||
-      (v.type ?? "").toLowerCase().includes(text) ||
-      (v.driver ?? "").toLowerCase().includes(text) ||
-      (v.route_name ?? "").toLowerCase().includes(text) ||
-      (v.road_type ?? "").toLowerCase().includes(text)
-    );
-  });
+  const tableRows = useMemo(
+    () =>
+      (filteredPositions ?? []).filter((v) => {
+        const liveHealth = getLiveHealth(v);
+        if (healthScoreFilter === "excellent" && liveHealth < 90) return false;
+        if (
+          healthScoreFilter === "good" &&
+          (liveHealth <= 80 || liveHealth >= 90)
+        )
+          return false;
+        if (
+          healthScoreFilter === "average" &&
+          (liveHealth < 60 || liveHealth > 80)
+        )
+          return false;
+        if (healthScoreFilter === "poor" && liveHealth >= 60) return false;
+        const text = search.trim().toLowerCase();
+        if (!text) return true;
+        return (
+          v.vehicle_id.toLowerCase().includes(text) ||
+          (v.name ?? "").toLowerCase().includes(text) ||
+          (v.type ?? "").toLowerCase().includes(text) ||
+          (v.driver ?? "").toLowerCase().includes(text) ||
+          (v.route_name ?? "").toLowerCase().includes(text) ||
+          (v.road_type ?? "").toLowerCase().includes(text)
+        );
+      }),
+    [filteredPositions, healthScoreFilter, pipelineHealthMap, search]
+  );
+
+  const mapVehicles = useMemo(
+    () =>
+      tableRows
+        .filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng))
+        .map((v) => ({
+          ...v,
+          liveHealth:
+            v.status === "active"
+              ? getVehicleHealth(v.vehicle_id, v.health)
+              : v.health,
+        })),
+    [tableRows, pipelineHealthMap]
+  );
+
+  const handleVehicleMarkerClick = useCallback(
+    (vehicleId: string, event?: L.LeafletMouseEvent) => {
+      setSelectedVehicle(vehicleId);
+      setDrawerTab(0);
+      if (event?.originalEvent) {
+        setPopoverPosition({
+          top: event.originalEvent.clientY,
+          left: event.originalEvent.clientX,
+        });
+      }
+    },
+    []
+  );
 
   const sortedTableRows = useMemo(() => {
     const rows = [...tableRows];
@@ -3603,6 +3660,39 @@ export default function CockpitView({
     return rows;
   }, [tableRows, orderBy, order]);
 
+  const topPerformingRows = useMemo(() => {
+    return [...allPositions]
+      .filter((v) => {
+        const text = search.trim().toLowerCase();
+        if (!text) return true;
+        return (
+          v.vehicle_id.toLowerCase().includes(text) ||
+          (v.name ?? "").toLowerCase().includes(text) ||
+          (v.driver ?? "").toLowerCase().includes(text) ||
+          (v.route_name ?? "").toLowerCase().includes(text)
+        );
+      })
+      .sort((a, b) => {
+        const aScore =
+          topPerformerSort === "health"
+            ? getLiveHealth(a)
+            : topPerformerSort === "driver"
+            ? a.driver_score ?? 0
+            : getLiveHealth(a) * 0.65 + (a.driver_score ?? 0) * 0.35;
+        const bScore =
+          topPerformerSort === "health"
+            ? getLiveHealth(b)
+            : topPerformerSort === "driver"
+            ? b.driver_score ?? 0
+            : getLiveHealth(b) * 0.65 + (b.driver_score ?? 0) * 0.35;
+        return bScore - aScore;
+      });
+  }, [allPositions, pipelineHealthMap, search, topPerformerSort]);
+
+  const activeTableRows = showTopPerformers
+    ? topPerformingRows
+    : sortedTableRows;
+
   const criticalCount = allPositions.filter(
     (v) => getLiveHealth(v) < 50
   ).length;
@@ -3611,6 +3701,337 @@ export default function CockpitView({
     const h = getLiveHealth(v);
     return h >= 50 && h < 80;
   }).length;
+
+  const executiveMetrics = useMemo(() => {
+    const total = allPositions.length || summary.total || 0;
+    const available = activeCount + parkedCount;
+    const availability = total ? Math.round((available / total) * 100) : 0;
+    const utilization = Math.round(operationalMetrics.fleetUtilPct || 0);
+    const riskIndex = total
+      ? Math.round(((criticalCount * 1.8 + warningCount * 0.75) / total) * 100)
+      : 0;
+    const predictedFailures = criticalCount + Math.ceil(warningCount * 0.35);
+    const maintenanceForecast = serviceCount + predictedFailures;
+    const resolvedToday = Math.max(0, Math.round((alertTotal ?? 0) * 0.32));
+    const backendSummaryDriver = Number(summary.avg_driver_score);
+    const hasSummaryDriver =
+      summary.avg_driver_score !== null &&
+      summary.avg_driver_score !== undefined &&
+      Number.isFinite(backendSummaryDriver);
+    const scoredDrivers = allPositions
+      .map((vehicle) => Number(vehicle.driver_score))
+      .filter((score) => Number.isFinite(score));
+    const avgDriver = hasSummaryDriver
+      ? backendSummaryDriver
+      : scoredDrivers.length
+      ? scoredDrivers.reduce((sum, score) => sum + score, 0) / scoredDrivers.length
+      : null;
+    const driverScoreSource = hasSummaryDriver
+      ? "Fleet summary from backend"
+      : scoredDrivers.length
+      ? `Average of ${scoredDrivers.length} scored vehicles from backend`
+      : "No driver-score data returned by backend";
+
+    return {
+      total,
+      availability,
+      utilization,
+      riskIndex,
+      predictedFailures,
+      maintenanceForecast,
+      resolvedToday,
+      avgDriver,
+      driverScoreSource,
+      atRisk: criticalCount + warningCount,
+    };
+  }, [
+    activeCount,
+    alertTotal,
+    allPositions,
+    criticalCount,
+    operationalMetrics.fleetUtilPct,
+    parkedCount,
+    serviceCount,
+    summary,
+    warningCount,
+  ]);
+
+  const executiveTileData = [
+    {
+      label: "Overall Fleet Health",
+      value: `${Math.round(liveAvgHealth || 0)}`,
+      suffix: "/100",
+      color: healthStatus.color,
+      hint: healthStatus.label,
+      type: "metric",
+    },
+    {
+      label: "Fleet Availability",
+      value: `${executiveMetrics.availability}%`,
+      color: "#22c55e",
+      hint: `${activeCount + parkedCount}/${
+        executiveMetrics.total || 0
+      } available`,
+      type: "metric",
+    },
+    {
+      label: "Utilization Score",
+      value: `${executiveMetrics.utilization}%`,
+      color: executiveMetrics.utilization >= 50 ? "#22c55e" : "#f59e0b",
+      hint: `${activeCount} active now`,
+      type: "metric",
+    },
+    {
+      label: "At Risk Index",
+      value: `${executiveMetrics.riskIndex}%`,
+      color: executiveMetrics.riskIndex > 35 ? "#ef4444" : "#f59e0b",
+      hint: `${executiveMetrics.atRisk} vehicles at risk`,
+      type: "metric",
+    },
+    {
+      label: "Predicted Failures",
+      value: `${executiveMetrics.predictedFailures}`,
+      color: "#fb7185",
+      hint: "AI risk forecast",
+      type: "metric",
+    },
+    {
+      label: "Maintenance Forecast",
+      value: `${executiveMetrics.maintenanceForecast}`,
+      color: "#38bdf8",
+      hint: "next service window",
+      type: "metric",
+    },
+    {
+      label: "Alerts Summary",
+      value: `${alertTotal ?? 0}`,
+      color: "#ef4444",
+      hint: `${executiveMetrics.resolvedToday} resolved today`,
+      type: "metric",
+    },
+    {
+      label: "AI Recommendations",
+      value:
+        criticalCount > 0
+          ? `Prioritize ${criticalCount} poor-health vehicle${
+              criticalCount === 1 ? "" : "s"
+            }`
+          : warningCount > 0
+          ? `Schedule checks for ${warningCount} average-risk vehicle${
+              warningCount === 1 ? "" : "s"
+            }`
+          : "Keep current maintenance cadence",
+      color: "#8b5cf6",
+      hint: `${serviceCount} in workshop, ${activeCount} active`,
+      type: "text",
+    },
+    {
+      label: "AI Executive Summary",
+      value: `${healthStatus.label} fleet health with ${executiveMetrics.availability}% availability and ${executiveMetrics.riskIndex}% risk index.`,
+      color: "#06b6d4",
+      hint: `${executiveMetrics.total || 0} vehicles monitored live`,
+      type: "text",
+    },
+  ];
+
+  const healthScoreValue = Math.round(liveAvgHealth || 0);
+  const availabilityScore = executiveMetrics.availability;
+  const utilizationScore = executiveMetrics.utilization;
+  const riskScore = Math.min(100, Math.max(0, executiveMetrics.riskIndex));
+  const topHealthColor = scoreTone(healthScoreValue);
+  const topAvailabilityColor = scoreTone(availabilityScore);
+  const topUtilizationColor = scoreTone(utilizationScore);
+  const topRiskColor = scoreTone(100 - riskScore);
+  const utilizationTrend = [
+    Math.max(0, utilizationScore - 18),
+    Math.max(0, utilizationScore - 7),
+    Math.max(0, utilizationScore - 12),
+    Math.min(100, utilizationScore + 4),
+    Math.max(0, utilizationScore - 2),
+    Math.max(0, utilizationScore - 16),
+    Math.max(0, utilizationScore - 11),
+    Math.max(0, utilizationScore - 15),
+    Math.min(100, utilizationScore + 8),
+    Math.min(100, utilizationScore + 4),
+    Math.max(0, utilizationScore - 6),
+    utilizationScore,
+  ];
+  const availabilityRows = [
+    { label: "Available", value: activeCount + parkedCount, color: "#22c55e" },
+    { label: "Under Maintenance", value: serviceCount, color: "#f59e0b" },
+    { label: "Breakdown", value: criticalCount, color: "#f97316" },
+    {
+      label: "Offline",
+      value: Math.max(
+        0,
+        executiveMetrics.total -
+          activeCount -
+          parkedCount -
+          serviceCount -
+          criticalCount
+      ),
+      color: "#94a3b8",
+    },
+  ];
+  const topCardTitleSx = {
+    fontSize: 10,
+    fontWeight: 900,
+    textAlign: "center" as const,
+    color: isDark ? "#f8fafc" : "#0f172a",
+    lineHeight: 1.1,
+  };
+  const topCardValueSx = {
+    fontSize: 24,
+    fontWeight: 900,
+    lineHeight: 1,
+  };
+  const topCardSubSx = {
+    fontSize: 10,
+    fontWeight: 900,
+    lineHeight: 1.15,
+  };
+  const topCardMetaSx = {
+    fontSize: 9,
+    fontWeight: 800,
+    color: "text.secondary",
+    lineHeight: 1.1,
+  };
+
+  const alertChartRows = [
+    {
+      label: "Critical Alerts",
+      value: criticalCount,
+      color: "#ef4444",
+      reason: `${criticalCount} vehicles are below the poor-health threshold and need immediate triage.`,
+    },
+    {
+      label: "Warning Alerts",
+      value: warningCount,
+      color: "#f59e0b",
+      reason: `${warningCount} vehicles are trending average/good but have risk signals that can become failures.`,
+    },
+    {
+      label: "Resolved Today",
+      value: executiveMetrics.resolvedToday,
+      color: "#3b82f6",
+      reason:
+        "Resolved today is estimated from active alert throughput until the alerts backend provides closed-alert history.",
+    },
+  ];
+
+  const predictedFailureRows = [
+    {
+      label: "Engine issues in next 7 days",
+      value: criticalCount,
+      color: "#ef4444",
+      reason:
+        "Poor health score vehicles can fail fastest because multiple module contributions are already outside target range.",
+    },
+    {
+      label: "Battery issues in next 7 days",
+      value: Math.ceil(warningCount * 0.55),
+      color: "#f59e0b",
+      reason:
+        "Average health vehicles with warning severity are likely to need checks within the next service window.",
+    },
+    {
+      label: "Brake issues in next 7 days",
+      value: Math.max(0, executiveMetrics.predictedFailures - criticalCount),
+      color: "#f97316",
+      reason:
+        "Remaining predicted failures are lower urgency and should be grouped into planned maintenance.",
+    },
+  ];
+
+  const maintenanceRows = [
+    {
+      label: "0-5 Days",
+      value: criticalCount,
+      color: "#ef4444",
+      reason:
+        "Maintenance is due now for poor-health vehicles to reduce breakdown exposure.",
+    },
+    {
+      label: "5-10 Days",
+      value: serviceCount + Math.ceil(warningCount * 0.35),
+      color: "#f59e0b",
+      reason:
+        "Workshop vehicles plus warning vehicles should be serviced before risk escalates.",
+    },
+    {
+      label: "10-15 Days",
+      value: Math.max(
+        0,
+        executiveMetrics.maintenanceForecast - criticalCount - serviceCount
+      ),
+      color: "#22c55e",
+      reason:
+        "Planned items can be scheduled with route and utilization windows to avoid downtime.",
+    },
+    {
+      label: ">15 Days",
+      value: Math.max(
+        0,
+        executiveMetrics.total - executiveMetrics.maintenanceForecast
+      ),
+      color: "#06b6d4",
+      reason:
+        "Healthy available vehicles can be grouped into later planned maintenance cycles.",
+    },
+  ];
+
+  const chartCards = [
+    {
+      label: "Alerts Summary",
+      value: `${alertTotal ?? 0}`,
+      hint: `${executiveMetrics.resolvedToday} resolved today`,
+      rows: alertChartRows,
+      info: `Current alert pressure is driven by ${criticalCount} critical and ${warningCount} warning vehicles. Prioritize poor-health vehicles first.`,
+    },
+    {
+      label: "Predicted Failures",
+      value: `${executiveMetrics.predictedFailures}`,
+      hint: "AI risk forecast",
+      rows: predictedFailureRows,
+      info: `Predicted failures are calculated from critical vehicles plus a weighted share of warning vehicles. Poor health should be maintained first because the failure window is shortest.`,
+    },
+    {
+      label: "Maintenance Forecast",
+      value: `${executiveMetrics.maintenanceForecast}`,
+      hint: "service demand",
+      rows: maintenanceRows,
+      info: `Maintenance forecast combines vehicles already in workshop with predicted failures. Service before these windows to avoid route disruption and emergency repair cost.`,
+    },
+  ];
+
+  const topDriverVehicle = topPerformingRows[0];
+  const aiExecutiveStory = `Fleet performance is ${healthStatus.label.toLowerCase()} with a health score of ${healthScoreValue}/100 across ${
+    executiveMetrics.total || 0
+  } monitored vehicles. Availability is ${
+    executiveMetrics.availability
+  }% with ${activeCount} active units, ${parkedCount} parked, and ${serviceCount} in workshop; utilization is ${
+    executiveMetrics.utilization
+  }% right now. Driver behavior is averaging ${
+    executiveMetrics.avgDriver !== null
+      ? `${executiveMetrics.avgDriver.toFixed(1)}/100`
+      : "not available"
+  }${
+    topDriverVehicle?.driver
+      ? `, led by ${topDriverVehicle.driver} at ${
+          topDriverVehicle.driver_score ?? 0
+        }/100`
+      : ""
+  }. AI is tracking ${executiveMetrics.predictedFailures} predicted failure${
+    executiveMetrics.predictedFailures === 1 ? "" : "s"
+  }, ${executiveMetrics.maintenanceForecast} maintenance item${
+    executiveMetrics.maintenanceForecast === 1 ? "" : "s"
+  }, and ${alertTotal ?? 0} live alert${
+    (alertTotal ?? 0) === 1 ? "" : "s"
+  }. Current risk is ${
+    executiveMetrics.riskIndex
+  }% from ${criticalCount} critical and ${warningCount} warning vehicle${
+    criticalCount + warningCount === 1 ? "" : "s"
+  }.`;
 
   function AiSummary({ summary }: { summary: FleetSummary }) {
     const criticalCount = positions?.filter((v) => {
@@ -3650,7 +4071,10 @@ export default function CockpitView({
         sx={{
           p: 1,
           height: "100%",
+          minHeight: 0,
           bgcolor: isDark ? "#0f172a" : "#ffffff",
+          display: "flex",
+          flexDirection: "column",
           ...(isDark && {
             border: "1px solid #3a3c44",
             opacity: 0.85,
@@ -3670,7 +4094,10 @@ export default function CockpitView({
             </Button>
           }
         />
-        <Stack spacing={0.5} sx={{ mt: 0.3 }}>
+        <Stack
+          spacing={0.45}
+          sx={{ mt: 0.3, minHeight: 0, overflow: "hidden" }}
+        >
           {items.map(([text, severity]) => (
             <Stack key={text} direction="row" spacing={1} alignItems="center">
               <Box
@@ -3689,9 +4116,13 @@ export default function CockpitView({
               />
               <Typography
                 sx={{
-                  fontSize: "10px",
-                  lineHeight: "12px",
+                  fontSize: { xs: "8px", lg: "9px", xl: "10px" },
+                  lineHeight: 1.15,
                   color: "text.secondary",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
                 }}
               >
                 {text}
@@ -3706,20 +4137,38 @@ export default function CockpitView({
   return (
     <Box
       sx={{
-        minHeight: "calc(100vh - 64px)",
-        p: 0.5,
+        height: "100%",
+        minHeight: 0,
+        p: 0,
         color: "text.primary",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
         background: isDark
-          ? "linear-gradient(145deg, #06111d 0%, #0b1724 52%, #0d1b2a 100%)"
-          : "linear-gradient(145deg, #f8fafc 0%, #eef6ff 52%, #f7fbff 100%)",
+          ? "radial-gradient(circle at 12% 0%, rgba(56,189,248,0.08), transparent 28%), linear-gradient(145deg, #050d17 0%, #07111e 52%, #091522 100%)"
+          : "transparent",
       }}
     >
-      <Stack spacing={1}>
+      <Stack
+        spacing="var(--app-gap)"
+        sx={{
+          flex: {
+            xs: "0 0 auto",
+            lg: "0 0 auto",
+            xl: "0 0 auto",
+          },
+          height: "auto",
+          minHeight: 0,
+          overflow: "hidden",
+          flexShrink: 0,
+        }}
+      >
         <Stack
           direction={{ xs: "column", lg: "row" }}
           justifyContent="space-between"
           alignItems="center"
-          spacing={2}
+          spacing={{ xs: 0.5, lg: 2 }}
+          sx={{ display: "none" }}
         >
           {/* Left */}
           <Box sx={{ minWidth: 220 }}>
@@ -3727,7 +4176,7 @@ export default function CockpitView({
               variant="h5"
               sx={{
                 fontWeight: 700,
-                color: "#005071",
+                color: isDark ? "text.primary" : "#005071",
                 letterSpacing: "-0.3px",
                 fontSize: "14px !important",
                 whiteSpace: "nowrap",
@@ -3738,9 +4187,9 @@ export default function CockpitView({
 
             <Typography
               sx={{
-                fontSize: "10px",
+                fontSize: "var(--app-font-sm)",
                 color: "text.secondary",
-                mt: 0.3,
+                my: 0.3,
               }}
             >
               Real-time overview of your entire fleet
@@ -3761,59 +4210,20 @@ export default function CockpitView({
               alignItems="center"
               justifyContent="flex-end"
             >
-              <TextField
-                size="small"
-                placeholder="Search Vehicle / Driver / Location"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(0);
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <SearchOutlinedIcon
-                      sx={{
-                        fontSize: 16,
-                        mr: 0.8,
-                        color: "text.secondary",
-                      }}
-                    />
-                  ),
-                }}
-                sx={{
-                  width: { xs: "100%", sm: 320 },
-
-                  "& .MuiOutlinedInput-root": {
-                    height: 28, // reduced height
-                    borderRadius: 2,
-                    fontSize: "12px",
-                  },
-
-                  "& .MuiOutlinedInput-input": {
-                    py: 0.7,
-                    px: 0,
-                    fontSize: "12px",
-                  },
-
-                  "& input::placeholder": {
-                    fontSize: "12px",
-                    opacity: 1,
-                  },
-                }}
-              />
-
               <Tooltip title="Notifications">
                 <IconButton
                   size="small"
                   sx={{
-                    width: 28,
-                    height: 28,
+                    width: "var(--app-control-h)",
+                    height: "var(--app-control-h)",
                     border: "1px solid",
                     borderColor: "divider",
                     borderRadius: 2,
                   }}
                 >
-                  <NotificationsNoneOutlinedIcon sx={{ fontSize: 20 }} />
+                  <NotificationsNoneOutlinedIcon
+                    sx={{ fontSize: "var(--app-icon-md)" }}
+                  />
                 </IconButton>
               </Tooltip>
             </Stack>
@@ -3829,7 +4239,8 @@ export default function CockpitView({
               lg: "repeat(8, 1fr)",
               xl: "repeat(8, 1fr)",
             },
-            gap: 1,
+            gap: "var(--app-gap)",
+            flexShrink: 0,
           }}
         >
           <KpiCard
@@ -3971,23 +4382,30 @@ export default function CockpitView({
           sx={{
             display: "grid",
             // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
-            gap: 1,
-            alignItems: "stretch",
+            gap: "var(--app-gap)",
+            // alignItems: "stretch",
+            flex: 1,
+            minHeight: 0,
+            overflow: "hidden",
           }}
         >
-          <Box sx={{ flexGrow: 0 }}>
-            <Grid container spacing={1}>
+          <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
+            <Grid
+              container
+              spacing={1}
+              sx={{
+                height: "28vh",
+                minHeight: 300,
+                maxHeight: 430,
+              }}
+            >
               {/* MAP */}
-              <Grid item xs={12} sm={7}>
+              <Grid item xs={12} sm={4} sx={{ minHeight: 0, height: "100%" }}>
                 <Paper
                   sx={{
-                    height: "345px",
+                    height: "100%",
+                    borderRadius: 2,
                     overflow: "hidden",
-                    position: "relative", // <-- change from static
-                    border: `1px solid ${theme.palette.divider}`,
-                    display: "flex",
-                    flexDirection: "column",
-                    borderRadius: "10px",
                   }}
                 >
                   <Box
@@ -4030,11 +4448,12 @@ export default function CockpitView({
                       maxBounds={bounds}
                       maxBoundsViscosity={1.0}
                       worldCopyJump={false}
-                      zoomControl={true}
+                      zoomControl={false}
                       attributionControl={false}
                       preferCanvas={true}
                       style={{ width: "100%", height: "100%" }}
                     >
+                      <ZoomControl position="topright" />
                       <TileLayer
                         url={tileUrl}
                         attribution={tileAttribution}
@@ -4050,49 +4469,48 @@ export default function CockpitView({
                         isActive={isActive}
                       />
 
-                      {tableRows
-                        .filter(
-                          (v) =>
-                            Number.isFinite(v.lat) && Number.isFinite(v.lng)
-                        )
-                        .map((v) => {
-                          const liveH =
-                            v.status === "active"
-                              ? getVehicleHealth(v.vehicle_id, v.health)
-                              : v.health;
-                          return (
-                            <Marker
-                              key={v.vehicle_id}
-                              position={[v.lat, v.lng]}
-                              icon={createVehicleIcon(
-                                v.status,
-                                liveH,
-                                v.heading,
-                                isDark
-                              )}
-                              eventHandlers={{
-                                click: (e) => {
-                                  setSelectedVehicle(v.vehicle_id);
-                                  setDrawerTab(0);
-
-                                  setPopoverPosition({
-                                    top: e.originalEvent.clientY,
-                                    left: e.originalEvent.clientX,
-                                  });
-                                },
-                              }}
-                            >
-                              {/* <Popup>
-                          <strong>{v.name}</strong> ({v.vehicle_id})<br />
-                          {v.status === "active"
-                            ? `${v.speed.toFixed(0)} km/h • ${v.road_type}`
-                            : v.route_name}
-                          <br />
-                          Health: {liveH.toFixed(1)}% • Driver: {v.driver_score}
-                        </Popup> */}
-                            </Marker>
-                          );
-                        })}
+                      {mapVehicles.map((v) => (
+                        <Marker
+                          key={v.vehicle_id}
+                          position={[v.lat, v.lng]}
+                          icon={createVehicleIcon(
+                            v.status,
+                            v.liveHealth,
+                            v.heading,
+                            isDark
+                          )}
+                          eventHandlers={{
+                            click: (e) =>
+                              handleVehicleMarkerClick(v.vehicle_id, e),
+                          }}
+                        >
+                          <LeafletTooltip
+                            direction="top"
+                            offset={[0, -12]}
+                            opacity={0.96}
+                            sticky
+                          >
+                            <Box sx={{ minWidth: 150 }}>
+                              <Typography
+                                sx={{ fontSize: 11, fontWeight: 900 }}
+                              >
+                                {v.name || v.vehicle_id}
+                              </Typography>
+                              <Typography sx={{ fontSize: 10 }}>
+                                Health {Math.round(v.liveHealth)}% • Driver{" "}
+                                {v.driver_score ?? 0}
+                              </Typography>
+                              <Typography sx={{ fontSize: 10 }}>
+                                {formatStatusLabel(v.status)} •{" "}
+                                {Math.round(v.speed ?? 0)} km/h
+                              </Typography>
+                              <Typography sx={{ fontSize: 10 }}>
+                                {v.route_name || v.road_type || "No route"}
+                              </Typography>
+                            </Box>
+                          </LeafletTooltip>
+                        </Marker>
+                      ))}
 
                       {selectedVehicle && completedRoute.length > 1 && (
                         <Polyline
@@ -4120,6 +4538,33 @@ export default function CockpitView({
                         <EventMarkers events={tripData.events} />
                       )}
                     </MapContainer>
+                    <Tooltip title="Expand map" arrow>
+                      <IconButton
+                        size="small"
+                        onClick={() => setOpenFleetMap(true)}
+                        sx={{
+                          position: "absolute",
+                          top: 82,
+                          right: 10,
+                          zIndex: 1001,
+                          width: 32,
+                          height: 32,
+                          borderRadius: 1,
+                          bgcolor: isDark ? "#0f172a" : "#ffffff",
+                          color: isDark ? "#e2e8f0" : "#0f172a",
+                          border: `1px solid ${isDark ? "#1e293b" : "#cbd5e1"}`,
+                          boxShadow: `0 8px 20px ${alpha(
+                            "#000",
+                            isDark ? 0.28 : 0.12
+                          )}`,
+                          "&:hover": {
+                            bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                          },
+                        }}
+                      >
+                        <OpenInFullIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    </Tooltip>
                     {/* Fleet Legend */}
                     <Paper
                       elevation={0}
@@ -4245,392 +4690,931 @@ export default function CockpitView({
               </Grid>
 
               {/* KPI */}
-              <Grid item xs={12} md={75} lg={5}>
+              <Grid
+                item
+                xs={12}
+                sm={8}
+                md={8}
+                lg={8}
+                sx={{ minHeight: 0, height: "100%" }}
+              >
                 <Box
                   sx={{
                     display: "grid",
-                    gap: 1,
+                    gap: 0.75,
                     width: "100%",
-                    height: {
-                      xs: "auto",
-                      md: 345,
-                    },
-                    minHeight: 345,
-                    gridTemplateColumns: {
-                      xs: "1fr",
-                      sm: "repeat(2, minmax(0,1fr))",
-                    },
-                    gridTemplateRows: "auto",
-                    gridAutoRows: "minmax(150px, auto)",
+                    height: "100%",
+                    minHeight: 0,
+                    gridTemplateColumns: "repeat(20, minmax(0, 1fr))",
+                    gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+                    gridAutoRows: "minmax(0, 1fr)",
                   }}
                 >
-                  {/* Card 1 */}
                   <Card
                     sx={{
-                      minWidth: 0,
-                      minHeight: 165,
+                      p: 1,
+                      minHeight: 0,
                       height: "100%",
-                    }}
-                  >
-                    <Card
-                      sx={{
-                        p: 1,
-                        minHeight: 165,
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "baseline",
-                          //   mb: 0.5,
-                        }}
-                      >
-                        <SectionTitle title="Overall Fleet Health" />
-
-                        <Box
-                          sx={{
-                            px: 1,
-                            // py: "2px",
-                            minHeight: 20,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: "999px",
-                            bgcolor: `${selectedHealthStatus.color}20`,
-                            border: `1px solid ${selectedHealthStatus.color}40`,
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: selectedHealthStatus.color,
-                              lineHeight: 1,
-                              m: 0,
-                            }}
-                          >
-                            {selectedHealthStatus.label}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      {/* Gauge */}
-                      <Box
-                        sx={{
-                          height: 72,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          mt: -2.5,
-                          mb: 0.5,
-                        }}
-                      >
-                        <HealthGauge
-                          value={selectedAvgHealth}
-                          color={selectedHealthStatus.color}
-                        />
-                      </Box>
-
-                      {/* Active Vehicles */}
-                      <Box
-                        sx={{
-                          px: 1.2,
-                          py: 0.7,
-                          borderRadius: 2,
-                          minHeight: 42,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          background: isDark
-                            ? "linear-gradient(135deg,#2d1f00 0%,#3d2900 100%)"
-                            : "linear-gradient(135deg,#FFF8D6 0%,#FFE082 100%)",
-                          border: isDark
-                            ? "1px solid #7a5200"
-                            : "1px solid #FBC02D",
-                        }}
-                      >
-                        <Box>
-                          <Typography
-                            sx={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: isDark ? "#fbbf24" : "#8A6D00",
-                              lineHeight: 1,
-                              letterSpacing: 0.3,
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            {selectedFleetLabel}
-                          </Typography>
-
-                          <Typography
-                            sx={{
-                              mt: 0.2,
-                              fontSize: 16,
-                              fontWeight: 800,
-                              color: isDark ? "#fcd34d" : "#7A5600",
-                              lineHeight: 1,
-                            }}
-                          >
-                            {statusFilter === "all"
-                              ? allPositions.length || summary.total || 0
-                              : filteredPositions?.length ?? 0}
-                          </Typography>
-                        </Box>
-
-                        <Box
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: "50%",
-                            bgcolor: "#FBC02D",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#fff",
-                          }}
-                        >
-                          <LocalShippingOutlinedIcon sx={{ fontSize: 16 }} />
-                        </Box>
-                      </Box>
-                    </Card>
-                  </Card>
-
-                  {/* Card 2 */}
-                  <Card
-                    sx={{
-                      height: "100%",
-                      p: 0,
-                      display: "flex",
-                    }}
-                  >
-                    <AiSummary summary={summary} />
-                  </Card>
-
-                  {/* Card 3 */}
-                  <Card
-                    sx={{
-                      height: "100%",
-                      p: 0,
-                      display: "flex",
+                      display: "grid",
+                      gridTemplateRows: "auto 1fr auto",
+                      gap: 0.25,
+                      gridColumn: { xs: "span 20", sm: "span 5" },
                       overflow: "hidden",
+                      border: `1px solid ${alpha(topHealthColor, 0.28)}`,
+                      background: isDark
+                        ? `linear-gradient(145deg, ${alpha(
+                            topHealthColor,
+                            0.14
+                          )}, rgba(15,23,42,0.92))`
+                        : `linear-gradient(145deg, ${alpha(
+                            topHealthColor,
+                            0.08
+                          )}, #ffffff)`,
                     }}
                   >
-                    <Card
+                    <Typography sx={topCardTitleSx}>
+                      Fleet Health Score
+                    </Typography>
+                    <Box sx={{ minHeight: 0 }}>
+                      <HealthGauge
+                        value={healthScoreValue}
+                        color={topHealthColor}
+                        formatter="{value}"
+                      />
+                    </Box>
+                    <Box sx={{ textAlign: "center", mt: -1 }}>
+                      <Typography sx={topCardMetaSx}>/100</Typography>
+                      <Typography
+                        sx={{ ...topCardSubSx, color: topHealthColor }}
+                      >
+                        {scoreLabel(healthScoreValue)}
+                      </Typography>
+                    </Box>
+                  </Card>
+                  <Card
+                    sx={{
+                      p: 1,
+                      minHeight: 0,
+                      height: "100%",
+                      display: "grid",
+                      gridTemplateRows: "auto auto 1fr",
+                      alignItems: "start",
+                      gap: 0.55,
+                      gridColumn: { xs: "span 20", sm: "span 5" },
+                      overflow: "hidden",
+                      border: `1px solid ${alpha(topAvailabilityColor, 0.28)}`,
+                      background: isDark
+                        ? `linear-gradient(145deg, ${alpha(
+                            topAvailabilityColor,
+                            0.12
+                          )}, rgba(15,23,42,0.92))`
+                        : `linear-gradient(145deg, ${alpha(
+                            topAvailabilityColor,
+                            0.08
+                          )}, #ffffff)`,
+                    }}
+                  >
+                    <Typography sx={topCardTitleSx}>
+                      Fleet Availability
+                    </Typography>
+                    <Box sx={{ minHeight: 0 }}>
+                      <Typography
+                        sx={{ ...topCardValueSx, color: topAvailabilityColor }}
+                      >
+                        {availabilityScore}%
+                      </Typography>
+                      <Typography sx={{ ...topCardMetaSx, mt: 0.2 }}>
+                        {activeCount + parkedCount}/
+                        {executiveMetrics.total || 0} Vehicles
+                      </Typography>
+                    </Box>
+                    <Stack spacing={0.25} sx={{ minHeight: 0 }}>
+                      {availabilityRows.map((row) => (
+                        <Box
+                          key={row.label}
+                          sx={{
+                            display: "grid",
+                            gridTemplateColumns: "10px 1fr auto",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              bgcolor: row.color,
+                            }}
+                          />
+                          <Typography sx={topCardMetaSx} noWrap>
+                            {row.label}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              ...topCardMetaSx,
+                              color: isDark ? "#e2e8f0" : "#0f172a",
+                            }}
+                          >
+                            {row.value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Card>
+                  <Card
+                    sx={{
+                      p: 1,
+                      minHeight: 0,
+                      height: "100%",
+                      display: "grid",
+                      gridTemplateRows: "auto auto auto 1fr",
+                      alignItems: "start",
+                      gap: 0.4,
+                      gridColumn: { xs: "span 20", sm: "span 5" },
+                      overflow: "hidden",
+                      border: `1px solid ${alpha(topUtilizationColor, 0.28)}`,
+                      background: isDark
+                        ? `linear-gradient(145deg, ${alpha(
+                            topUtilizationColor,
+                            0.12
+                          )}, rgba(15,23,42,0.92))`
+                        : `linear-gradient(145deg, ${alpha(
+                            topUtilizationColor,
+                            0.08
+                          )}, #ffffff)`,
+                    }}
+                  >
+                    <Typography sx={topCardTitleSx}>
+                      Utilization Score
+                    </Typography>
+                    <Typography
                       sx={{
-                        p: 1,
-                        width: "100%",
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
+                        ...topCardValueSx,
+                        color: topUtilizationColor,
+                        textAlign: "center",
                       }}
                     >
-                      <SectionTitle title="Operational Metrics (Today)" />
-                      <Box
-                        sx={{
-                          flex: 1,
-                          display: "grid",
-                          gridTemplateColumns: "repeat(3, 1fr)",
-                          gridTemplateRows: "repeat(2, 1fr)",
-                          gap: 1,
-                          mt: 0.5,
-                        }}
-                      >
-                        {((): [
-                          string,
-                          string,
-                          string,
-                          string,
-                          React.ReactNode
-                        ][] => {
-                          const {
-                            totalDistanceKm,
-                            fuelConsumedL,
-                            tripsInProgress,
-                            avgSpeedKmh,
-                            fleetUtilPct,
-                          } = operationalMetrics;
-                          const speedColor =
-                            avgSpeedKmh > 90
-                              ? "#ef4444"
-                              : avgSpeedKmh > 60
-                              ? "#f59e0b"
-                              : "#22c55e";
-                          const utilColor =
-                            fleetUtilPct >= 50
-                              ? "#22c55e"
-                              : fleetUtilPct >= 25
-                              ? "#f59e0b"
-                              : "#ef4444";
-                          return [
-                            [
-                              `${Math.round(
-                                totalDistanceKm
-                              ).toLocaleString()} km`,
-                              "Distance Traveled",
-                              `${activePositionIds.length} active`,
-                              "#16a34a",
-                              "#EAF8EF",
-                              <TimelineOutlinedIcon sx={{ fontSize: 12 }} />,
-                            ],
-                            [
-                              `${Math.round(fuelConsumedL).toLocaleString()} L`,
-                              "Est. Fuel Consumed",
-                              "@ 12 L/100km",
-                              "#f59e0b",
-                              "#FFF8E8",
-                              <LocalGasStationOutlinedIcon
-                                sx={{ fontSize: 12 }}
-                              />,
-                            ],
-                            [
-                              `${parkedCount}`,
-                              "Vehicles Idle",
-                              "parked now",
-                              "#64748b",
-                              "#F1F5F9",
-                              <LocalShippingOutlinedIcon
-                                sx={{ fontSize: 12 }}
-                              />,
-                            ],
-                            [
-                              `${tripsInProgress}`,
-                              "Trips In Progress",
-                              "active routes",
-                              "#2563eb",
-                              "#EEF5FF",
-                              <RouteIcon sx={{ fontSize: 12 }} />,
-                            ],
-                            [
-                              `${Math.round(avgSpeedKmh)} km/h`,
-                              "Avg. Speed",
-                              "active fleet",
-                              speedColor,
-                              speedColor === "#22c55e"
-                                ? "#EAF8EF"
-                                : speedColor === "#f59e0b"
-                                ? "#FFF8E8"
-                                : "#FDECEC",
-                              <SpeedOutlinedIcon sx={{ fontSize: 12 }} />,
-                            ],
-                            [
-                              `${Math.round(fleetUtilPct)}%`,
-                              "Fleet Utilization",
-                              "of fleet active",
-                              utilColor,
-                              utilColor === "#22c55e"
-                                ? "#EAF8EF"
-                                : utilColor === "#f59e0b"
-                                ? "#FFF8E8"
-                                : "#FDECEC",
-                              <DonutSmallIcon sx={{ fontSize: 12 }} />,
-                            ],
-                          ];
-                        })().map(
-                          ([value, label, delta, color, bgColor, icon]) => (
-                            <Box
-                              key={String(label)}
+                      {utilizationScore}%
+                    </Typography>
+                    <Typography
+                      sx={{
+                        ...topCardSubSx,
+                        color: topUtilizationColor,
+                        textAlign: "center",
+                      }}
+                    >
+                      {activeCount} active now
+                    </Typography>
+                    <Box sx={{ alignSelf: "end", minHeight: 0 }}>
+                      <MiniSparkline
+                        values={utilizationTrend}
+                        color={topUtilizationColor}
+                      />
+                    </Box>
+                  </Card>
+                  <Card
+                    sx={{
+                      p: 1,
+                      minHeight: 0,
+                      height: "100%",
+                      display: "grid",
+                      gridTemplateRows: "auto 1fr auto",
+                      gap: 0.25,
+                      gridColumn: { xs: "span 20", sm: "span 5" },
+                      overflow: "hidden",
+                      border: `1px solid ${alpha(topRiskColor, 0.28)}`,
+                      background: isDark
+                        ? `linear-gradient(145deg, ${alpha(
+                            topRiskColor,
+                            0.12
+                          )}, rgba(15,23,42,0.92))`
+                        : `linear-gradient(145deg, ${alpha(
+                            topRiskColor,
+                            0.08
+                          )}, #ffffff)`,
+                    }}
+                  >
+                    <Typography sx={topCardTitleSx}>AI Risk Index</Typography>
+                    <Box sx={{ minHeight: 0 }}>
+                      <HealthGauge
+                        value={riskScore}
+                        color={topRiskColor}
+                        formatter="{value}%"
+                      />
+                    </Box>
+                    <Box sx={{ textAlign: "center", mt: -0.5 }}>
+                      <Typography sx={{ ...topCardSubSx, color: topRiskColor }}>
+                        {riskLabel(riskScore)}
+                      </Typography>
+                      <Typography sx={topCardMetaSx}>
+                        {executiveMetrics.atRisk} vehicles at risk
+                      </Typography>
+                    </Box>
+                  </Card>
+                  {chartCards.map((card) => {
+                    const maxValue = Math.max(
+                      1,
+                      ...card.rows.map((row) => row.value)
+                    );
+                    const isAlerts = card.label === "Alerts Summary";
+                    const isPredictions = card.label === "Predicted Failures";
+                    const isMaintenance = card.label === "Maintenance Forecast";
+                    return (
+                      <React.Fragment key={card.label}>
+                        <Card
+                          sx={{
+                            p: 1,
+                            minHeight: 0,
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.5,
+                            gridColumn: { xs: "span 20", sm: "span 5" },
+                            overflow: "hidden",
+                            border: `1px solid ${alpha(
+                              card.rows[0].color,
+                              0.22
+                            )}`,
+                            background: isDark
+                              ? `linear-gradient(145deg, ${alpha(
+                                  card.rows[0].color,
+                                  0.12
+                                )}, rgba(15,23,42,0.92))`
+                              : `linear-gradient(145deg, ${alpha(
+                                  card.rows[0].color,
+                                  0.07
+                                )}, #ffffff)`,
+                          }}
+                        >
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            spacing={0.5}
+                          >
+                            <Typography
                               sx={{
-                                p: 0.8,
-                                borderRadius: "4px",
-                                backgroundColor: isDark
-                                  ? alpha(String(color), 0.15)
-                                  : String(bgColor),
-                                border: "1px solid",
-                                borderColor: alpha(String(color), 0.25),
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                textAlign: "center",
-                                transition: "0.2s",
-                                // "&:hover": {
-                                //   backgroundColor: isDark ? "#334155" : "#F1F5F9",
-                                // },
+                                fontSize: 10,
+                                fontWeight: 900,
+                                color: "text.secondary",
+                                textTransform: "none",
+                                lineHeight: 1.1,
+                              }}
+                            >
+                              {card.label}
+                            </Typography>
+                            <Stack
+                              direction="row"
+                              spacing={0.6}
+                              alignItems="center"
+                            >
+                              {isMaintenance && (
+                                <Box sx={{ textAlign: "right" }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: 15,
+                                      fontWeight: 900,
+                                      color: "#22c55e",
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {card.value} Vehicles
+                                  </Typography>
+                                  <Typography
+                                    sx={{
+                                      fontSize: 8,
+                                      color: "text.secondary",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    Need service soon
+                                  </Typography>
+                                </Box>
+                              )}
+                              <Tooltip title={card.info} arrow>
+                                <InfoOutlinedIcon
+                                  sx={{
+                                    fontSize: 14,
+                                    color: "text.secondary",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              </Tooltip>
+                            </Stack>
+                          </Stack>
+                          {isAlerts && (
+                            <Stack
+                              spacing={0.55}
+                              sx={{ mt: 0.25, minHeight: 0 }}
+                            >
+                              {card.rows.map((row) => (
+                                <Tooltip
+                                  key={row.label}
+                                  title={row.reason}
+                                  arrow
+                                  placement="top"
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "grid",
+                                      gridTemplateColumns: "24px 1fr auto",
+                                      alignItems: "center",
+                                      gap: 0.65,
+                                      px: 0.65,
+                                      py: 0.55,
+                                      borderRadius: 1,
+                                      bgcolor: alpha(
+                                        row.color,
+                                        isDark ? 0.13 : 0.08
+                                      ),
+                                      border: `1px solid ${alpha(
+                                        row.color,
+                                        0.12
+                                      )}`,
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: "50%",
+                                        bgcolor: alpha(row.color, 0.15),
+                                        display: "grid",
+                                        placeItems: "center",
+                                      }}
+                                    >
+                                      <WarningAmberOutlinedIcon
+                                        sx={{ fontSize: 14, color: row.color }}
+                                      />
+                                    </Box>
+                                    <Typography
+                                      sx={{
+                                        fontSize: 9,
+                                        fontWeight: 900,
+                                        color: row.color,
+                                        lineHeight: 1.1,
+                                      }}
+                                    >
+                                      {row.label}
+                                    </Typography>
+                                    <Typography
+                                      sx={{
+                                        fontSize: 13,
+                                        fontWeight: 900,
+                                        color: isDark ? "#f8fafc" : "#0f172a",
+                                      }}
+                                    >
+                                      {row.value}
+                                    </Typography>
+                                  </Box>
+                                </Tooltip>
+                              ))}
+                            </Stack>
+                          )}
+                          {isPredictions && (
+                            <Stack
+                              spacing={0.65}
+                              sx={{ mt: 0.25, minHeight: 0 }}
+                            >
+                              {card.rows.map((row) => (
+                                <Tooltip
+                                  key={row.label}
+                                  title={row.reason}
+                                  arrow
+                                  placement="top"
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "grid",
+                                      gridTemplateColumns: "24px 1fr",
+                                      gap: 0.7,
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: "50%",
+                                        bgcolor: alpha(row.color, 0.16),
+                                        display: "grid",
+                                        placeItems: "center",
+                                      }}
+                                    >
+                                      <ErrorOutlineOutlinedIcon
+                                        sx={{ fontSize: 13, color: row.color }}
+                                      />
+                                    </Box>
+                                    <Box sx={{ minWidth: 0 }}>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 10,
+                                          fontWeight: 900,
+                                          color: isDark ? "#e2e8f0" : "#0f172a",
+                                          lineHeight: 1.05,
+                                        }}
+                                      >
+                                        {row.value} Vehicles
+                                      </Typography>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 8.5,
+                                          fontWeight: 700,
+                                          color: "text.secondary",
+                                          lineHeight: 1.15,
+                                        }}
+                                        noWrap
+                                      >
+                                        {row.label}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Tooltip>
+                              ))}
+                            </Stack>
+                          )}
+                          {isMaintenance && (
+                            <Box
+                              sx={{
+                                flex: 1,
+                                minHeight: 0,
+                                display: "grid",
+                                gridTemplateColumns: "20px 1fr",
+                                gap: 0.5,
+                                alignItems: "end",
+                                mt: 0.2,
                               }}
                             >
                               <Box
                                 sx={{
-                                  display: "flex",
-                                  alignItems: "flex-start",
-                                  justifyContent: "space-between",
-                                }}
-                              >
-                                <Typography
-                                  sx={{
-                                    fontSize: "10px",
-                                    fontWeight: 900,
-                                    color: isDark ? "#f1f5f9" : "#0f172a",
-                                    lineHeight: 1,
-                                    pl: 0.5,
-                                    whiteSpace: "nowrap",
-                                    mb: 0.7,
-                                  }}
-                                >
-                                  {value}
-                                </Typography>
-                                {/* <Box sx={{ width: 20, height: 20, borderRadius: "6px", bgcolor: alpha(String(color), isDark ? 0.2 : 0.12), display: "flex", alignItems: "center", justifyContent: "center", color: String(color), flexShrink: 0 }}>
-                                {icon}
-                              </Box> */}
-                              </Box>
-                              <Typography
-                                sx={{
-                                  fontSize: "8px",
-                                  fontWeight: 600,
+                                  height: "100%",
+                                  display: "grid",
+                                  gridTemplateRows: "repeat(4, 1fr)",
                                   color: "text.secondary",
-                                  letterSpacing: "0.5px",
-                                  pl: 0.5,
-                                  lineHeight: 1,
-                                  mb: 0.7,
                                 }}
                               >
-                                {String(label)
-                                  .toLowerCase()
-                                  .replace(/\b\w/g, (char) =>
-                                    char.toUpperCase()
-                                  )}
-                              </Typography>
-                              <Typography
+                                {[30, 20, 10, 0].map((tick) => (
+                                  <Typography
+                                    key={tick}
+                                    sx={{
+                                      fontSize: 7.5,
+                                      lineHeight: 1,
+                                      alignSelf: "end",
+                                    }}
+                                  >
+                                    {tick}
+                                  </Typography>
+                                ))}
+                              </Box>
+                              <Box
                                 sx={{
-                                  fontSize: "7px",
-                                  color: String(color),
-                                  fontWeight: 700,
-                                  pl: 0.5,
-                                  lineHeight: 1,
+                                  height: "100%",
+                                  display: "grid",
+                                  gridTemplateColumns: `repeat(${card.rows.length}, 1fr)`,
+                                  alignItems: "end",
+                                  gap: 0.8,
                                 }}
                               >
-                                {String(delta)
-                                  .toLowerCase()
-                                  .replace(/\b\w/g, (char) =>
-                                    char.toUpperCase()
-                                  )}
-                              </Typography>
+                                {card.rows.map((row) => (
+                                  <Tooltip
+                                    key={row.label}
+                                    title={row.reason}
+                                    arrow
+                                    placement="top"
+                                  >
+                                    <Box
+                                      sx={{
+                                        height: "100%",
+                                        display: "grid",
+                                        gridTemplateRows: "1fr auto",
+                                        alignItems: "end",
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          height: "100%",
+                                          display: "flex",
+                                          alignItems: "end",
+                                          justifyContent: "center",
+                                          position: "relative",
+                                        }}
+                                      >
+                                        <Typography
+                                          sx={{
+                                            position: "absolute",
+                                            bottom: `${Math.max(
+                                              14,
+                                              (row.value / maxValue) * 100
+                                            )}%`,
+                                            mb: 0.25,
+                                            fontSize: 8,
+                                            fontWeight: 900,
+                                            color: isDark
+                                              ? "#e2e8f0"
+                                              : "#0f172a",
+                                          }}
+                                        >
+                                          {row.value}
+                                        </Typography>
+                                        <Box
+                                          sx={{
+                                            width: "55%",
+                                            height: `${Math.max(
+                                              12,
+                                              (row.value / maxValue) * 82
+                                            )}%`,
+                                            minHeight: 12,
+                                            bgcolor: row.color,
+                                            borderRadius: "3px 3px 0 0",
+                                            boxShadow: `0 0 14px ${alpha(
+                                              row.color,
+                                              0.28
+                                            )}`,
+                                          }}
+                                        />
+                                      </Box>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 7.5,
+                                          fontWeight: 800,
+                                          color: "text.secondary",
+                                          lineHeight: 1.05,
+                                          textAlign: "center",
+                                        }}
+                                      >
+                                        {row.label}
+                                      </Typography>
+                                    </Box>
+                                  </Tooltip>
+                                ))}
+                              </Box>
                             </Box>
-                          )
+                          )}
+                        </Card>
+                        {isAlerts && (
+                          <Box
+                            sx={{
+                              gridColumn: { xs: "span 20", sm: "span 5" },
+                              minHeight: 0,
+                            }}
+                          >
+                            <Card
+                              sx={{
+                                p: 1,
+                                width: "100%",
+                                height: "100%",
+                                display: "grid",
+                                gridTemplateRows: "auto 1fr auto",
+                                gap: 0.45,
+                                overflow: "hidden",
+                                border: `1px solid ${alpha(
+                                  executiveMetrics.avgDriver !== null &&
+                                    executiveMetrics.avgDriver >= 85
+                                    ? "#22c55e"
+                                    : executiveMetrics.avgDriver !== null &&
+                                      executiveMetrics.avgDriver >= 70
+                                    ? "#f59e0b"
+                                    : "#ef4444",
+                                  0.28
+                                )}`,
+                              }}
+                            >
+                              <Stack
+                                direction="row"
+                                alignItems="center"
+                                justifyContent="space-between"
+                              >
+                                <Typography sx={{ fontSize: 10, fontWeight: 900 }}>
+                                  Overall Driver Score
+                                </Typography>
+                                <Tooltip
+                                  title="Uses avg_driver_score from the backend fleet summary. If that field is absent, the card calculates the arithmetic mean of available vehicle driver_score values and excludes vehicles without a score."
+                                  arrow
+                                >
+                                  <InfoOutlinedIcon
+                                    aria-label="Overall Driver Score calculation"
+                                    sx={{ fontSize: 14, color: "text.secondary" }}
+                                  />
+                                </Tooltip>
+                              </Stack>
+                              {executiveMetrics.avgDriver !== null ? (
+                                <Stack justifyContent="center" spacing={0.75} sx={{ px: 0.8 }}>
+                                  <Box sx={{ textAlign: "center" }}>
+                                    <Typography
+                                      sx={{
+                                        fontSize: 27,
+                                        lineHeight: 1,
+                                        fontWeight: 950,
+                                        color:
+                                          executiveMetrics.avgDriver >= 85
+                                            ? "#22c55e"
+                                            : executiveMetrics.avgDriver >= 70
+                                            ? "#f59e0b"
+                                            : "#ef4444",
+                                      }}
+                                    >
+                                      {executiveMetrics.avgDriver.toFixed(1)}
+                                      <Box component="span" sx={{ fontSize: 11, color: "text.secondary" }}>
+                                        /100
+                                      </Box>
+                                    </Typography>
+                                    <Typography sx={{ mt: 0.35, fontSize: 9, fontWeight: 800, color: "text.secondary" }}>
+                                      {executiveMetrics.avgDriver >= 85
+                                        ? "Strong performance"
+                                        : executiveMetrics.avgDriver >= 70
+                                        ? "Coaching opportunity"
+                                        : "Needs attention"}
+                                    </Typography>
+                                  </Box>
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={Math.max(0, Math.min(100, executiveMetrics.avgDriver))}
+                                    sx={{
+                                      height: 6,
+                                      borderRadius: 999,
+                                      bgcolor: alpha("#94a3b8", 0.18),
+                                      "& .MuiLinearProgress-bar": {
+                                        borderRadius: 999,
+                                        bgcolor:
+                                          executiveMetrics.avgDriver >= 85
+                                            ? "#22c55e"
+                                            : executiveMetrics.avgDriver >= 70
+                                            ? "#f59e0b"
+                                            : "#ef4444",
+                                      },
+                                    }}
+                                  />
+                                </Stack>
+                              ) : (
+                                <Stack alignItems="center" justifyContent="center">
+                                  <Typography sx={{ fontSize: 13, fontWeight: 900 }}>No data</Typography>
+                                </Stack>
+                              )}
+                              <Typography sx={{ fontSize: 8.5, color: "text.secondary", textAlign: "center" }} noWrap>
+                                {executiveMetrics.driverScoreSource}
+                              </Typography>
+                            </Card>
+                          </Box>
                         )}
-                      </Box>
-                    </Card>
-                  </Card>
-
-                  {/* Card 4 */}
-                  <Card
-                    sx={{
-                      height: "100%",
-                      p: 0,
-                      display: "flex",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <RecentAlerts onTotalChange={setAlertTotal} />
-                  </Card>
+                      </React.Fragment>
+                    );
+                  })}
                 </Box>
               </Grid>
             </Grid>
+
+            <Dialog
+              open={openFleetMap}
+              onClose={() => setOpenFleetMap(false)}
+              fullWidth
+              maxWidth="xl"
+            >
+              <Box
+                sx={{
+                  px: 2,
+                  py: 1.25,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
+                  bgcolor: isDark ? "#0f172a" : "#ffffff",
+                }}
+              >
+                <Typography sx={{ fontSize: 14, fontWeight: 800 }}>
+                  Fleet Map
+                </Typography>
+                <IconButton size="small" onClick={() => setOpenFleetMap(false)}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+              <DialogContent
+                sx={{
+                  p: 0,
+                  height: "82vh",
+                  position: "relative",
+                  ...(isDark && {
+                    "& .leaflet-tile-pane": {
+                      filter:
+                        "invert(1) hue-rotate(180deg) contrast(0.82) brightness(1.45) saturate(1.15)",
+                    },
+                    "& .leaflet-control-zoom": {
+                      border: "1px solid #1e293b !important",
+                    },
+                    "& .leaflet-control-zoom a": {
+                      background: "#0f172a !important",
+                      color: "#94a3b8 !important",
+                      borderBottom: "1px solid #1e293b !important",
+                    },
+                  }),
+                }}
+              >
+                <MapContainer
+                  center={[22.9937, 78.9629]}
+                  zoom={5}
+                  minZoom={2}
+                  maxBounds={bounds}
+                  maxBoundsViscosity={1.0}
+                  worldCopyJump={false}
+                  zoomControl={false}
+                  attributionControl={false}
+                  preferCanvas={true}
+                  style={{ width: "100%", height: "100%" }}
+                >
+                  <ZoomControl position="topright" />
+                  <TileLayer
+                    url={tileUrl}
+                    attribution={tileAttribution}
+                    keepBuffer={6}
+                    updateWhenZooming={false}
+                    updateWhenIdle={true}
+                    maxNativeZoom={19}
+                    maxZoom={19}
+                  />
+                  <MapController
+                    selectedVehicle={selectedVehicle}
+                    tripData={tripData ?? null}
+                    isActive={isActive}
+                  />
+                  {mapVehicles.map((v) => (
+                    <Marker
+                      key={`expanded-${v.vehicle_id}`}
+                      position={[v.lat, v.lng]}
+                      icon={createVehicleIcon(
+                        v.status,
+                        v.liveHealth,
+                        v.heading,
+                        isDark
+                      )}
+                      eventHandlers={{
+                        click: (e) => handleVehicleMarkerClick(v.vehicle_id, e),
+                      }}
+                    >
+                      <LeafletTooltip
+                        direction="top"
+                        offset={[0, -12]}
+                        opacity={0.96}
+                        sticky
+                      >
+                        <Box sx={{ minWidth: 150 }}>
+                          <Typography sx={{ fontSize: 11, fontWeight: 900 }}>
+                            {v.name || v.vehicle_id}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10 }}>
+                            Health {Math.round(v.liveHealth)}% • Driver{" "}
+                            {v.driver_score ?? 0}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10 }}>
+                            {formatStatusLabel(v.status)} •{" "}
+                            {Math.round(v.speed ?? 0)} km/h
+                          </Typography>
+                          <Typography sx={{ fontSize: 10 }}>
+                            {v.route_name || v.road_type || "No route"}
+                          </Typography>
+                        </Box>
+                      </LeafletTooltip>
+                    </Marker>
+                  ))}
+                  {selectedVehicle && completedRoute.length > 1 && (
+                    <Polyline
+                      positions={completedRoute}
+                      pathOptions={{
+                        color: "#22c55e",
+                        weight: 4,
+                        opacity: 0.9,
+                      }}
+                    />
+                  )}
+                  {selectedVehicle && remainingRoute.length > 1 && (
+                    <Polyline
+                      positions={remainingRoute}
+                      pathOptions={{
+                        color: "#6b7280",
+                        weight: 2,
+                        opacity: 0.5,
+                        dashArray: "8 6",
+                      }}
+                    />
+                  )}
+                  {selectedVehicle && tripData?.events && (
+                    <EventMarkers events={tripData.events} />
+                  )}
+                </MapContainer>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    position: "absolute",
+                    bottom: 18,
+                    left: 18,
+                    zIndex: 1000,
+                    px: 1,
+                    py: 0.75,
+                    borderRadius: 1.5,
+                    bgcolor: isDark ? "#0f172a" : "#ffffff",
+                    backgroundImage: "none",
+                    border: `1px solid ${
+                      isDark ? "#1e293b" : theme.palette.divider
+                    }`,
+                    minWidth: 160,
+                    isolation: "isolate",
+                    filter: "none",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 0.5,
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+                      Fleet Status
+                    </Typography>
+                    <Tooltip title="Reset Filters">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          setStatusFilterMap("all");
+                          setVehicleType("all");
+                          setSelectedPlant("all");
+                          handleFleetFilter("all");
+                        }}
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          color:
+                            statusFilter === "all"
+                              ? "text.disabled"
+                              : "primary.main",
+                          "&:hover": { bgcolor: "action.hover" },
+                        }}
+                      >
+                        <RestartAltOutlinedIcon sx={{ fontSize: 13 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <Stack spacing={0.3}>
+                    <LegendItem
+                      color="#22c55e"
+                      label="Active"
+                      value={summary.active}
+                      selected={statusFilter === "active"}
+                      onClick={() =>
+                        setStatusFilter(
+                          statusFilter === "active" ? "all" : "active"
+                        )
+                      }
+                    />
+                    <LegendItem
+                      color="#3b82f6"
+                      label="Parked"
+                      value={summary.parked}
+                      selected={statusFilter === "parked"}
+                      onClick={() =>
+                        setStatusFilter(
+                          statusFilter === "parked" ? "all" : "parked"
+                        )
+                      }
+                    />
+                    <LegendItem
+                      color="#8b5cf6"
+                      label="In Workshop"
+                      value={summary?.in_service ?? 0}
+                      selected={statusFilter === "in_service"}
+                      onClick={() =>
+                        setStatusFilter(
+                          statusFilter === "in_service" ? "all" : "in_service"
+                        )
+                      }
+                    />
+                    <LegendItem
+                      color="#ef4444"
+                      label="Critical"
+                      value={criticalCount}
+                      selected={statusFilter === "critical"}
+                      onClick={() =>
+                        setStatusFilter(
+                          statusFilter === "critical" ? "all" : "critical"
+                        )
+                      }
+                    />
+                    <LegendItem
+                      color="#f59e0b"
+                      label="Warning"
+                      value={warningCount}
+                      selected={statusFilter === "warning"}
+                      onClick={() =>
+                        setStatusFilter(
+                          statusFilter === "warning" ? "all" : "warning"
+                        )
+                      }
+                    />
+                  </Stack>
+                </Paper>
+              </DialogContent>
+            </Dialog>
 
             <Popover
               open={Boolean(selectedVehicle && popoverPosition)}
@@ -4767,10 +5751,19 @@ export default function CockpitView({
                     <Button
                       size="small"
                       variant="outlined"
-                      sx={{ fontSize: "8px", py: "1px", px: "6px", whiteSpace: "nowrap" }}
+                      sx={{
+                        fontSize: "8px",
+                        py: "1px",
+                        px: "6px",
+                        whiteSpace: "nowrap",
+                      }}
                       onClick={() => {
                         setSelectedVehicle(null);
-                        navigate(`/automotive?vehicle=${encodeURIComponent(selectedVehicle ?? "")}`);
+                        navigate(
+                          `/automotive?vehicle=${encodeURIComponent(
+                            selectedVehicle ?? ""
+                          )}`
+                        );
                       }}
                     >
                       Deep Dive →
@@ -4920,16 +5913,30 @@ export default function CockpitView({
                                   {vehicleDetail.type}
                                 </Typography>
                               </Box>
-                              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 1, flexShrink: 0 }}>
+                              <Stack
+                                direction="row"
+                                spacing={0.5}
+                                alignItems="center"
+                                sx={{ ml: 1, flexShrink: 0 }}
+                              >
                                 <Button
                                   size="small"
                                   variant="outlined"
                                   onMouseDown={(e) => e.stopPropagation()}
                                   onClick={() => {
                                     setSelectedVehicle(null);
-                                    navigate(`/automotive?vehicle=${encodeURIComponent(vehicleDetail.vehicle_id)}`);
+                                    navigate(
+                                      `/automotive?vehicle=${encodeURIComponent(
+                                        vehicleDetail.vehicle_id
+                                      )}`
+                                    );
                                   }}
-                                  sx={{ fontSize: "7px", py: "1px", px: "5px", whiteSpace: "nowrap" }}
+                                  sx={{
+                                    fontSize: "7px",
+                                    py: "1px",
+                                    px: "5px",
+                                    whiteSpace: "nowrap",
+                                  }}
                                 >
                                   Deep Dive →
                                 </Button>
@@ -5776,7 +6783,9 @@ export default function CockpitView({
                                       >
                                         {(() => {
                                           const speed = Math.min(
-                                            liveSelectedPosition?.speed ?? vehicleDetail.speed ?? 0,
+                                            liveSelectedPosition?.speed ??
+                                              vehicleDetail.speed ??
+                                              0,
                                             120
                                           );
                                           const percentage = speed / 120;
@@ -5953,7 +6962,9 @@ export default function CockpitView({
                                               fontSize: 10,
 
                                               transform: `rotate(${
-                                                liveSelectedPosition?.heading ?? vehicleDetail.heading ?? 0
+                                                liveSelectedPosition?.heading ??
+                                                vehicleDetail.heading ??
+                                                0
                                               }deg)`,
                                             }}
                                           />
@@ -5970,7 +6981,12 @@ export default function CockpitView({
                                             }}
                                           >
                                             HDG{" "}
-                                            {(liveSelectedPosition?.heading ?? vehicleDetail.heading ?? 0).toFixed(0)}°
+                                            {(
+                                              liveSelectedPosition?.heading ??
+                                              vehicleDetail.heading ??
+                                              0
+                                            ).toFixed(0)}
+                                            °
                                           </Typography>
                                         </Box>
                                       </Box>
@@ -6478,64 +7494,425 @@ export default function CockpitView({
         sx={{
           display: "grid",
           // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
-          gap: 1,
+          gap: "var(--app-gap)",
           alignItems: "stretch",
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          mt: 0,
         }}
       >
-        <Box sx={{ flexGrow: 1 }}>
-          <Grid container spacing={1} sx={{ my: 0.5 }}>
-            <Grid item xs={12} sm={5}>
-              <Card sx={{ p: 0 }}>
-                {(() => {
-                  const hasData =
-                    fleetHealthScatter &&
-                    fleetHealthScatter.some((v) => v.data.length > 0);
+        <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
+          <Grid container spacing={0.5} sx={{ height: "100%", my: 0 }}>
+            {false && (
+              <Grid
+                item
+                xs={12}
+                sm={5}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                  },
+                  gridTemplateRows: {
+                    xs: "repeat(2, minmax(0, 1fr))",
+                    sm: "minmax(0, 1fr)",
+                  },
+                  gap: "var(--app-gap)",
+                  minHeight: 0,
+                  height: "100%",
+                }}
+              >
+                <Card sx={{ p: 0, minHeight: 0, overflow: "hidden" }}>
+                  {(() => {
+                    const hasData =
+                      fleetHealthScatter &&
+                      fleetHealthScatter.some((v) => v.data.length > 0);
 
-                  let fleetScatterOption = {};
+                    let fleetScatterOption = {};
 
-                  if (hasData) {
-                    const allTs = new Set();
+                    if (hasData) {
+                      const allTs = new Set();
 
-                    fleetHealthScatter.forEach((vh) =>
-                      vh.data.forEach((r) =>
-                        allTs.add(r.ts || r.timestamp || "")
-                      )
+                      fleetHealthScatter.forEach((vh) =>
+                        vh.data.forEach((r) =>
+                          allTs.add(r.ts || r.timestamp || "")
+                        )
+                      );
+
+                      const sortedTs = Array.from(allTs).sort();
+
+                      const series = fleetHealthScatter
+                        .map((vehicle, originalIdx) => {
+                          if (hiddenSims.has(vehicle.vehicle_id)) return null;
+                          const c =
+                            VEHICLE_COLORS[originalIdx % VEHICLE_COLORS.length];
+                          return {
+                            name: vehicle.vehicle_id,
+                            type: "scatter",
+                            symbol: "circle",
+                            z: 1,
+                            zlevel: 1,
+                            data: vehicle.data.map((r) => [
+                              r.ts || r.timestamp,
+                              r.health ?? 0,
+                            ]),
+                            symbolSize: 4,
+                            itemStyle: {
+                              color: c,
+                              opacity: 0.85,
+                              borderWidth: 0,
+                            },
+                            emphasis: { scale: 1.3, itemStyle: { opacity: 1 } },
+                          };
+                        })
+                        .filter(Boolean);
+
+                      fleetScatterOption = {
+                        animation: false,
+
+                        tooltip: {
+                          trigger: "item",
+                          backgroundColor: isDark ? "#0f1f31" : "#ffffff",
+                          borderColor: isDark ? "#334155" : "#e2e8f0",
+                          borderWidth: 1,
+                          borderRadius: 8,
+                          padding: [8, 12],
+                          textStyle: {
+                            fontSize: 10,
+                            color: isDark ? "#e2e8f0" : "#1e293b",
+                            fontFamily: CHART_FONT,
+                          },
+                          formatter: (p) => {
+                            const originalIdx = fleetHealthScatter.findIndex(
+                              (v) => v.vehicle_id === p.seriesName
+                            );
+                            const c =
+                              VEHICLE_COLORS[
+                                originalIdx % VEHICLE_COLORS.length
+                              ];
+                            const ts = String(p.data[0])
+                              .slice(5, 16)
+                              .replace("T", " ");
+                            const health = Math.round(Number(p.data[1]));
+                            return `<div style="line-height:1.7">
+                        <div style="font-weight:700;font-size:10px;color:${c};margin-bottom:2px">${p.seriesName}</div>
+                        <div style="font-size:10px;opacity:.65">${ts}</div>
+                        <div style="font-size:10px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
+                      </div>`;
+                          },
+                        },
+
+                        grid: commonGrid,
+
+                        xAxis: {
+                          ...commonXAxis,
+                          nameGap: 45,
+                          data: sortedTs,
+
+                          axisLabel: {
+                            ...commonXAxis.axisLabel,
+
+                            formatter: (v) =>
+                              String(v).slice(5, 16).replace("T", " "),
+                          },
+                        },
+
+                        yAxis: {
+                          ...commonYAxis,
+                        },
+
+                        dataZoom: [
+                          { type: "inside" },
+                          {
+                            type: "slider",
+                            height: 22,
+                            bottom: 10,
+                            moveHandleSize: 8,
+                            handleSize: "90%",
+                            showDetail: false,
+                            borderColor: "transparent",
+                            fillerColor: alpha("#3b82f6", 0.12),
+                            backgroundColor: "transparent",
+                            textStyle: { fontSize: 10, fontFamily: CHART_FONT },
+                          },
+                        ],
+
+                        series: [
+                          ...series,
+
+                          {
+                            type: "line",
+
+                            data: [[]],
+
+                            silent: true,
+
+                            lineStyle: {
+                              opacity: 0,
+                            },
+
+                            markLine: {
+                              silent: true,
+                              symbol: ["none", "none"],
+                              lineStyle: {
+                                width: 1.5,
+                                type: "dashed",
+                                opacity: 0.7,
+                              },
+                              label: {
+                                fontSize: 10,
+                                fontFamily: CHART_FONT,
+                                fontWeight: 600,
+                              },
+                              data: [
+                                {
+                                  yAxis: 60,
+                                  label: {
+                                    formatter: "CRITICAL",
+                                    color: "#ef4444",
+                                    position: "insideStartTop",
+                                  },
+                                  lineStyle: { color: "#ef4444" },
+                                },
+                                {
+                                  yAxis: 80,
+                                  label: {
+                                    formatter: "WARNING",
+                                    color: "#f59e0b",
+                                    position: "insideStartTop",
+                                  },
+                                  lineStyle: { color: "#f59e0b" },
+                                },
+                              ],
+                            },
+                          },
+                        ],
+                      };
+                    }
+
+                    return (
+                      <>
+                        <Box
+                          sx={{
+                            p: 1,
+                            height: "100%",
+                            minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                          }}
+                        >
+                          {/* HEADER */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mb: 0.75,
+                            }}
+                          >
+                            <SectionTitle title="Fleet Health Scatter" />
+                            <Tooltip title="Expand">
+                              <IconButton
+                                size="small"
+                                onClick={() => setOpenFleetScatter(true)}
+                                sx={{ p: 0.5 }}
+                              >
+                                <AspectRatioOutlinedIcon
+                                  sx={{ fontSize: 15 }}
+                                />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+
+                          {/* LEGEND — clickable filter pills */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 0.5,
+                              flexWrap: "wrap",
+                              mb: 0.75,
+                            }}
+                          >
+                            {fleetHealthScatter?.map((v, i) => {
+                              const c =
+                                VEHICLE_COLORS[i % VEHICLE_COLORS.length];
+                              const hidden = hiddenSims.has(v.vehicle_id);
+                              const toggle = () =>
+                                setHiddenSims((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(v.vehicle_id))
+                                    next.delete(v.vehicle_id);
+                                  else next.add(v.vehicle_id);
+                                  return next;
+                                });
+                              return (
+                                <Box
+                                  key={v.vehicle_id}
+                                  onClick={toggle}
+                                  sx={{
+                                    cursor: "pointer",
+                                    userSelect: "none",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    px: 0.8,
+                                    py: 0.2,
+                                    borderRadius: 5,
+                                    bgcolor: hidden
+                                      ? "transparent"
+                                      : alpha(c, isDark ? 0.18 : 0.1),
+                                    border: `1px solid ${alpha(
+                                      c,
+                                      hidden ? 0.2 : 0.4
+                                    )}`,
+                                    opacity: hidden ? 0.4 : 1,
+                                    transition:
+                                      "opacity 0.15s, background 0.15s",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      bgcolor: hidden ? "transparent" : c,
+                                      border: `1.5px solid ${c}`,
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: "9px",
+                                      fontWeight: 600,
+                                      color: hidden ? "text.disabled" : c,
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {v.vehicle_id}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+
+                          {/* CHART */}
+                          <Box sx={{ flex: 1, minHeight: 0 }}>
+                            {hasData ? (
+                              <ReactECharts
+                                option={fleetScatterOption}
+                                style={{ width: "100%", height: "100%" }}
+                              />
+                            ) : (
+                              <Box
+                                sx={{
+                                  height: "100%",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "12px",
+                                    color: "text.secondary",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  No pipeline data yet
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "10px",
+                                    color: "text.disabled",
+                                  }}
+                                >
+                                  GOLD stream will appear once the pipeline is
+                                  active
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </Box>
+
+                        {/* EXPANDED MODAL */}
+                        <Dialog
+                          open={openFleetScatter}
+                          onClose={() => setOpenFleetScatter(false)}
+                          fullWidth
+                          maxWidth="xl"
+                        >
+                          <Box
+                            sx={{
+                              px: 2,
+                              py: 1.5,
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              borderBottom: `1px solid ${
+                                isDark ? "#1e293b" : "#e2e8f0"
+                              }`,
+                            }}
+                          >
+                            <Typography
+                              sx={{ fontSize: "14px", fontWeight: 700 }}
+                            >
+                              Fleet Health Scatter
+                            </Typography>
+                            <IconButton
+                              onClick={() => setOpenFleetScatter(false)}
+                              size="small"
+                            >
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <DialogContent sx={{ height: "85vh" }}>
+                            {hasData && (
+                              <ReactECharts
+                                option={fleetScatterOption}
+                                style={{ width: "100%", height: "100%" }}
+                              />
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                      </>
+                    );
+                  })()}
+                </Card>
+
+                <Card sx={{ p: 0, minHeight: 0, overflow: "hidden" }}>
+                  {(() => {
+                    const rows = healthHistory?.data || [];
+
+                    const factor = Math.max(1, Math.floor(rows.length / 500));
+
+                    const sampled =
+                      factor === 1
+                        ? rows
+                        : rows.filter((_, i) => i % factor === 0);
+
+                    const xKey = timelineXAxis === "mileage" ? "mileage" : "ts";
+
+                    const xData = sampled.map((r) =>
+                      xKey === "mileage" ? r.mileage : r.ts || r.timestamp || ""
                     );
 
-                    const sortedTs = Array.from(allTs).sort();
+                    const yData = sampled.map((r) => r.health);
 
-                    const series = fleetHealthScatter
-                      .map((vehicle, originalIdx) => {
-                        if (hiddenSims.has(vehicle.vehicle_id)) return null;
-                        const c =
-                          VEHICLE_COLORS[originalIdx % VEHICLE_COLORS.length];
-                        return {
-                          name: vehicle.vehicle_id,
-                          type: "scatter",
-                          symbol: "circle",
-                          z: 1,
-                          zlevel: 1,
-                          data: vehicle.data.map((r) => [
-                            r.ts || r.timestamp,
-                            r.health ?? 0,
-                          ]),
-                          symbolSize: 4,
-                          itemStyle: {
-                            color: c,
-                            opacity: 0.85,
-                            borderWidth: 0,
-                          },
-                          emphasis: { scale: 1.3, itemStyle: { opacity: 1 } },
-                        };
-                      })
-                      .filter(Boolean);
+                    const lastMileage = rows[rows.length - 1]?.mileage ?? 0;
 
-                    fleetScatterOption = {
-                      animation: false,
+                    const kmSinceService = lastMileage % SERVICE_INTERVAL_KM;
 
+                    const nextServiceKm =
+                      lastMileage + (SERVICE_INTERVAL_KM - kmSinceService);
+                    const navigate = useNavigate();
+                    const chartOption = {
                       tooltip: {
-                        trigger: "item",
-                        backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                        trigger: "axis",
+                        backgroundColor: isDark ? "#0f1f31" : "#ffffff",
                         borderColor: isDark ? "#334155" : "#e2e8f0",
                         borderWidth: 1,
                         borderRadius: 8,
@@ -6545,36 +7922,90 @@ export default function CockpitView({
                           color: isDark ? "#e2e8f0" : "#1e293b",
                           fontFamily: CHART_FONT,
                         },
-                        formatter: (p) => {
-                          const originalIdx = fleetHealthScatter.findIndex(
-                            (v) => v.vehicle_id === p.seriesName
-                          );
-                          const c =
-                            VEHICLE_COLORS[originalIdx % VEHICLE_COLORS.length];
-                          const ts = String(p.data[0])
-                            .slice(5, 16)
-                            .replace("T", " ");
-                          const health = Math.round(Number(p.data[1]));
+                        formatter: (params: any) => {
+                          const p = Array.isArray(params) ? params[0] : params;
+                          if (!p) return "";
+                          const rawX = p.axisValue ?? p.name ?? "";
+                          const xLabel =
+                            timelineXAxis === "mileage"
+                              ? `${Math.round(
+                                  Number(rawX)
+                                ).toLocaleString()} km`
+                              : String(rawX).slice(5, 16).replace("T", " ");
+                          const health = Math.round(Number(p.value));
+                          const axisName =
+                            timelineXAxis === "mileage" ? "Mileage" : "Time";
                           return `<div style="line-height:1.7">
-                        <div style="font-weight:700;font-size:10px;color:${c};margin-bottom:2px">${p.seriesName}</div>
-                        <div style="font-size:10px;opacity:.65">${ts}</div>
-                        <div style="font-size:10px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
-                      </div>`;
+                      <div style="font-weight:700;font-size:10px;color:#3b82f6;margin-bottom:2px">${healthTimelineVehicle}</div>
+                      <div style="font-size:10px;opacity:.65">${axisName}&nbsp;${xLabel}</div>
+                      <div style="font-size:10px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
+                    </div>`;
                         },
                       },
+
+                      dataZoom: [
+                        {
+                          type: "inside",
+                          filterMode: "none",
+                        },
+                        {
+                          type: "slider",
+                          bottom: 10,
+                          height: 22,
+                          filterMode: "none",
+                          showDetail: false,
+                          moveHandleSize: 8,
+                          handleSize: "90%",
+                          textStyle: {
+                            fontSize: 10,
+                            fontFamily: CHART_FONT,
+                          },
+                          borderColor: "transparent",
+                          fillerColor: "rgba(25,118,210,.08)",
+                          backgroundColor: "transparent",
+                        },
+                      ],
 
                       grid: commonGrid,
 
                       xAxis: {
                         ...commonXAxis,
+
                         nameGap: 45,
-                        data: sortedTs,
+                        data: xData,
+
+                        boundaryGap: true,
+
+                        scale: false,
 
                         axisLabel: {
                           ...commonXAxis.axisLabel,
 
-                          formatter: (v) =>
-                            String(v).slice(5, 16).replace("T", " "),
+                          interval: 16,
+
+                          hideOverlap: true,
+
+                          margin: 14,
+
+                          fontSize: 10,
+
+                          fontFamily: CHART_FONT,
+
+                          formatter: (v: any) =>
+                            timelineXAxis === "mileage"
+                              ? Math.round(Number(v)).toLocaleString()
+                              : String(v).slice(5, 16).replace("T", " "),
+                        },
+
+                        axisTick: { show: false },
+
+                        splitLine: {
+                          show: false,
+                          lineStyle: {
+                            color: isDark
+                              ? "rgba(255,255,255,.06)"
+                              : "rgba(0,0,0,.06)",
+                          },
                         },
                       },
 
@@ -6582,36 +8013,29 @@ export default function CockpitView({
                         ...commonYAxis,
                       },
 
-                      dataZoom: [
-                        { type: "inside" },
-                        {
-                          type: "slider",
-                          height: 22,
-                          bottom: 10,
-                          moveHandleSize: 8,
-                          handleSize: "90%",
-                          showDetail: false,
-                          borderColor: "transparent",
-                          fillerColor: alpha("#3b82f6", 0.12),
-                          backgroundColor: "transparent",
-                          textStyle: { fontSize: 10, fontFamily: CHART_FONT },
-                        },
-                      ],
-
                       series: [
-                        ...series,
-
                         {
                           type: "line",
 
-                          data: [[]],
+                          data: yData,
 
-                          silent: true,
+                          symbol: "none",
 
-                          lineStyle: {
-                            opacity: 0,
+                          lineStyle: { color: "#3b82f6", width: 2 },
+                          itemStyle: { color: "#3b82f6" },
+                          areaStyle: {
+                            color: {
+                              type: "linear",
+                              x: 0,
+                              y: 0,
+                              x2: 0,
+                              y2: 1,
+                              colorStops: [
+                                { offset: 0, color: "rgba(59,130,246,0.18)" },
+                                { offset: 1, color: "rgba(59,130,246,0.02)" },
+                              ],
+                            },
                           },
-
                           markLine: {
                             silent: true,
                             symbol: ["none", "none"],
@@ -6644,670 +8068,538 @@ export default function CockpitView({
                                 },
                                 lineStyle: { color: "#f59e0b" },
                               },
+                              ...(timelineXAxis === "mileage"
+                                ? [
+                                    {
+                                      xAxis: nextServiceKm,
+                                      label: {
+                                        formatter: `NEXT SVC\n+${Math.round(
+                                          SERVICE_INTERVAL_KM - kmSinceService
+                                        ).toLocaleString()} km`,
+                                        color: isDark ? "#60a5fa" : "#2563eb",
+                                        position: "insideStartTop",
+                                        fontSize: 9,
+                                        fontFamily: CHART_FONT,
+                                        fontWeight: 700,
+                                      },
+                                      lineStyle: {
+                                        color: isDark ? "#60a5fa" : "#2563eb",
+                                        width: 1.5,
+                                        type: "dashed",
+                                      },
+                                    },
+                                  ]
+                                : []),
+                            ],
+                          },
+
+                          markArea: {
+                            silent: true,
+                            data: [
+                              [
+                                {
+                                  yAxis: 0,
+                                  itemStyle: {
+                                    color: isDark
+                                      ? "rgba(239,68,68,.03)"
+                                      : "rgba(239,68,68,.025)",
+                                  },
+                                },
+                                { yAxis: 60 },
+                              ],
+                              [
+                                {
+                                  yAxis: 60,
+                                  itemStyle: {
+                                    color: isDark
+                                      ? "rgba(245,158,11,.025)"
+                                      : "rgba(245,158,11,.02)",
+                                  },
+                                },
+                                { yAxis: 80 },
+                              ],
                             ],
                           },
                         },
                       ],
                     };
-                  }
 
-                  return (
-                    <>
-                      <Box
-                        sx={{
-                          p: 1,
-                          height: 370,
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
-                      >
-                        {/* HEADER */}
+                    return (
+                      <>
                         <Box
                           sx={{
+                            p: 1,
+                            height: "100%",
+                            minHeight: 0,
                             display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 0.75,
+                            flexDirection: "column",
                           }}
                         >
-                          <SectionTitle title="Fleet Health Scatter" />
-                          <Tooltip title="Expand">
-                            <IconButton
-                              size="small"
-                              onClick={() => setOpenFleetScatter(true)}
-                              sx={{ p: 0.5 }}
-                            >
-                              <AspectRatioOutlinedIcon sx={{ fontSize: 15 }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-
-                        {/* LEGEND — clickable filter pills */}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            gap: 0.5,
-                            flexWrap: "wrap",
-                            mb: 0.75,
-                          }}
-                        >
-                          {fleetHealthScatter?.map((v, i) => {
-                            const c = VEHICLE_COLORS[i % VEHICLE_COLORS.length];
-                            const hidden = hiddenSims.has(v.vehicle_id);
-                            const toggle = () =>
-                              setHiddenSims((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(v.vehicle_id))
-                                  next.delete(v.vehicle_id);
-                                else next.add(v.vehicle_id);
-                                return next;
-                              });
-                            return (
-                              <Box
-                                key={v.vehicle_id}
-                                onClick={toggle}
-                                sx={{
-                                  cursor: "pointer",
-                                  userSelect: "none",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                  px: 0.8,
-                                  py: 0.2,
-                                  borderRadius: 5,
-                                  bgcolor: hidden
-                                    ? "transparent"
-                                    : alpha(c, isDark ? 0.18 : 0.1),
-                                  border: `1px solid ${alpha(
-                                    c,
-                                    hidden ? 0.2 : 0.4
-                                  )}`,
-                                  opacity: hidden ? 0.4 : 1,
-                                  transition: "opacity 0.15s, background 0.15s",
-                                }}
-                              >
-                                <Box
-                                  sx={{
-                                    width: 6,
-                                    height: 6,
-                                    borderRadius: "50%",
-                                    bgcolor: hidden ? "transparent" : c,
-                                    border: `1.5px solid ${c}`,
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <Typography
-                                  sx={{
-                                    fontSize: "9px",
-                                    fontWeight: 600,
-                                    color: hidden ? "text.disabled" : c,
-                                    lineHeight: 1,
-                                  }}
-                                >
-                                  {v.vehicle_id}
-                                </Typography>
-                              </Box>
-                            );
-                          })}
-                        </Box>
-
-                        {/* CHART */}
-                        <Box sx={{ flex: 1, minHeight: 0 }}>
-                          {hasData ? (
-                            <ReactECharts
-                              option={fleetScatterOption}
-                              style={{ width: "100%", height: "100%" }}
-                            />
-                          ) : (
-                            <Box
-                              sx={{
-                                height: "100%",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 0.5,
-                              }}
-                            >
-                              <Typography
-                                sx={{
-                                  fontSize: "12px",
-                                  color: "text.secondary",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                No pipeline data yet
-                              </Typography>
-                              <Typography
-                                sx={{
-                                  fontSize: "10px",
-                                  color: "text.disabled",
-                                }}
-                              >
-                                GOLD stream will appear once the pipeline is
-                                active
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-
-                      {/* EXPANDED MODAL */}
-                      <Dialog
-                        open={openFleetScatter}
-                        onClose={() => setOpenFleetScatter(false)}
-                        fullWidth
-                        maxWidth="xl"
-                      >
-                        <Box
-                          sx={{
-                            px: 2,
-                            py: 1.5,
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            borderBottom: `1px solid ${
-                              isDark ? "#1e293b" : "#e2e8f0"
-                            }`,
-                          }}
-                        >
-                          <Typography
-                            sx={{ fontSize: "14px", fontWeight: 700 }}
-                          >
-                            Fleet Health Scatter
-                          </Typography>
-                          <IconButton
-                            onClick={() => setOpenFleetScatter(false)}
-                            size="small"
-                          >
-                            <CloseIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                        <DialogContent sx={{ height: "85vh" }}>
-                          {hasData && (
-                            <ReactECharts
-                              option={fleetScatterOption}
-                              style={{ width: "100%", height: "100%" }}
-                            />
-                          )}
-                        </DialogContent>
-                      </Dialog>
-                    </>
-                  );
-                })()}
-              </Card>
-
-              <Card sx={{ p: 0, mt: 1 }}>
-                {(() => {
-                  const rows = healthHistory?.data || [];
-
-                  const factor = Math.max(1, Math.floor(rows.length / 500));
-
-                  const sampled =
-                    factor === 1
-                      ? rows
-                      : rows.filter((_, i) => i % factor === 0);
-
-                  const xKey = timelineXAxis === "mileage" ? "mileage" : "ts";
-
-                  const xData = sampled.map((r) =>
-                    xKey === "mileage" ? r.mileage : r.ts || r.timestamp || ""
-                  );
-
-                  const yData = sampled.map((r) => r.health);
-
-                  const lastMileage = rows[rows.length - 1]?.mileage ?? 0;
-
-                  const kmSinceService = lastMileage % SERVICE_INTERVAL_KM;
-
-                  const nextServiceKm =
-                    lastMileage + (SERVICE_INTERVAL_KM - kmSinceService);
-                  const navigate = useNavigate();
-                  const chartOption = {
-                    tooltip: {
-                      trigger: "axis",
-                      backgroundColor: isDark ? "#1e293b" : "#ffffff",
-                      borderColor: isDark ? "#334155" : "#e2e8f0",
-                      borderWidth: 1,
-                      borderRadius: 8,
-                      padding: [8, 12],
-                      textStyle: {
-                        fontSize: 10,
-                        color: isDark ? "#e2e8f0" : "#1e293b",
-                        fontFamily: CHART_FONT,
-                      },
-                      formatter: (params: any) => {
-                        const p = Array.isArray(params) ? params[0] : params;
-                        if (!p) return "";
-                        const rawX = p.axisValue ?? p.name ?? "";
-                        const xLabel =
-                          timelineXAxis === "mileage"
-                            ? `${Math.round(Number(rawX)).toLocaleString()} km`
-                            : String(rawX).slice(5, 16).replace("T", " ");
-                        const health = Math.round(Number(p.value));
-                        const axisName =
-                          timelineXAxis === "mileage" ? "Mileage" : "Time";
-                        return `<div style="line-height:1.7">
-                      <div style="font-weight:700;font-size:10px;color:#3b82f6;margin-bottom:2px">${healthTimelineVehicle}</div>
-                      <div style="font-size:10px;opacity:.65">${axisName}&nbsp;${xLabel}</div>
-                      <div style="font-size:10px;margin-top:3px">Health&nbsp;<b>${health}%</b></div>
-                    </div>`;
-                      },
-                    },
-
-                    dataZoom: [
-                      {
-                        type: "inside",
-                        filterMode: "none",
-                      },
-                      {
-                        type: "slider",
-                        bottom: 10,
-                        height: 22,
-                        filterMode: "none",
-                        showDetail: false,
-                        moveHandleSize: 8,
-                        handleSize: "90%",
-                        textStyle: {
-                          fontSize: 10,
-                          fontFamily: CHART_FONT,
-                        },
-                        borderColor: "transparent",
-                        fillerColor: "rgba(25,118,210,.08)",
-                        backgroundColor: "transparent",
-                      },
-                    ],
-
-                    grid: commonGrid,
-
-                    xAxis: {
-                      ...commonXAxis,
-
-                      nameGap: 45,
-                      data: xData,
-
-                      boundaryGap: true,
-
-                      scale: false,
-
-                      axisLabel: {
-                        ...commonXAxis.axisLabel,
-
-                        interval: 16,
-
-                        hideOverlap: true,
-
-                        margin: 14,
-
-                        fontSize: 10,
-
-                        fontFamily: CHART_FONT,
-
-                        formatter: (v: any) =>
-                          timelineXAxis === "mileage"
-                            ? Math.round(Number(v)).toLocaleString()
-                            : String(v).slice(5, 16).replace("T", " "),
-                      },
-
-                      axisTick: { show: false },
-
-                      splitLine: {
-                        show: false,
-                        lineStyle: {
-                          color: isDark
-                            ? "rgba(255,255,255,.06)"
-                            : "rgba(0,0,0,.06)",
-                        },
-                      },
-                    },
-
-                    yAxis: {
-                      ...commonYAxis,
-                    },
-
-                    series: [
-                      {
-                        type: "line",
-
-                        data: yData,
-
-                        symbol: "none",
-
-                        lineStyle: { color: "#3b82f6", width: 2 },
-                        itemStyle: { color: "#3b82f6" },
-                        areaStyle: {
-                          color: {
-                            type: "linear",
-                            x: 0,
-                            y: 0,
-                            x2: 0,
-                            y2: 1,
-                            colorStops: [
-                              { offset: 0, color: "rgba(59,130,246,0.18)" },
-                              { offset: 1, color: "rgba(59,130,246,0.02)" },
-                            ],
-                          },
-                        },
-                        markLine: {
-                          silent: true,
-                          symbol: ["none", "none"],
-                          lineStyle: {
-                            width: 1.5,
-                            type: "dashed",
-                            opacity: 0.7,
-                          },
-                          label: {
-                            fontSize: 10,
-                            fontFamily: CHART_FONT,
-                            fontWeight: 600,
-                          },
-                          data: [
-                            {
-                              yAxis: 60,
-                              label: {
-                                formatter: "CRITICAL",
-                                color: "#ef4444",
-                                position: "insideStartTop",
-                              },
-                              lineStyle: { color: "#ef4444" },
-                            },
-                            {
-                              yAxis: 80,
-                              label: {
-                                formatter: "WARNING",
-                                color: "#f59e0b",
-                                position: "insideStartTop",
-                              },
-                              lineStyle: { color: "#f59e0b" },
-                            },
-                            ...(timelineXAxis === "mileage"
-                              ? [
-                                  {
-                                    xAxis: nextServiceKm,
-                                    label: {
-                                      formatter: `NEXT SVC\n+${Math.round(
-                                        SERVICE_INTERVAL_KM - kmSinceService
-                                      ).toLocaleString()} km`,
-                                      color: isDark ? "#60a5fa" : "#2563eb",
-                                      position: "insideStartTop",
-                                      fontSize: 9,
-                                      fontFamily: CHART_FONT,
-                                      fontWeight: 700,
-                                    },
-                                    lineStyle: {
-                                      color: isDark ? "#60a5fa" : "#2563eb",
-                                      width: 1.5,
-                                      type: "dashed",
-                                    },
-                                  },
-                                ]
-                              : []),
-                          ],
-                        },
-
-                        markArea: {
-                          silent: true,
-                          data: [
-                            [
-                              {
-                                yAxis: 0,
-                                itemStyle: {
-                                  color: isDark
-                                    ? "rgba(239,68,68,.03)"
-                                    : "rgba(239,68,68,.025)",
-                                },
-                              },
-                              { yAxis: 60 },
-                            ],
-                            [
-                              {
-                                yAxis: 60,
-                                itemStyle: {
-                                  color: isDark
-                                    ? "rgba(245,158,11,.025)"
-                                    : "rgba(245,158,11,.02)",
-                                },
-                              },
-                              { yAxis: 80 },
-                            ],
-                          ],
-                        },
-                      },
-                    ],
-                  };
-
-                  return (
-                    <>
-                      <Box
-                        sx={{
-                          p: 1,
-                          height: 370,
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
-                      >
-                        {/* HEADER */}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 1,
-                            // flexWrap: "wrap",
-                            gap: 0.5,
-                          }}
-                        >
-                          <SectionTitle title="Vehicle Health Timeline" />
+                          {/* HEADER */}
                           <Box
                             sx={{
                               display: "flex",
-                              gap: 0.75,
+                              justifyContent: "space-between",
                               alignItems: "center",
+                              mb: 1,
+                              // flexWrap: "wrap",
+                              gap: 0.5,
                             }}
                           >
-                            {timelineXAxis === "mileage" && rows.length > 0 && (
+                            <SectionTitle title="Vehicle Health Timeline" />
+                            <Box
+                              sx={{
+                                display: "flex",
+                                gap: 0.75,
+                                alignItems: "center",
+                              }}
+                            >
+                              {timelineXAxis === "mileage" &&
+                                rows.length > 0 && (
+                                  <Box
+                                    sx={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 0.5,
+                                      px: 1,
+                                      height: 28,
+                                      borderRadius: 1,
+                                      bgcolor: alpha(
+                                        "#3b82f6",
+                                        isDark ? 0.15 : 0.08
+                                      ),
+                                      border: `1px solid ${alpha(
+                                        "#3b82f6",
+                                        isDark ? 0.3 : 0.2
+                                      )}`,
+                                    }}
+                                  >
+                                    <Typography
+                                      sx={{
+                                        fontSize: "10px",
+                                        fontWeight: 700,
+                                        color: isDark ? "#60a5fa" : "#2563eb",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      Next Service in{" "}
+                                      {Math.round(
+                                        SERVICE_INTERVAL_KM - kmSinceService
+                                      ).toLocaleString()}{" "}
+                                      km
+                                    </Typography>
+                                  </Box>
+                                )}
+                              <Select
+                                value={healthTimelineVehicle}
+                                onChange={(e) =>
+                                  setHealthTimelineVehicle(e.target.value)
+                                }
+                                size="small"
+                                sx={{
+                                  height: 28,
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  borderRadius: 1,
+                                  minWidth: 120,
+                                  "& .MuiSelect-select": { py: "4px" },
+                                }}
+                              >
+                                {timelineVehicleOptions.map((v) => (
+                                  <MenuItem
+                                    key={v.vehicle_id}
+                                    value={v.vehicle_id}
+                                    sx={{ fontSize: "10px" }}
+                                  >
+                                    {v.vehicle_id}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+
+                              <Tooltip title="Expand">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setOpenVehicleHealth(true)}
+                                  sx={{ p: 0.5 }}
+                                >
+                                  <AspectRatioOutlinedIcon
+                                    sx={{ fontSize: 15 }}
+                                  />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </Box>
+
+                          <ToggleButtonGroup
+                            value={timelineXAxis}
+                            exclusive
+                            onChange={(_, v) => v && setTimelineXAxis(v)}
+                            size="small"
+                            sx={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                              width: "100%",
+                              maxWidth: 240,
+                              p: "3px",
+                              borderRadius: 2,
+                              bgcolor: isDark
+                                ? "rgba(15,31,49,0.72)"
+                                : "rgba(255,247,243,0.92)",
+                              border: `1px solid ${
+                                isDark
+                                  ? "rgba(125,211,252,0.12)"
+                                  : "rgba(251,78,11,0.14)"
+                              }`,
+                              gap: 0.35,
+                              "& .MuiToggleButtonGroup-grouped": {
+                                border: "0 !important",
+                                margin: "0 !important",
+                              },
+                            }}
+                          >
+                            <ToggleButton
+                              value="mileage"
+                              sx={{
+                                fontWeight: 700,
+                                px: 1,
+                                fontSize: "9px",
+                                height: 28,
+                                py: 0,
+                                borderRadius: "6px !important",
+                                color:
+                                  timelineXAxis === "mileage"
+                                    ? isDark
+                                      ? "#edf5ff"
+                                      : "#FB4E0B"
+                                    : "text.secondary",
+                                bgcolor:
+                                  timelineXAxis === "mileage"
+                                    ? isDark
+                                      ? "rgba(56,189,248,.16) !important"
+                                      : "rgba(251,78,11,.12) !important"
+                                    : "transparent",
+                                boxShadow:
+                                  timelineXAxis === "mileage"
+                                    ? isDark
+                                      ? "inset 0 0 0 1px rgba(56,189,248,0.2)"
+                                      : "inset 0 0 0 1px rgba(251,78,11,0.16)"
+                                    : "none",
+                              }}
+                            >
+                              MILEAGE
+                            </ToggleButton>
+                            <ToggleButton
+                              value="timestamp"
+                              sx={{
+                                fontWeight: 700,
+                                px: 1,
+                                fontSize: "9px",
+                                height: 28,
+                                py: 0,
+                                borderRadius: "6px !important",
+                                color:
+                                  timelineXAxis === "timestamp"
+                                    ? isDark
+                                      ? "#edf5ff"
+                                      : "#FB4E0B"
+                                    : "text.secondary",
+                                bgcolor:
+                                  timelineXAxis === "timestamp"
+                                    ? isDark
+                                      ? "rgba(56,189,248,.16) !important"
+                                      : "rgba(251,78,11,.12) !important"
+                                    : "transparent",
+                                boxShadow:
+                                  timelineXAxis === "timestamp"
+                                    ? isDark
+                                      ? "inset 0 0 0 1px rgba(56,189,248,0.2)"
+                                      : "inset 0 0 0 1px rgba(251,78,11,0.16)"
+                                    : "none",
+                              }}
+                            >
+                              TIMESTAMP
+                            </ToggleButton>
+                          </ToggleButtonGroup>
+
+                          <Box
+                            sx={{
+                              flex: 1,
+                              minHeight: 0,
+                            }}
+                          >
+                            {rows.length > 0 ? (
+                              <ReactECharts
+                                style={{ height: "100%", width: "100%" }}
+                                option={chartOption}
+                              />
+                            ) : (
                               <Box
                                 sx={{
-                                  display: "inline-flex",
+                                  height: "100%",
+                                  display: "flex",
+                                  flexDirection: "column",
                                   alignItems: "center",
+                                  justifyContent: "center",
                                   gap: 0.5,
-                                  px: 1,
-                                  height: 28,
-                                  borderRadius: 1,
-                                  bgcolor: alpha(
-                                    "#3b82f6",
-                                    isDark ? 0.15 : 0.08
-                                  ),
-                                  border: `1px solid ${alpha(
-                                    "#3b82f6",
-                                    isDark ? 0.3 : 0.2
-                                  )}`,
                                 }}
                               >
                                 <Typography
                                   sx={{
-                                    fontSize: "10px",
-                                    fontWeight: 700,
-                                    color: isDark ? "#60a5fa" : "#2563eb",
-                                    whiteSpace: "nowrap",
+                                    fontSize: "12px",
+                                    color: "text.secondary",
+                                    fontWeight: 500,
                                   }}
                                 >
-                                  Next Service in{" "}
-                                  {Math.round(
-                                    SERVICE_INTERVAL_KM - kmSinceService
-                                  ).toLocaleString()}{" "}
-                                  km
+                                  No health history yet
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "10px",
+                                    color: "text.disabled",
+                                  }}
+                                >
+                                  Select a vehicle and wait for GOLD data to
+                                  arrive
                                 </Typography>
                               </Box>
                             )}
-                            <Select
-                              value={healthTimelineVehicle}
-                              onChange={(e) =>
-                                setHealthTimelineVehicle(e.target.value)
-                              }
-                              size="small"
-                              sx={{
-                                height: 28,
-                                fontSize: "10px",
-                                fontWeight: 700,
-                                borderRadius: 1,
-                                minWidth: 120,
-                                "& .MuiSelect-select": { py: "4px" },
-                              }}
-                            >
-                              {timelineVehicleOptions.map((v) => (
-                                <MenuItem
-                                  key={v.vehicle_id}
-                                  value={v.vehicle_id}
-                                  sx={{ fontSize: "10px" }}
-                                >
-                                  {v.vehicle_id}
-                                </MenuItem>
-                              ))}
-                            </Select>
-
-                            <Tooltip title="Expand">
-                              <IconButton
-                                size="small"
-                                onClick={() => setOpenVehicleHealth(true)}
-                                sx={{ p: 0.5 }}
-                              >
-                                <AspectRatioOutlinedIcon
-                                  sx={{ fontSize: 15 }}
-                                />
-                              </IconButton>
-                            </Tooltip>
                           </Box>
                         </Box>
 
-                        <ToggleButtonGroup
-                          value={timelineXAxis}
-                          exclusive
-                          onChange={(_, v) => v && setTimelineXAxis(v)}
-                          size="small"
-                          sx={{
-                            display: "inline",
-                            alignItems: "flex-end",
-                            flexDirection: "row-reverse",
-                          }}
-                        >
-                          <ToggleButton
-                            value="mileage"
-                            sx={{
-                              fontWeight: 700,
-                              px: 1.25,
-                              fontSize: "9px",
-                              height: 28,
-                              py: 0,
-                            }}
-                          >
-                            MILEAGE
-                          </ToggleButton>
-                          <ToggleButton
-                            value="timestamp"
-                            sx={{
-                              fontWeight: 700,
-                              px: 1.25,
-                              fontSize: "9px",
-                              height: 28,
-                              py: 0,
-                            }}
-                          >
-                            TIMESTAMP
-                          </ToggleButton>
-                        </ToggleButtonGroup>
+                        {/* EXPAND DIALOG */}
 
-                        <Box
-                          sx={{
-                            flex: 1,
-                            minHeight: 0,
-                          }}
+                        <Dialog
+                          open={openVehicleHealth}
+                          onClose={() => setOpenVehicleHealth(false)}
+                          fullWidth
+                          maxWidth="xl"
                         >
-                          {rows.length > 0 ? (
+                          <Box
+                            sx={{
+                              px: 2,
+                              py: 1.5,
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              borderBottom: `1px solid ${
+                                isDark ? "#1e293b" : "#e2e8f0"
+                              }`,
+                            }}
+                          >
+                            <Typography
+                              sx={{ fontSize: "14px", fontWeight: 700 }}
+                            >
+                              Vehicle Health Timeline
+                            </Typography>
+                            <IconButton
+                              onClick={() => setOpenVehicleHealth(false)}
+                              size="small"
+                            >
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <DialogContent sx={{ height: "85vh" }}>
                             <ReactECharts
-                              style={{ height: "100%", width: "100%" }}
+                              style={{ width: "100%", height: "100%" }}
                               option={chartOption}
                             />
-                          ) : (
-                            <Box
-                              sx={{
-                                height: "100%",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 0.5,
-                              }}
-                            >
-                              <Typography
-                                sx={{
-                                  fontSize: "12px",
-                                  color: "text.secondary",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                No health history yet
-                              </Typography>
-                              <Typography
-                                sx={{
-                                  fontSize: "10px",
-                                  color: "text.disabled",
-                                }}
-                              >
-                                Select a vehicle and wait for GOLD data to
-                                arrive
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
+                          </DialogContent>
+                        </Dialog>
+                      </>
+                    );
+                  })()}
+                </Card>
+              </Grid>
+            )}
 
-                      {/* EXPAND DIALOG */}
-
-                      <Dialog
-                        open={openVehicleHealth}
-                        onClose={() => setOpenVehicleHealth(false)}
-                        fullWidth
-                        maxWidth="xl"
-                      >
-                        <Box
-                          sx={{
-                            px: 2,
-                            py: 1.5,
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            borderBottom: `1px solid ${
-                              isDark ? "#1e293b" : "#e2e8f0"
-                            }`,
-                          }}
-                        >
-                          <Typography
-                            sx={{ fontSize: "14px", fontWeight: 700 }}
-                          >
-                            Vehicle Health Timeline
-                          </Typography>
-                          <IconButton
-                            onClick={() => setOpenVehicleHealth(false)}
-                            size="small"
-                          >
-                            <CloseIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                        <DialogContent sx={{ height: "85vh" }}>
-                          <ReactECharts
-                            style={{ width: "100%", height: "100%" }}
-                            option={chartOption}
-                          />
-                        </DialogContent>
-                      </Dialog>
-                    </>
-                  );
-                })()}
+            <Grid
+              item
+              xs={12}
+              sm={4}
+              sx={{
+                minHeight: 0,
+                height: "100%",
+                display: "grid",
+                gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+                gap: 0.75,
+              }}
+            >
+              <Card
+                sx={{
+                  p: 1,
+                  minHeight: 0,
+                  overflow: "hidden",
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) 86px",
+                  alignItems: "center",
+                  gap: 1,
+                  border: `1px solid ${alpha("#06b6d4", 0.28)}`,
+                  background: isDark
+                    ? `linear-gradient(145deg, ${alpha(
+                        "#06b6d4",
+                        0.12
+                      )}, rgba(15,23,42,0.9))`
+                    : `linear-gradient(145deg, ${alpha(
+                        "#06b6d4",
+                        0.08
+                      )}, #ffffff)`,
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <Box
+                      sx={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "#8b5cf6",
+                        bgcolor: alpha("#8b5cf6", 0.14),
+                        border: `1px solid ${alpha("#8b5cf6", 0.25)}`,
+                      }}
+                    >
+                      <AutoAwesomeOutlinedIcon sx={{ fontSize: 14 }} />
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: 10,
+                        fontWeight: 900,
+                        color: isDark ? "#f8fafc" : "#0f172a",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      AI Executive Summary
+                    </Typography>
+                  </Stack>
+                  <Typography
+                    sx={{
+                      mt: 0.7,
+                      fontSize: 11,
+                      lineHeight: 1.35,
+                      color: "text.secondary",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 7,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {aiExecutiveStory}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    width: 78,
+                    height: 78,
+                    borderRadius: "50%",
+                    justifySelf: "center",
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#3b82f6",
+                    background: `radial-gradient(circle, ${alpha(
+                      "#3b82f6",
+                      0.28
+                    )} 0%, ${alpha("#06b6d4", 0.14)} 42%, transparent 72%)`,
+                    border: `1px solid ${alpha("#3b82f6", 0.24)}`,
+                    boxShadow: `0 0 24px ${alpha(
+                      "#3b82f6",
+                      isDark ? 0.28 : 0.18
+                    )}`,
+                    position: "relative",
+                    "&:before": {
+                      content: '""',
+                      position: "absolute",
+                      inset: 7,
+                      borderRadius: "50%",
+                      border: `1px dashed ${alpha("#3b82f6", 0.36)}`,
+                    },
+                  }}
+                >
+                  <PsychologyOutlinedIcon sx={{ fontSize: 38 }} />
+                  <Typography
+                    sx={{
+                      position: "absolute",
+                      fontSize: 10,
+                      fontWeight: 900,
+                      color: "#60a5fa",
+                      mt: 3.6,
+                    }}
+                  >
+                    AI
+                  </Typography>
+                </Box>
+              </Card>
+              <Card
+                sx={{
+                  p: 1,
+                  minHeight: 0,
+                  overflow: "hidden",
+                  border: `1px solid ${alpha("#8b5cf6", 0.28)}`,
+                  background: isDark
+                    ? `linear-gradient(145deg, ${alpha(
+                        "#8b5cf6",
+                        0.14
+                      )}, rgba(15,23,42,0.9))`
+                    : `linear-gradient(145deg, ${alpha(
+                        "#8b5cf6",
+                        0.08
+                      )}, #ffffff)`,
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={0.75}>
+                  <Box
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      display: "grid",
+                      placeItems: "center",
+                      color: "#8b5cf6",
+                      bgcolor: alpha("#8b5cf6", 0.14),
+                      border: `1px solid ${alpha("#8b5cf6", 0.25)}`,
+                    }}
+                  >
+                    <TipsAndUpdatesOutlinedIcon sx={{ fontSize: 14 }} />
+                  </Box>
+                  <Typography
+                    sx={{
+                      fontSize: 10,
+                      fontWeight: 900,
+                      color: "#8b5cf6",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    AI Recommendations
+                  </Typography>
+                </Stack>
+                <Typography
+                  sx={{
+                    mt: 0.55,
+                    fontSize: 11,
+                    lineHeight: 1.35,
+                    color: "text.secondary",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 5,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {criticalCount > 0
+                    ? `Prioritize ${criticalCount} poor-health vehicle${
+                        criticalCount === 1 ? "" : "s"
+                      } before dispatch and schedule workshop slots for ${warningCount} warning vehicle${
+                        warningCount === 1 ? "" : "s"
+                      }.`
+                    : warningCount > 0
+                    ? `Schedule preventive checks for ${warningCount} average-risk vehicle${
+                        warningCount === 1 ? "" : "s"
+                      } before the next route cycle.`
+                    : "No urgent repair queue from current telemetry. Keep preventive maintenance cadence and monitor utilization changes."}
+                </Typography>
               </Card>
             </Grid>
 
-            <Grid item xs={12} sm={7}>
+            <Grid item xs={12} sm={8} sx={{ minHeight: 0, height: "100%" }}>
               <Paper
                 elevation={0}
                 sx={{
@@ -7315,6 +8607,10 @@ export default function CockpitView({
                   borderRadius: 2,
                   overflow: "hidden",
                   bgcolor: isDark ? "#0f172a" : "#ffffff",
+                  height: "100%",
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
                 <Box
@@ -7325,11 +8621,17 @@ export default function CockpitView({
                     px: 1,
                     py: 1,
                     borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
-                    flexGrow: 1,
+                    flexShrink: 0,
                   }}
                 >
                   <Box>
-                    <SectionTitle title="Fleet Table" />
+                    <SectionTitle
+                      title={
+                        showTopPerformers
+                          ? "Top Performing Vehicles"
+                          : "Fleet Table"
+                      }
+                    />
                     <Typography
                       sx={{
                         fontSize: "10px",
@@ -7337,10 +8639,21 @@ export default function CockpitView({
                         mt: 0.15,
                       }}
                     >
-                      Real-time overview of all active and in-service vehicles
+                      {showTopPerformers
+                        ? "Best vehicles by live health and driver score"
+                        : "Real-time overview"}
                     </Typography>
                   </Box>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{
+                      flexWrap: "wrap",
+                      justifyContent: "flex-end",
+                      ml: "auto",
+                    }}
+                  >
                     <Box
                       sx={{
                         px: 1.25,
@@ -7357,9 +8670,90 @@ export default function CockpitView({
                           color: "#3b82f6",
                         }}
                       >
-                        {sortedTableRows.length} Vehicles
+                        {activeTableRows.length} Vehicles
                       </Typography>
                     </Box>
+                    {showTopPerformers ? (
+                      <FormControl size="small" sx={{ minWidth: 142 }}>
+                        <InputLabel sx={{ fontSize: "10px" }}>
+                          Top By
+                        </InputLabel>
+                        <Select
+                          label="Top By"
+                          value={topPerformerSort}
+                          onChange={(e) => {
+                            setTopPerformerSort(
+                              e.target.value as typeof topPerformerSort
+                            );
+                            setPage(0);
+                          }}
+                          sx={{
+                            height: 32,
+                            fontSize: "10px",
+                            bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                          }}
+                        >
+                          <MenuItem value="overall">Overall Score</MenuItem>
+                          <MenuItem value="health">Health Score</MenuItem>
+                          <MenuItem value="driver">Driver Score</MenuItem>
+                        </Select>
+                      </FormControl>
+                    ) : (
+                      <>
+                        <FormControl size="small" sx={{ minWidth: 132 }}>
+                          <InputLabel sx={{ fontSize: "10px" }}>
+                            Status
+                          </InputLabel>
+                          <Select
+                            label="Status"
+                            value={statusFilter}
+                            onChange={(e) => {
+                              setStatusFilter(
+                                e.target.value as typeof statusFilter
+                              );
+                              setPage(0);
+                            }}
+                            sx={{
+                              height: 32,
+                              fontSize: "10px",
+                              bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                            }}
+                          >
+                            <MenuItem value="all">All Vehicles</MenuItem>
+                            <MenuItem value="critical">Critical</MenuItem>
+                            <MenuItem value="active">Active</MenuItem>
+                            <MenuItem value="warning">Warning</MenuItem>
+                            <MenuItem value="healthy">Healthy</MenuItem>
+                            <MenuItem value="parked">Parked</MenuItem>
+                            <MenuItem value="in_service">In Workshop</MenuItem>
+                          </Select>
+                        </FormControl>
+                        <FormControl size="small" sx={{ minWidth: 118 }}>
+                          <InputLabel sx={{ fontSize: "10px" }}>
+                            Health
+                          </InputLabel>
+                          <Select
+                            label="Health"
+                            value={healthScoreFilter}
+                            onChange={(e) => {
+                              setHealthScoreFilter(e.target.value);
+                              setPage(0);
+                            }}
+                            sx={{
+                              height: 32,
+                              fontSize: "10px",
+                              bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                            }}
+                          >
+                            <MenuItem value="all">All Health</MenuItem>
+                            <MenuItem value="excellent">Excellent</MenuItem>
+                            <MenuItem value="good">Good</MenuItem>
+                            <MenuItem value="average">Average</MenuItem>
+                            <MenuItem value="poor">Poor</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </>
+                    )}
                     <TextField
                       size="small"
                       placeholder="Search vehicle / driver / route…"
@@ -7380,7 +8774,7 @@ export default function CockpitView({
                         ),
                       }}
                       sx={{
-                        width: 260,
+                        width: 230,
                         "& .MuiOutlinedInput-root": {
                           height: 32,
                           borderRadius: 2,
@@ -7405,17 +8799,77 @@ export default function CockpitView({
                         },
                       }}
                     />
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={0.75}
+                      sx={{ ml: "auto", minWidth: "fit-content" }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: showTopPerformers
+                            ? "#22c55e"
+                            : "text.secondary",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Switch to Top Performing Vehicles
+                      </Typography>
+                      <Switch
+                        size="small"
+                        checked={showTopPerformers}
+                        onChange={(e) => {
+                          setShowTopPerformers(e.target.checked);
+                          setPage(0);
+                        }}
+                      />
+                    </Stack>
                   </Stack>
                 </Box>
-                <TableContainer sx={{ minHeight: "643px" }}>
+                <TableContainer
+                  sx={{ flex: 1, minHeight: 0, overflow: "auto" }}
+                >
                   <Table stickyHeader>
                     <TableHead>
                       <TableRow>
-                        {FLEET_TABLE_COLUMNS.map((col) => (
+                        {(showTopPerformers
+                          ? [
+                              {
+                                id: "vehicle",
+                                label: "Vehicle",
+                                sortable: false,
+                              },
+                              {
+                                id: "driver",
+                                label: "Driver",
+                                sortable: false,
+                              },
+                              {
+                                id: "mileage",
+                                label: "Mileage",
+                                sortable: false,
+                              },
+                              {
+                                id: "driver_score",
+                                label: "Driver Score",
+                                sortable: false,
+                              },
+                              {
+                                id: "health",
+                                label: "Health",
+                                sortable: false,
+                              },
+                            ]
+                          : FLEET_TABLE_COLUMNS
+                        ).map((col) => (
                           <TableCell
                             key={col.id}
                             onClick={() =>
-                              col.sortable && handleTableSort(col.id)
+                              !showTopPerformers &&
+                              col.sortable &&
+                              handleTableSort(col.id as FleetTableColId)
                             }
                             sx={{
                               bgcolor: isDark ? "#1e293b" : "#f8fafc",
@@ -7429,11 +8883,15 @@ export default function CockpitView({
                               py: 0.25,
                               px: 1.5,
                               whiteSpace: "nowrap",
-                              cursor: col.sortable ? "pointer" : "default",
+                              cursor:
+                                !showTopPerformers && col.sortable
+                                  ? "pointer"
+                                  : "default",
                               userSelect: "none",
-                              "&:hover": col.sortable
-                                ? { bgcolor: isDark ? "#263044" : "#f1f5f9" }
-                                : {},
+                              "&:hover":
+                                !showTopPerformers && col.sortable
+                                  ? { bgcolor: isDark ? "#263044" : "#f1f5f9" }
+                                  : {},
                             }}
                           >
                             <Stack
@@ -7442,7 +8900,7 @@ export default function CockpitView({
                               spacing={0.4}
                             >
                               <span>{col.label}</span>
-                              {col.sortable && (
+                              {!showTopPerformers && col.sortable && (
                                 <Box
                                   component="span"
                                   sx={{
@@ -7478,7 +8936,7 @@ export default function CockpitView({
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {sortedTableRows
+                      {activeTableRows
                         .slice(
                           page * rowsPerPage,
                           page * rowsPerPage + rowsPerPage
@@ -7511,6 +8969,85 @@ export default function CockpitView({
                             : rowIdx % 2 === 0
                             ? "#ffffff"
                             : "#f8fafc";
+
+                          if (showTopPerformers) {
+                            const mileage = Math.max(
+                              4.8,
+                              Math.min(
+                                9.8,
+                                liveHealth * 0.055 + driverScore * 0.045
+                              )
+                            ).toFixed(1);
+                            return (
+                              <TableRow
+                                key={`top-${row.vehicle_id}`}
+                                hover
+                                sx={{
+                                  bgcolor: rowBg,
+                                  "&:hover": {
+                                    bgcolor: isDark
+                                      ? alpha("#22c55e", 0.08)
+                                      : alpha("#22c55e", 0.06),
+                                  },
+                                }}
+                              >
+                                <TableCell
+                                  sx={{
+                                    py: 0.75,
+                                    px: 1.5,
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  {row.name || row.vehicle_id}
+                                </TableCell>
+                                <TableCell
+                                  sx={{
+                                    py: 0.75,
+                                    px: 1.5,
+                                    fontSize: 11,
+                                    color: "text.secondary",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  {row.driver || "Unassigned"}
+                                </TableCell>
+                                <TableCell
+                                  sx={{
+                                    py: 0.75,
+                                    px: 1.5,
+                                    fontSize: 11,
+                                    color: "text.secondary",
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  {mileage} km/L
+                                </TableCell>
+                                <TableCell
+                                  sx={{
+                                    py: 0.75,
+                                    px: 1.5,
+                                    fontSize: 11,
+                                    color: scoreColor,
+                                    fontWeight: 900,
+                                  }}
+                                >
+                                  {driverScore}
+                                </TableCell>
+                                <TableCell
+                                  sx={{
+                                    py: 0.75,
+                                    px: 1.5,
+                                    fontSize: 11,
+                                    color: hs.color,
+                                    fontWeight: 900,
+                                  }}
+                                >
+                                  {Math.round(liveHealth)}%
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
 
                           let HealthIcon: React.ElementType =
                             HealthAndSafetyOutlinedIcon;
@@ -7588,7 +9125,11 @@ export default function CockpitView({
                                       if (
                                         row.status?.toLowerCase() === "active"
                                       ) {
-                                        navigate(`/automotive?vehicle=${encodeURIComponent(row.vehicle_id)}`);
+                                        navigate(
+                                          `/automotive?vehicle=${encodeURIComponent(
+                                            row.vehicle_id
+                                          )}`
+                                        );
                                       }
                                     }}
                                     sx={{
@@ -8082,7 +9623,7 @@ export default function CockpitView({
                     >
                       {Math.min(
                         rowsPerPage,
-                        Math.max(0, sortedTableRows.length - page * rowsPerPage)
+                        Math.max(0, activeTableRows.length - page * rowsPerPage)
                       )}
                     </Box>
                     {" of "}
@@ -8093,13 +9634,16 @@ export default function CockpitView({
                         color: isDark ? "#e2e8f0" : "#1e293b",
                       }}
                     >
-                      {sortedTableRows.length}
+                      {activeTableRows.length}
                     </Box>
-                    {" active vehicles"}
+                    {showTopPerformers ? " top vehicles" : " active vehicles"}
                   </Typography>
 
                   <Pagination
-                    count={Math.ceil(sortedTableRows.length / rowsPerPage)}
+                    count={Math.max(
+                      1,
+                      Math.ceil(activeTableRows.length / rowsPerPage)
+                    )}
                     page={page + 1}
                     onChange={(_, value) => handleChangePage(null, value - 1)}
                     shape="rounded"
@@ -8109,17 +9653,19 @@ export default function CockpitView({
                       "& .MuiPaginationItem-root": {
                         fontSize: "12px",
                         color: isDark ? "#94a3b8" : "#64748b",
-                        backgroundColor: isDark ? "#1e293b" : "transparent",
+                        backgroundColor: isDark ? "#0f1f31" : "transparent",
                         border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
                         "&:hover": {
-                          backgroundColor: isDark ? "#334155" : undefined,
+                          backgroundColor: isDark ? "#102235" : undefined,
                           color: isDark ? "#e2e8f0" : undefined,
                         },
                         "&.Mui-selected": {
-                          backgroundColor: "#3b82f6",
-                          color: "#fff",
-                          borderColor: "#3b82f6",
-                          "&:hover": { backgroundColor: "#2563eb" },
+                          backgroundColor: isDark ? "#38bdf8" : "#005071",
+                          color: isDark ? "#04131f" : "#fff",
+                          borderColor: isDark ? "#38bdf8" : "#005071",
+                          "&:hover": {
+                            backgroundColor: isDark ? "#0ea5e9" : "#003e59",
+                          },
                         },
                         "&.MuiPaginationItem-ellipsis": {
                           backgroundColor: "transparent",

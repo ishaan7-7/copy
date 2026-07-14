@@ -56,7 +56,7 @@ import {
   Brush,
 } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useStore } from "../store";
 import { liveInterval, useRefetchOnActivate } from "../hooks/useApi";
@@ -532,7 +532,18 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (location.hash !== "#alerts-feed") return;
+    window.requestAnimationFrame(() => {
+      document.getElementById("alerts-feed")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [location.hash]);
 
   const fleetQuery = useQuery<FleetSummary>({
     queryKey: ["fh-fleet-summary"],
@@ -1215,7 +1226,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
       <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2.5 }}>
 
         {/* Section 1: Vital Signs */}
-        <Paper elevation={0} sx={{ ...iSx(isDark), p: 2 }}>
+        <Paper id="alerts-feed" elevation={0} sx={{ ...iSx(isDark), p: 2 }}>
           <SectionHeader
             title="Fleet Vital Signs"
             accent={accentGreen}

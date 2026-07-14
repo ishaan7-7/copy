@@ -21,7 +21,9 @@ export default function KnowledgeRepo() {
     <Box
       sx={{
         width: "100%",
-        height: "calc(100vh - 45px)",
+        height: "100%",
+        minHeight: 0,
+        display: "flex",
         overflow: "hidden",
       }}
     >
@@ -33,6 +35,7 @@ export default function KnowledgeRepo() {
         style={{
           width: "100%",
           height: "100%",
+          display: "block",
           border: "none",
         }}
       />
