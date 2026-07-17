@@ -87,7 +87,15 @@ export default function TelematrixLandingPage() {
     document.getElementById("capabilities")?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: colors.page, color: colors.ink }}>
+    <Box
+      sx={{
+        height: "100vh",
+        overflowY: "auto",
+        overflowX: "hidden",
+        bgcolor: colors.page,
+        color: colors.ink,
+      }}
+    >
       <AppBar
         elevation={0}
         position="sticky"
@@ -99,23 +107,43 @@ export default function TelematrixLandingPage() {
         }}
       >
         <Toolbar
+          disableGutters
           sx={{
-            minHeight: "52px !important",
-            px: { xs: 1.5, md: 3 },
+            minHeight: "var(--app-header-h) !important",
+            height: "var(--app-header-h)",
+            padding: "0 var(--app-page-pad) !important",
             display: "flex",
-            gap: 2,
+            justifyContent: "space-between",
+            gap: "var(--app-gap)",
           }}
         >
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: { xs: 1, lg: 1.75, xl: 2.5 },
+              gap: { xs: 1.5, lg: 2, xl: 2.5 },
+              minWidth: 0,
               flexShrink: 0,
-              cursor: "pointer",
             }}
-            onClick={() => navigate("/")}
           >
+            <Box
+              aria-hidden="true"
+              sx={{
+                width: "var(--app-control-h)",
+                height: "var(--app-control-h)",
+                flexShrink: 0,
+              }}
+            />
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 1, lg: 1.75, xl: 2.5 },
+                flexShrink: 0,
+                cursor: "pointer",
+              }}
+              onClick={() => navigate("/")}
+            >
             <Box
               component="img"
               src={exlLogo}
@@ -163,6 +191,7 @@ export default function TelematrixLandingPage() {
               >
                 Vehicle Intelligence Platform
               </Typography>
+            </Box>
             </Box>
           </Box>
 

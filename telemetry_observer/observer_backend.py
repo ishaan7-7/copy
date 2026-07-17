@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import uuid
 from collections import defaultdict, deque
 from typing import Dict, Any
 from datetime import datetime, timezone
@@ -103,12 +102,14 @@ class HybridObserver:
         retry_delay = 5
 
         while self.running:
-            unique_group_id = f"telemetry-observer-{uuid.uuid4().hex[:8]}"
             consumer = AIOKafkaConsumer(
                 *topics,
                 bootstrap_servers=bootstrap,
-                group_id=unique_group_id,
+                group_id="telemetry-observer-v1",
                 auto_offset_reset="earliest",
+                session_timeout_ms=30000,
+                heartbeat_interval_ms=10000,
+                max_poll_interval_ms=300000,
             )
             try:
                 await consumer.start()

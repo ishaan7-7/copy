@@ -3834,6 +3834,25 @@ export default function CockpitView({
     },
   ];
 
+  const aiRecommendationItems = [
+    criticalCount > 0
+      ? `Prioritize ${criticalCount} poor-health vehicle${criticalCount === 1 ? "" : "s"} before dispatch; ${warningCount} more require preventive checks.`
+      : warningCount > 0
+      ? `Schedule preventive checks for ${warningCount} average-risk vehicle${warningCount === 1 ? "" : "s"} before the next route cycle.`
+      : "No urgent repair queue is indicated by the current vehicle-health data.",
+    serviceCount > 0
+      ? `Review workshop turnaround for ${serviceCount} vehicle${serviceCount === 1 ? "" : "s"}; current fleet availability is ${executiveMetrics.availability}%.`
+      : `Fleet availability is ${executiveMetrics.availability}% with no vehicles currently reported in the workshop.`,
+    executiveMetrics.avgDriver !== null
+      ? executiveMetrics.avgDriver < 80
+        ? `Target driver coaching where scores are lowest; the backend fleet average is ${executiveMetrics.avgDriver.toFixed(1)}/100.`
+        : `Maintain the current driver program; the backend fleet average is ${executiveMetrics.avgDriver.toFixed(1)}/100.`
+      : `Balance dispatch capacity across ${activeCount} active and ${parkedCount} parked vehicles.`,
+    (alertTotal ?? 0) > 0
+      ? `Triage ${alertTotal ?? 0} open alert${(alertTotal ?? 0) === 1 ? "" : "s"}, starting with vehicles already in the risk queue.`
+      : `Monitor utilization at ${executiveMetrics.utilization}% and adjust dispatch if active demand changes.`,
+  ];
+
   const healthScoreValue = Math.round(liveAvgHealth || 0);
   const availabilityScore = executiveMetrics.availability;
   const utilizationScore = executiveMetrics.utilization;
@@ -8572,30 +8591,32 @@ export default function CockpitView({
                     AI Recommendations
                   </Typography>
                 </Stack>
-                <Typography
+                <Stack
+                  component="ul"
                   sx={{
                     mt: 0.55,
-                    fontSize: 11,
-                    lineHeight: 1.35,
-                    color: "text.secondary",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 5,
-                    WebkitBoxOrient: "vertical",
+                    mb: 0,
+                    pl: 2,
+                    gap: 0.32,
                     overflow: "hidden",
                   }}
                 >
-                  {criticalCount > 0
-                    ? `Prioritize ${criticalCount} poor-health vehicle${
-                        criticalCount === 1 ? "" : "s"
-                      } before dispatch and schedule workshop slots for ${warningCount} warning vehicle${
-                        warningCount === 1 ? "" : "s"
-                      }.`
-                    : warningCount > 0
-                    ? `Schedule preventive checks for ${warningCount} average-risk vehicle${
-                        warningCount === 1 ? "" : "s"
-                      } before the next route cycle.`
-                    : "No urgent repair queue from current telemetry. Keep preventive maintenance cadence and monitor utilization changes."}
-                </Typography>
+                  {aiRecommendationItems.map((recommendation) => (
+                    <Typography
+                      component="li"
+                      key={recommendation}
+                      sx={{
+                        fontSize: 9.7,
+                        lineHeight: 1.25,
+                        color: "text.secondary",
+                        pl: 0.1,
+                        "&::marker": { color: "#8b5cf6" },
+                      }}
+                    >
+                      {recommendation}
+                    </Typography>
+                  ))}
+                </Stack>
               </Card>
             </Grid>
 

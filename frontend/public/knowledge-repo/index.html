@@ -2372,6 +2372,132 @@
           page-break-after: always;
         }
       }
+
+      /* Embedded repository layout: align the index to the application viewport. */
+      .master-index {
+        width: 100%;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 40px 40px;
+      }
+      .master-index .index-cover {
+        margin: 0 -40px 28px;
+        padding: 38px 40px 34px;
+        min-height: 0;
+      }
+      .master-index .index-cover h1 { line-height: 1.1; }
+      .index-grid { align-items: stretch; }
+      .index-section-list li.index-link-row {
+        cursor: pointer;
+        color: var(--accent);
+        border-radius: 4px;
+        transition: background-color 0.15s ease, padding-left 0.15s ease;
+      }
+      .index-section-list li.index-link-row:hover,
+      .index-section-list li.index-link-row:focus-visible {
+        background: rgba(37, 99, 235, 0.08);
+        padding-left: 6px;
+        outline: none;
+      }
+      html.dark .index-section-list li.index-link-row:hover,
+      html.dark .index-section-list li.index-link-row:focus-visible {
+        background: rgba(96, 165, 250, 0.11);
+      }
+      [id] { scroll-margin-top: 16px; }
+      .persona-doc [id] { scroll-margin-top: 54px; }
+      .exl-fixed-footer { display: none !important; }
+      /* Keep the repository scrollbar easy to find in both themes. */
+      html,
+      body {
+        scrollbar-width: auto;
+        scrollbar-color: #356f8d #e7eef3;
+      }
+      html::-webkit-scrollbar,
+      body::-webkit-scrollbar {
+        width: 11px;
+        height: 11px;
+      }
+      html::-webkit-scrollbar-track,
+      body::-webkit-scrollbar-track {
+        background: #e7eef3;
+      }
+      html::-webkit-scrollbar-thumb,
+      body::-webkit-scrollbar-thumb {
+        background: #356f8d;
+        border: 2px solid #e7eef3;
+        border-radius: 999px;
+      }
+      html::-webkit-scrollbar-thumb:hover,
+      body::-webkit-scrollbar-thumb:hover {
+        background: #005071;
+      }
+      html.dark,
+      html.dark body {
+        scrollbar-color: #38bdf8 #0b1624;
+      }
+      html.dark::-webkit-scrollbar-track,
+      html.dark body::-webkit-scrollbar-track {
+        background: #0b1624;
+      }
+      html.dark::-webkit-scrollbar-thumb,
+      html.dark body::-webkit-scrollbar-thumb {
+        background: #38bdf8;
+        border-color: #0b1624;
+      }
+      html.dark::-webkit-scrollbar-thumb:hover,
+      html.dark body::-webkit-scrollbar-thumb:hover {
+        background: #7dd3fc;
+      }
+      .knowledge-brand {
+        position: fixed;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        pointer-events: none;
+      }
+      .knowledge-brand img {
+        display: block;
+        width: auto;
+        height: 32px;
+      }
+      .knowledge-brand-top {
+        position: absolute;
+        top: 20px;
+        right: 28px;
+      }
+      .knowledge-brand-bottom {
+        position: fixed;
+        right: 22px;
+        bottom: 20px;
+      }
+      html.dark .knowledge-brand {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+      }
+      .master-index .index-cover {
+        position: relative;
+        padding-right: 150px;
+      }
+      @media (max-width: 720px) {
+        .master-index { padding: 0 18px 28px; }
+        .master-index .index-cover {
+          margin: 0 -18px 22px;
+          padding: 28px 100px 26px 20px;
+        }
+        .knowledge-brand-top { top: 18px; right: 20px; }
+        .knowledge-brand-top img { height: 26px; }
+        .knowledge-brand-bottom { right: 18px; bottom: 18px; }
+        .knowledge-brand-bottom img { height: 28px; }
+        .index-stats { flex-wrap: wrap; }
+        .index-stat { min-width: 33.333%; }
+        .index-grid { grid-template-columns: 1fr; }
+      }
     </style>
     <script>
       (function () {
@@ -2387,15 +2513,109 @@
         window.addEventListener("message", function (e) {
           if (e.data === "theme:dark") applyTheme(true);
           if (e.data === "theme:light") applyTheme(false);
+          if (e.data === "scroll:top") {
+            window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+          }
         });
+
+        var scrollReportPending = false;
+        function reportRepositoryScroll() {
+          if (scrollReportPending) return;
+          scrollReportPending = true;
+          window.requestAnimationFrame(function () {
+            scrollReportPending = false;
+            var scrollTop =
+              window.scrollY ||
+              document.documentElement.scrollTop ||
+              document.body.scrollTop ||
+              0;
+            window.parent.postMessage(
+              { type: "knowledge:scroll", scrollTop: scrollTop },
+              "*"
+            );
+          });
+        }
+        window.addEventListener("scroll", reportRepositoryScroll, { passive: true });
+        window.addEventListener("load", reportRepositoryScroll);
+
+        function scrollToRepositoryTarget(target, targetId) {
+          if (!target) return;
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.history.replaceState(null, "", "#" + targetId);
+        }
+
+        function initScopedAnchorNavigation() {
+          document.addEventListener("click", function (event) {
+            var link = event.target.closest && event.target.closest('a[href^="#"]');
+            if (!link || link.closest(".master-index")) return;
+            var targetId = (link.getAttribute("href") || "").slice(1);
+            if (!targetId) return;
+            var scope = link.closest(".mqtt-doc, .vf-doc, .vm-doc, .persona-doc");
+            if (!scope) return;
+            var target = scope.querySelector('[id="' + targetId.replace(/"/g, "") + '"]');
+            if (!target) return;
+            event.preventDefault();
+            scrollToRepositoryTarget(target, targetId);
+          });
+        }
+
+        function initIndexNavigation() {
+          var cards = Array.prototype.slice.call(document.querySelectorAll(".master-index .index-doc-card"));
+          var documents = [
+            { scope: ".mqtt-doc", targets: ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"] },
+            { scope: null, targets: ["ecm", "tcm", "abs", "bcm", "adas", "bms", "mcu", "acm", "tcu", "icm", "hvac", "gateway"] },
+            { scope: ".vf-doc", targets: ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"] },
+            { scope: ".vm-doc", targets: ["vm-eng", "vm-bat", "vm-fc", "vm-trn", "vm-dyn", "vm-brk", "vm-thm", "vm-elec", "vm-drv", "vm-pm", "vm-emi", "vm-ada"] },
+            { scope: ".persona-doc", targets: ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "xref"] },
+          ];
+          cards.forEach(function (card, cardIndex) {
+            var config = documents[cardIndex];
+            if (!config) return;
+            var scope = config.scope ? document.querySelector(config.scope) : document;
+            if (!scope) return;
+            var rows = Array.prototype.slice.call(card.querySelectorAll(".index-section-list li"));
+            rows.forEach(function (row, rowIndex) {
+              var targetId = config.targets[rowIndex];
+              if (!targetId) return;
+              var target = scope.querySelector('[id="' + targetId + '"]');
+              if (!target) return;
+              row.classList.add("index-link-row");
+              row.setAttribute("role", "link");
+              row.setAttribute("tabindex", "0");
+              var openTarget = function (event) {
+                event.preventDefault();
+                scrollToRepositoryTarget(target, targetId);
+              };
+              row.addEventListener("click", openTarget);
+              row.addEventListener("keydown", function (event) {
+                if (event.key === "Enter" || event.key === " ") openTarget(event);
+              });
+            });
+          });
+        }
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", function () {
+            initScopedAnchorNavigation();
+            initIndexNavigation();
+          });
+        } else {
+          initScopedAnchorNavigation();
+          initIndexNavigation();
+        }
       })();
     </script>
   </head>
   <body>
+    <div class="knowledge-brand knowledge-brand-bottom" aria-hidden="true">
+      <img src="/images/exl-logo.png" alt="" />
+    </div>
     <!-- ════════════════════════════════════════ MASTER INDEX ════════════════════════════════════════ -->
     <div class="master-index">
       <!-- INDEX COVER -->
       <div class="index-cover">
+        <div class="knowledge-brand knowledge-brand-top" aria-hidden="true">
+          <img src="/images/exl-logo.png" alt="" />
+        </div>
         <!-- <div class="exl-logo">
           <svg
             width="96"
@@ -2548,7 +2768,7 @@
             <ul class="index-section-list">
               <li>
                 <span class="index-section-num">§1</span
-                ><a href="#doc-vt">Engine Control Module (ECM)</a>
+                ><a href="#ecm">Engine Control Module (ECM)</a>
               </li>
               <li>
                 <span class="index-section-num">§2</span>Transmission Control
@@ -2580,19 +2800,18 @@
               </li>
               <li>
                 <span class="index-section-num">§9</span>Telematics Control Unit
-                &amp; Gateway
+                (TCU)
               </li>
               <li>
-                <span class="index-section-num">§10</span>Infotainment / HMI
-                Systems
+                <span class="index-section-num">§10</span>Instrument Cluster
+                Module (ICM)
               </li>
               <li>
-                <span class="index-section-num">§11</span>Thermal Management
-                System (TMS)
+                <span class="index-section-num">§11</span>HVAC Control Module
               </li>
               <li>
-                <span class="index-section-num">§12–14</span>Chassis, Suspension
-                &amp; Auxiliary ECUs
+                <span class="index-section-num">§12–14</span>Central Gateway &amp;
+                OBD-II Reference
               </li>
             </ul>
             <div class="index-doc-footer">
@@ -2621,47 +2840,41 @@
             <ul class="index-section-list">
               <li>
                 <span class="index-section-num">§1</span
-                ><a href="#doc-vf">DTC Structure &amp; Classification</a>
+                ><a href="#s1">Fundamentals of Vehicle Diagnostics</a>
               </li>
               <li>
-                <span class="index-section-num">§2</span>OBD-II Diagnostic Modes
-                (Mode 01–0A)
+                <span class="index-section-num">§2</span>Engine Faults
               </li>
               <li>
-                <span class="index-section-num">§3</span>Engine &amp; Fuel
-                System Faults (P0xxx)
+                <span class="index-section-num">§3</span>Fuel System Faults
               </li>
               <li>
-                <span class="index-section-num">§4</span>Emissions &amp; Exhaust
-                System Faults
+                <span class="index-section-num">§4</span>Ignition System Faults
               </li>
               <li>
-                <span class="index-section-num">§5</span>Transmission &amp;
-                Drivetrain Faults
+                <span class="index-section-num">§5</span>Emission &amp; Exhaust
+                Faults
               </li>
               <li>
-                <span class="index-section-num">§6</span>Chassis &amp; Braking
-                System Faults
+                <span class="index-section-num">§6</span>Cooling System Faults
               </li>
               <li>
-                <span class="index-section-num">§7</span>Body &amp; Comfort
-                System Faults (B-codes)
+                <span class="index-section-num">§7</span>Lubrication System
+                Faults
               </li>
               <li>
-                <span class="index-section-num">§8</span>Network &amp;
-                Communication Faults (U-codes)
+                <span class="index-section-num">§8</span>Transmission Faults
               </li>
               <li>
-                <span class="index-section-num">§9</span>ADAS &amp; Safety
-                System Faults
+                <span class="index-section-num">§9</span>Braking System Faults
               </li>
               <li>
-                <span class="index-section-num">§10</span>Battery &amp;
-                High-Voltage System Faults (EV/HEV)
+                <span class="index-section-num">§10</span>Electrical &amp;
+                Battery Faults
               </li>
               <li>
-                <span class="index-section-num">§11–14</span>Freeze Frame Data,
-                Readiness Monitors &amp; Appendices
+                <span class="index-section-num">§11–14</span>Suspension, Tyre,
+                ADAS &amp; Signal Reference
               </li>
             </ul>
             <div class="index-doc-footer">
@@ -2690,7 +2903,7 @@
             <ul class="index-section-list">
               <li>
                 <span class="index-section-num">ENG</span
-                ><a href="#doc-vm">Engine Performance Metrics</a>
+                ><a href="#vm-eng">Engine Performance Metrics</a>
               </li>
               <li>
                 <span class="index-section-num">BAT</span>Battery &amp; Energy
@@ -2802,7 +3015,7 @@
       </div>
     </div>
     <!-- ═══════════════════════════════════════════════════════════════════════════════════════════════ -->
-    <div class="mqtt-doc">
+    <div class="mqtt-doc" id="doc-mqtt">
       <div class="cover">
         <!-- <div>
           <img
@@ -4391,7 +4604,7 @@ try_private false
     </div>
 
     <!-- COVER -->
-    <div class="cover">
+    <div class="cover" id="doc-vt">
       <!-- <div class="exl-logo">
         <svg
           width="96"
@@ -6889,7 +7102,7 @@ try_private false
       Signals&nbsp;&nbsp;&#8212;
     </div>
 
-    <div class="vf-doc">
+    <div class="vf-doc" id="doc-vf">
       <div class="vf-cover">
         <!-- <div class="exl-logo">
           <svg
@@ -8938,7 +9151,7 @@ try_private false
       &#8212;&nbsp;&nbsp;Document 4 &mdash; Vehicle Telemetry Derived Metrics
       Reference&nbsp;&nbsp;&#8212;
     </div>
-    <div class="vm-doc">
+    <div class="vm-doc" id="doc-vm">
       <div class="vm-cover">
         <!-- <div class="exl-logo">
           <svg
@@ -8974,7 +9187,7 @@ try_private false
         </div>
       </div>
 
-      <h2 class="eng">⚙️ &nbsp;Engine Performance <span>15 metrics</span></h2>
+      <h2 class="eng" id="vm-eng">⚙️ &nbsp;Engine Performance <span>15 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -9226,7 +9439,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="bat">
+      <h2 class="bat" id="vm-bat">
         🔋 &nbsp;Battery / Energy (EV &amp; HEV) <span>15 metrics</span>
       </h2>
       <table>
@@ -9496,7 +9709,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="fc">
+      <h2 class="fc" id="vm-fc">
         ⛽ &nbsp;Fuel &amp; Energy Consumption <span>8 metrics</span>
       </h2>
       <table>
@@ -9653,7 +9866,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="trn">
+      <h2 class="trn" id="vm-trn">
         🔩 &nbsp;Drivetrain / Transmission <span>8 metrics</span>
       </h2>
       <table>
@@ -9810,7 +10023,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="dyn">🚗 &nbsp;Vehicle Dynamics <span>10 metrics</span></h2>
+      <h2 class="dyn" id="vm-dyn">🚗 &nbsp;Vehicle Dynamics <span>10 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -10002,7 +10215,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="brk">🛑 &nbsp;Brake System <span>7 metrics</span></h2>
+      <h2 class="brk" id="vm-brk">🛑 &nbsp;Brake System <span>7 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -10140,7 +10353,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="thm">🌡️ &nbsp;Thermal Management <span>7 metrics</span></h2>
+      <h2 class="thm" id="vm-thm">🌡️ &nbsp;Thermal Management <span>7 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -10282,7 +10495,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="elec">⚡ &nbsp;Electrical System <span>6 metrics</span></h2>
+      <h2 class="elec" id="vm-elec">⚡ &nbsp;Electrical System <span>6 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -10403,7 +10616,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="drv">🧑‍💼 &nbsp;Driver Behaviour <span>8 metrics</span></h2>
+      <h2 class="drv" id="vm-drv">🧑‍💼 &nbsp;Driver Behaviour <span>8 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -10563,7 +10776,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="pm">
+      <h2 class="pm" id="vm-pm">
         🔧 &nbsp;Predictive Maintenance <span>10 metrics</span>
       </h2>
       <table>
@@ -10757,7 +10970,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="emi">🌿 &nbsp;Emissions <span>6 metrics</span></h2>
+      <h2 class="emi" id="vm-emi">🌿 &nbsp;Emissions <span>6 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -10881,7 +11094,7 @@ try_private false
         </tbody>
       </table>
 
-      <h2 class="ada">📡 &nbsp;ADAS <span>5 metrics</span></h2>
+      <h2 class="ada" id="vm-ada">📡 &nbsp;ADAS <span>5 metrics</span></h2>
       <table>
         <thead>
           <tr>
@@ -11014,7 +11227,7 @@ try_private false
     </div>
 
     <!-- ═══════════════════════════════════════════════ DOC 5: PERSONA APPLICATIONS ═══ -->
-    <div class="persona-doc">
+    <div class="persona-doc" id="doc-personas">
       <!-- COVER -->
       <div class="persona-cover">
         <!-- <div class="exl-logo">

@@ -76,7 +76,7 @@ const scrollbarStyles = (dark: boolean) => ({
   "html, body, #root": {
     height: "100%",
     overflowX: "hidden",
-    overflowY: "scroll",
+    overflowY: "hidden",
   },
   body: {
     fontSize: "var(--app-font-md)",
@@ -88,7 +88,7 @@ const scrollbarStyles = (dark: boolean) => ({
     {
       fontSize: "var(--app-font-sm) !important",
     },
-  ".MuiTableContainer-root, .ag-root-wrapper, .ag-body-viewport": {
+  ".MuiTableContainer-root": {
     overflow: "auto",
   },
   "*": {

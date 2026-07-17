@@ -3,12 +3,11 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent as ReactDragEvent,
-  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   Box,
+  Button,
   Chip,
   Fab,
   IconButton,
@@ -22,22 +21,35 @@ import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
+import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SmartToyRoundedIcon from "@mui/icons-material/SmartToyRounded";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import Draggable from "react-draggable";
+import { useNavigate } from "react-router-dom";
 import { useGoldStream } from "../contexts/GoldStreamContext";
+import { answerDtcQuestion } from "../utils/dtcKnowledge";
+import {
+  answerKnowledgeRepoQuestion,
+  type KnowledgeRepoAnswer,
+} from "../utils/knowledgeRepoKnowledge";
 
 const FLEET_API = "http://127.0.0.1:8009/api/fleet";
-const CHAT_POSITION_KEY = "telemetrix-fleet-chat-position";
+const CHAT_POSITION_KEY = "telemetrix-fleet-chat-position-v3";
 const CHAT_LAUNCHER_SIZE = 50;
 const CHAT_VIEWPORT_GAP = 8;
+const CHAT_DEFAULT_EDGE_GAP = 20;
+const CHAT_DEFAULT_BOTTOM_GAP = 88;
 
 type ChatPosition = {
   x: number;
   y: number;
+};
+
+type StoredChatOffsets = {
+  right: number;
+  bottom: number;
 };
 
 const clampChatPosition = (position: ChatPosition): ChatPosition => ({
@@ -50,6 +62,20 @@ const clampChatPosition = (position: ChatPosition): ChatPosition => ({
     Math.max(CHAT_VIEWPORT_GAP, window.innerHeight - CHAT_LAUNCHER_SIZE - CHAT_VIEWPORT_GAP)
   ),
 });
+
+const chatPositionFromOffsets = (offsets: StoredChatOffsets): ChatPosition =>
+  clampChatPosition({
+    x: window.innerWidth - CHAT_LAUNCHER_SIZE - offsets.right,
+    y: window.innerHeight - CHAT_LAUNCHER_SIZE - offsets.bottom,
+  });
+
+const persistChatPosition = (position: ChatPosition) => {
+  const offsets: StoredChatOffsets = {
+    right: Math.max(CHAT_VIEWPORT_GAP, window.innerWidth - CHAT_LAUNCHER_SIZE - position.x),
+    bottom: Math.max(CHAT_VIEWPORT_GAP, window.innerHeight - CHAT_LAUNCHER_SIZE - position.y),
+  };
+  window.localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(offsets));
+};
 
 type FleetFooterSummary = Record<string, unknown> & {
   avg_driver_score?: number;
@@ -71,6 +97,7 @@ type Message = {
   id: number;
   role: "assistant" | "user";
   text: string;
+  knowledgeSection?: string;
 };
 
 type FleetChatAssistantProps = {
@@ -79,14 +106,9 @@ type FleetChatAssistantProps = {
 };
 
 const topics = [
-  "What is the overall driver score?",
-  "What is today's downtime?",
-  "How many trucks are available?",
-  "How many vans are available?",
-  "How many vehicles are active?",
-  "How many vehicles are parked?",
-  "How is fleet health?",
-  "Are there open alerts?",
+  "Driver score",
+  "Today's downtime",
+  "DTC P0217",
 ];
 
 const numberFrom = (record: Record<string, unknown> | undefined, keys: string[]) => {
@@ -112,6 +134,7 @@ export default function FleetChatAssistant({
   activeAlertCount,
   currentRoleLabel,
 }: FleetChatAssistantProps) {
+  const navigate = useNavigate();
   const theme = useTheme();
   const { vehicles, connected } = useGoldStream();
   const { data: fleetSummary, isError: fleetSummaryError } = useQuery<FleetFooterSummary>({
@@ -133,15 +156,15 @@ export default function FleetChatAssistant({
     try {
       const savedPosition = window.localStorage.getItem(CHAT_POSITION_KEY);
       return savedPosition
-        ? clampChatPosition(JSON.parse(savedPosition) as ChatPosition)
-        : clampChatPosition({
-            x: window.innerWidth - CHAT_LAUNCHER_SIZE - 20,
-            y: window.innerHeight - CHAT_LAUNCHER_SIZE - 78,
+        ? chatPositionFromOffsets(JSON.parse(savedPosition) as StoredChatOffsets)
+        : chatPositionFromOffsets({
+            right: CHAT_DEFAULT_EDGE_GAP,
+            bottom: CHAT_DEFAULT_BOTTOM_GAP,
           });
     } catch {
-      return clampChatPosition({
-        x: window.innerWidth - CHAT_LAUNCHER_SIZE - 20,
-        y: window.innerHeight - CHAT_LAUNCHER_SIZE - 78,
+      return chatPositionFromOffsets({
+        right: CHAT_DEFAULT_EDGE_GAP,
+        bottom: CHAT_DEFAULT_BOTTOM_GAP,
       });
     }
   });
@@ -151,7 +174,7 @@ export default function FleetChatAssistant({
     {
       id: 1,
       role: "assistant",
-      text: "Hi! I’m the Fleet Assistant. Choose a topic or type a fleet question. My answers use the latest backend data.",
+      text: "Hi! I’m your AI Fleet Assistant. Ask me about fleet performance, vehicle diagnostics, driver insights, or telemetry—I’m here to help.",
     },
   ]);
   const nextId = useRef(2);
@@ -159,22 +182,14 @@ export default function FleetChatAssistant({
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const launcherRef = useRef<HTMLDivElement | null>(null);
   const chatPositionRef = useRef<ChatPosition>(chatPosition);
+  const viewportSizeRef = useRef({
+    width: typeof window === "undefined" ? 0 : window.innerWidth,
+    height: typeof window === "undefined" ? 0 : window.innerHeight,
+  });
   const didDragChatRef = useRef(false);
   const embeddedScrollTopRef = useRef(0);
   const chatDragRef = useRef<{
     pointerId: number;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-  } | null>(null);
-  const chatMouseDragRef = useRef<{
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-  } | null>(null);
-  const chatNativeDragRef = useRef<{
     startX: number;
     startY: number;
     originX: number;
@@ -377,54 +392,24 @@ export default function FleetChatAssistant({
   useEffect(() => {
     const keepLauncherOnScreen = () => {
       if (!chatPositionRef.current) return;
-      const nextPosition = clampChatPosition(chatPositionRef.current);
+      const previousViewport = viewportSizeRef.current;
+      const rightOffset =
+        previousViewport.width - CHAT_LAUNCHER_SIZE - chatPositionRef.current.x;
+      const bottomOffset =
+        previousViewport.height - CHAT_LAUNCHER_SIZE - chatPositionRef.current.y;
+      viewportSizeRef.current = { width: window.innerWidth, height: window.innerHeight };
+      const nextPosition = chatPositionFromOffsets({
+        right: Math.max(CHAT_VIEWPORT_GAP, rightOffset),
+        bottom: Math.max(CHAT_VIEWPORT_GAP, bottomOffset),
+      });
       chatPositionRef.current = nextPosition;
       setChatPosition(nextPosition);
-      window.localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(nextPosition));
+      persistChatPosition(nextPosition);
     };
 
     window.addEventListener("resize", keepLauncherOnScreen);
     return () => window.removeEventListener("resize", keepLauncherOnScreen);
   }, []);
-
-  const beginNativeChatDrag = (event: ReactDragEvent<HTMLButtonElement>) => {
-    const launcherBounds = launcherRef.current?.getBoundingClientRect();
-    if (!launcherBounds) return;
-    didDragChatRef.current = false;
-    chatNativeDragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: launcherBounds.left,
-      originY: launcherBounds.top,
-    };
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", "fleet-chat-launcher");
-    event.dataTransfer.setDragImage(event.currentTarget, 24, 24);
-  };
-
-  const moveNativeChatDrag = (event: ReactDragEvent<HTMLButtonElement>) => {
-    const drag = chatNativeDragRef.current;
-    if (!drag || (event.clientX === 0 && event.clientY === 0)) return;
-    const deltaX = event.clientX - drag.startX;
-    const deltaY = event.clientY - drag.startY;
-    if (Math.hypot(deltaX, deltaY) >= 5) didDragChatRef.current = true;
-    if (!didDragChatRef.current) return;
-
-    const nextPosition = clampChatPosition({
-      x: drag.originX + deltaX,
-      y: drag.originY + deltaY,
-    });
-    chatPositionRef.current = nextPosition;
-    setChatPosition(nextPosition);
-  };
-
-  const finishNativeChatDrag = (event: ReactDragEvent<HTMLButtonElement>) => {
-    moveNativeChatDrag(event);
-    chatNativeDragRef.current = null;
-    if (didDragChatRef.current && chatPositionRef.current) {
-      window.localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(chatPositionRef.current));
-    }
-  };
 
   useEffect(() => {
     const hasScrolledContent = () => {
@@ -499,6 +484,7 @@ export default function FleetChatAssistant({
     const deltaY = event.clientY - drag.startY;
     if (Math.hypot(deltaX, deltaY) >= 5) didDragChatRef.current = true;
     if (!didDragChatRef.current) return;
+    event.preventDefault();
 
     const nextPosition = clampChatPosition({
       x: drag.originX + deltaX,
@@ -516,56 +502,9 @@ export default function FleetChatAssistant({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     if (didDragChatRef.current && chatPositionRef.current) {
-      window.localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(chatPositionRef.current));
+      persistChatPosition(chatPositionRef.current);
     }
   };
-
-  const beginChatMouseDrag = (event: ReactMouseEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return;
-    const launcherBounds = launcherRef.current?.getBoundingClientRect();
-    if (!launcherBounds) return;
-    didDragChatRef.current = false;
-    chatMouseDragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: launcherBounds.left,
-      originY: launcherBounds.top,
-    };
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      const drag = chatMouseDragRef.current;
-      if (!drag) return;
-      const deltaX = event.clientX - drag.startX;
-      const deltaY = event.clientY - drag.startY;
-      if (Math.hypot(deltaX, deltaY) >= 5) didDragChatRef.current = true;
-      if (!didDragChatRef.current) return;
-      event.preventDefault();
-
-      const nextPosition = clampChatPosition({
-        x: drag.originX + deltaX,
-        y: drag.originY + deltaY,
-      });
-      chatPositionRef.current = nextPosition;
-      setChatPosition(nextPosition);
-    };
-
-    const handleMouseUp = () => {
-      if (!chatMouseDragRef.current) return;
-      chatMouseDragRef.current = null;
-      if (didDragChatRef.current && chatPositionRef.current) {
-        window.localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(chatPositionRef.current));
-      }
-    };
-
-    window.addEventListener("mousemove", handleMouseMove, { passive: false });
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, []);
 
   const toggleChat = () => {
     if (didDragChatRef.current) {
@@ -573,17 +512,6 @@ export default function FleetChatAssistant({
       return;
     }
     setOpen((value) => !value);
-  };
-
-  const dragLauncher = (_event: unknown, data: { x: number; y: number }) => {
-    const nextPosition = clampChatPosition({ x: data.x, y: data.y });
-    didDragChatRef.current = true;
-    chatPositionRef.current = nextPosition;
-    setChatPosition(nextPosition);
-  };
-
-  const finishLauncherDrag = () => {
-    window.localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(chatPositionRef.current));
   };
 
   const scrollToPageTop = () => {
@@ -602,10 +530,16 @@ export default function FleetChatAssistant({
     });
   };
 
-  const answerFor = (question: string) => {
+  const answerFor = (question: string): string | KnowledgeRepoAnswer => {
     const normalized = question.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
     const unavailable =
       "That value is not available from the fleet backend right now. I’ll calculate it automatically when live data is returned.";
+
+    const dtcAnswer = answerDtcQuestion(question);
+    if (dtcAnswer) return dtcAnswer;
+
+    const knowledgeAnswer = answerKnowledgeRepoQuestion(question);
+    if (knowledgeAnswer) return knowledgeAnswer;
 
     if (normalized.includes("driver") && normalized.includes("score")) {
       return footerMetrics.driverScore !== null
@@ -697,9 +631,15 @@ export default function FleetChatAssistant({
 
     const delay = 2300 + Math.floor(Math.random() * 700);
     responseTimer.current = setTimeout(() => {
+      const answer = answerFor(cleanQuestion);
       setMessages((current) => [
         ...current,
-        { id: nextId.current++, role: "assistant", text: answerFor(cleanQuestion) },
+        {
+          id: nextId.current++,
+          role: "assistant",
+          text: typeof answer === "string" ? answer : answer.text,
+          knowledgeSection: typeof answer === "string" ? undefined : answer.section,
+        },
       ]);
       setTyping(false);
       responseTimer.current = null;
@@ -711,17 +651,6 @@ export default function FleetChatAssistant({
 
   return (
     <>
-      <Draggable
-        nodeRef={launcherRef}
-        position={chatPosition}
-        onStart={() => {
-          didDragChatRef.current = false;
-        }}
-        onDrag={dragLauncher}
-        onStop={finishLauncherDrag}
-        handle='[data-testid="fleet-chat-button"]'
-        cancel='[data-testid="scroll-to-top-button"]'
-      >
       <Box
         ref={launcherRef}
         component="aside"
@@ -729,8 +658,8 @@ export default function FleetChatAssistant({
         data-testid="fleet-status-bar"
         sx={{
           position: "fixed",
-          left: 0,
-          top: 0,
+          left: chatPosition.x,
+          top: chatPosition.y,
           right: "auto",
           bottom: "auto",
           width: 50,
@@ -897,6 +826,10 @@ export default function FleetChatAssistant({
           aria-description="Drag to reposition. Click to open or close."
           title="Drag to reposition · Click to open"
           onClick={toggleChat}
+          onPointerDown={beginChatDrag}
+          onPointerMove={moveChat}
+          onPointerUp={finishChatDrag}
+          onPointerCancel={finishChatDrag}
           disableRipple
           disableFocusRipple
           size="medium"
@@ -938,11 +871,11 @@ export default function FleetChatAssistant({
               sx={{
                 pointerEvents: "auto",
                 position: "absolute",
-                top: 3,
-                ...(chatPosition && chatPosition.x < 66 ? { left: 58 } : { right: 58 }),
-                width: 42,
-                height: 42,
-                minHeight: 42,
+                top: 7,
+                ...(chatPosition && chatPosition.x < 66 ? { left: 56 } : { right: 56 }),
+                width: 34,
+                height: 34,
+                minHeight: 34,
                 color: "#fff",
                 bgcolor: accent,
                 opacity: 0.9,
@@ -963,12 +896,11 @@ export default function FleetChatAssistant({
                 },
               }}
             >
-              <KeyboardArrowUpRoundedIcon />
+              <KeyboardArrowUpRoundedIcon sx={{ fontSize: 20 }} />
             </Fab>
           </Tooltip>
         )}
       </Box>
-      </Draggable>
 
       {open && (
         <Paper
@@ -979,9 +911,12 @@ export default function FleetChatAssistant({
             position: "fixed",
             zIndex: (muiTheme) => muiTheme.zIndex.modal,
             right: { xs: 10, sm: 22 },
-            bottom: { xs: 136, sm: 142 },
+            bottom: { xs: 148, sm: 150 },
             width: { xs: "calc(100vw - 20px)", sm: 370 },
-            height: { xs: "min(580px, calc(100vh - 96px))", sm: 560 },
+            height: {
+              xs: "min(560px, calc(100vh - 172px))",
+              sm: "min(560px, calc(100vh - 174px))",
+            },
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
@@ -1065,9 +1000,34 @@ export default function FleetChatAssistant({
                         : "none",
                   }}
                 >
-                  <Typography sx={{ fontSize: 11.5, lineHeight: 1.48 }}>
+                  <Typography sx={{ fontSize: 11.5, lineHeight: 1.48, whiteSpace: "pre-line" }}>
                     {message.text}
                   </Typography>
+                  {message.knowledgeSection && (
+                    <Button
+                      size="small"
+                      startIcon={<MenuBookRoundedIcon sx={{ fontSize: "14px !important" }} />}
+                      onClick={() =>
+                        navigate(
+                          `/knowledge-repo?section=${encodeURIComponent(message.knowledgeSection!)}`
+                        )
+                      }
+                      sx={{
+                        mt: 0.55,
+                        p: 0,
+                        minWidth: 0,
+                        color: accent,
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        lineHeight: 1.35,
+                        textTransform: "none",
+                        justifyContent: "flex-start",
+                        "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
+                      }}
+                    >
+                      For more information, click here
+                    </Button>
+                  )}
                 </Box>
               ))}
               {typing && (
@@ -1126,7 +1086,12 @@ export default function FleetChatAssistant({
             >
               Suggested topics
             </Typography>
-            <Stack direction="row" useFlexGap flexWrap="wrap" gap={0.65}>
+            <Stack
+              direction="row"
+              useFlexGap
+              flexWrap="wrap"
+              gap={0.65}
+            >
               {topics.map((topic) => (
                 <Chip
                   key={topic}

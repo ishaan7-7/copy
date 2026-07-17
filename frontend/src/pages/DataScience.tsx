@@ -382,7 +382,7 @@ function InspectorEmpty({ accent, isDark, title, hint }: {
 function InspectorGrid({ isDark, rowData, colDefs }: { isDark: boolean; rowData: any[]; colDefs: ColDef[] }) {
   const agTheme = isDark ? "ag-theme-balham-dark" : "ag-theme-balham";
   return (
-    <Box className={agTheme} sx={{ flex: 1, minHeight: 0, ...agGridSx(isDark) }}>
+    <Box className={agTheme} sx={{ height: "100%", width: "100%", ...agGridSx(isDark) }}>
       <AgGridReact rowData={rowData} columnDefs={colDefs} rowHeight={32} headerHeight={32} suppressMovableColumns />
     </Box>
   );
@@ -1086,7 +1086,7 @@ function FleetInspector({
     { label: "FLEET HEALTH", value: fh !== null ? `${fh.toFixed(1)}%` : "—", color: hc },
     { label: "ACTIVE VEHICLES", value: `${vehicleList.length}`, color: "#38bdf8" },
     { label: "TOTAL GOLD ROWS", value: totalRows.toLocaleString(), color: "#fbbf24" },
-    { label: "MAX LAG", value: lag > 0 ? `${fmt(lag)}ms` : "—", color: lag > 1_000 ? "#ef4444" : "#22c55e" },
+    { label: "MAX LAG", value: goldData != null ? (lag > 0 ? `${fmt(lag)}ms` : "0ms") : "—", color: lag > 1_000 ? "#ef4444" : "#22c55e" },
   ];
 
   return (
@@ -1570,9 +1570,9 @@ function FleetIntelligenceSection({ isDark, writerData, inferenceData, goldData,
     { label: "ACTIVE VEHICLES",    value: vehicleCount > 0 ? String(vehicleCount) : "—",                        sub: "simulation feeds",                                       color: "#22c55e" },
     { label: "FLEET HEALTH",       value: fleetHealth !== null ? `${fleetHealth.toFixed(0)}%` : "—",             sub: fleetHealth !== null ? (fleetHealth >= 75 ? "nominal" : fleetHealth >= 50 ? "degraded" : "critical") : "no data", color: fhColor },
     { label: "GOLD ROWS",          value: totalGoldRows > 0 ? fmt(totalGoldRows) : "—",                         sub: "fused records total",                                    color: "#fbbf24" },
-    { label: "MAX LAG",            value: globalLag > 0 ? `${fmt(globalLag)}ms` : "—",                          sub: globalLag > 2000 ? "high latency" : "acceptable",          color: lagColor },
+    { label: "MAX LAG",            value: goldData != null ? (globalLag > 0 ? `${fmt(globalLag)}ms` : "0ms") : "—",   sub: goldData != null ? (globalLag > 2000 ? "high latency" : globalLag > 0 ? "acceptable" : "caught up") : "no data", color: lagColor },
     { label: "ACTIVE WRITERS",     value: totalWriters > 0 ? `${activeWriters}/${totalWriters}` : "—",           sub: "bronze writers running",                                 color: "#f59e0b" },
-    { label: "BRONZE THROUGHPUT",  value: totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "—",              sub: avgLatencyMs > 0 ? `avg ${avgLatencyMs.toFixed(0)}ms lat` : "waiting", color: "#f59e0b" },
+    { label: "BRONZE THROUGHPUT",  value: totalWriters > 0 ? (totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "0/m") : "—", sub: avgLatencyMs > 0 ? `avg ${avgLatencyMs.toFixed(0)}ms lat` : "pipeline idle", color: "#f59e0b" },
     { label: "ML MODULES",         value: activeModules > 0 ? `${activeModules}/5` : "—",                       sub: totalInferences > 0 ? `${fmt(totalInferences)} inf/5m` : "no inferences", color: "#38bdf8" },
     { label: "PIPELINE E2E",       value: globalE2E > 0 ? `${fmt(globalE2E)}ms` : "—",                          sub: "sensor → gold latency",                                  color: "#38bdf8" },
   ];
@@ -1812,12 +1812,10 @@ function WriterCard({ id, m, isDark }: { id: string; m: any; isDark: boolean }) 
         </Box>
       </Box>
       <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-        <MetricPair label="THROUGHPUT" value={m.throughput > 0 ? `${fmt(m.throughput)}/m` : "—"} isDark={isDark} />
+        <MetricPair label="THROUGHPUT" value={m.throughput > 0 ? `${fmt(m.throughput)}/m` : "0/m"} isDark={isDark} />
         <MetricPair label="LATENCY" value={m.latency_ms > 0 ? `${m.latency_ms.toFixed(1)}ms` : "—"} isDark={isDark} />
-        {m.true_lag > 0 && (
-          <MetricPair label="LAG" value={`${fmt(m.true_lag)}ms`}
-            color={m.true_lag > 1000 ? "#ef4444" : undefined} isDark={isDark} />
-        )}
+        <MetricPair label="LAG" value={m.true_lag > 0 ? `${fmt(m.true_lag)}ms` : "0ms"}
+          color={m.true_lag > 1000 ? "#ef4444" : undefined} isDark={isDark} />
       </Box>
     </Box>
   );
@@ -2857,17 +2855,17 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
                   : { label: "ALL RUNNING", color: "#22c55e" }
                 }
                 metrics={[
-                  { label: "THROUGHPUT", value: totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "—" },
+                  { label: "THROUGHPUT", value: totalWriters > 0 ? (totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "0/m") : "—" },
                   { label: "AVG LAT", value: avgLatencyMs > 0 ? `${avgLatencyMs.toFixed(0)}ms` : "—" },
                   { label: "PEAK LAG",
-                    value: maxWriterLag > 0 ? `${fmt(maxWriterLag)}ms` : "—",
+                    value: totalWriters > 0 ? (maxWriterLag > 0 ? `${fmt(maxWriterLag)}ms` : "0ms") : "—",
                     color: maxWriterLag > 1000 ? "#ef4444" : maxWriterLag > 300 ? "#eab308" : undefined },
                 ]}
                 isDark={isDark} onClick={openDrawer} />
 
               <HConnector
                 topLabel="bronze rows"
-                btmLabel={totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "—"}
+                btmLabel={totalWriters > 0 ? (totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "0/m") : "—"}
                 isDark={isDark} />
 
               <NodeCard id="silver" name="SILVER ML" icon={<PsychologyRoundedIcon />}
@@ -2905,7 +2903,7 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
                     value: fleetHealth !== null ? `${fleetHealth.toFixed(0)}%` : "—",
                     color: fleetHealth !== null ? (fleetHealth >= 75 ? "#22c55e" : fleetHealth >= 50 ? "#eab308" : "#ef4444") : undefined },
                   { label: "PIPELINE LAG",
-                    value: globalLag > 0 ? `${fmt(globalLag)}ms` : "—",
+                    value: goldData != null ? (globalLag > 0 ? `${fmt(globalLag)}ms` : "0ms") : "—",
                     color: globalLag > 2000 ? "#ef4444" : globalLag > 500 ? "#eab308" : undefined },
                   { label: "VEHICLES", value: `${vehicleList.length}` },
                 ]}

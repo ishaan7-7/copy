@@ -303,7 +303,7 @@ export default function Layout() {
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: { xs: 1.5, lg: 3, xl: 4 },
+              gap: { xs: 1.5, lg: 2, xl: 2.5 },
               minWidth: 0,
               flex: 1,
             }}
@@ -315,6 +315,8 @@ export default function Layout() {
                 onClick={() => setRoleDrawerOpen(true)}
                 size="small"
                 sx={{
+                  width: "var(--app-control-h)",
+                  height: "var(--app-control-h)",
                   flexShrink: 0,
                   color: darkMode ? "#cbd5e1" : "#475569",
                   border: `1px solid ${

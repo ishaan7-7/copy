@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 import aiohttp
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -110,10 +110,11 @@ async def proxy_request(service_key: str, endpoint: str, request: Request, fallb
                     _cb_success(service_key, result)
                 return result
             else:
-                error_text = await resp.text()
+                await resp.text()
                 if not skip_cb:
                     _cb_failure(service_key)
-                raise HTTPException(status_code=resp.status, detail=error_text)
+                cached = _cb_state(service_key)["last_ok"]
+                return cached if cached is not None else fallback_data
 
     except aiohttp.ClientConnectorError:
         if not skip_cb:
@@ -125,12 +126,12 @@ async def proxy_request(service_key: str, endpoint: str, request: Request, fallb
             cached = _cb_state(service_key)["last_ok"]
             return cached if cached is not None else fallback_data
         return fallback_data
-    except HTTPException:
-        raise
     except Exception as e:
+        logger.error(f"Unexpected proxy error for {service_key}: {e}")
         if not skip_cb:
             _cb_failure(service_key)
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        cached = _cb_state(service_key)["last_ok"]
+        return cached if cached is not None else fallback_data
 
 # --- Gateway Routes ---
 

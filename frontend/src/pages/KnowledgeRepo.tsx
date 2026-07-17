@@ -1,10 +1,16 @@
 import { useRef, useEffect, useCallback } from "react";
 import { Box } from "@mui/material";
 import { useStore } from "../store";
+import { useLocation } from "react-router-dom";
 
 export default function KnowledgeRepo() {
   const darkMode = useStore((s) => s.darkMode);
+  const location = useLocation();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const requestedSection = new URLSearchParams(location.search).get("section");
+  const iframeSrc = requestedSection
+    ? `/knowledge-repo/index.html#${encodeURIComponent(requestedSection)}`
+    : "/knowledge-repo/index.html";
 
   const sendTheme = useCallback((dark: boolean) => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -29,7 +35,7 @@ export default function KnowledgeRepo() {
     >
       <iframe
         ref={iframeRef}
-        src="/knowledge-repo/index.html"
+        src={iframeSrc}
         title="Knowledge Repository"
         onLoad={() => sendTheme(darkMode)}
         style={{

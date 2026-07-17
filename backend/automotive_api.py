@@ -880,6 +880,194 @@ def get_vehicle_dtc_history(vehicle_id: str):
     return {"vehicle_id": vehicle_id, "runs": vehicle_runs[:50]}
 
 
+_KPI_SENSORS: dict = {
+    "engine":       [("engine_rpm_rpm", "Engine RPM", "RPM"), ("engine_oil_temperature", "Oil Temp", "°C")],
+    "battery":      [("battery_state_of_charge_soc_pct", "State of Charge", "%"), ("battery_state_of_health_soh_pct", "State of Health", "%")],
+    "body":         [("cabin_temperature", "Cabin Temp", "°C"), ("fuel_level_pct", "Fuel Level", "%")],
+    "transmission": [("transmission_oil_temperature", "Trans Oil Temp", "°C"), ("vehicle_speed_kmh", "Vehicle Speed", "km/h")],
+    "tyre":         [("tyre_pressure_fl_psi", "FL Pressure", "PSI"), ("tyre_wear_fl_pct", "FL Tyre Wear", "%")],
+}
+
+_SERVICE_INTERVAL_KM = 15000
+
+
+@router.get("/api/automotive/vehicle-summary/{vehicle_id}")
+def get_vehicle_summary(vehicle_id: str):
+    cache_key = f"vehicle-summary-{vehicle_id}"
+    cached = _cached_response(cache_key, ttl=10.0)
+    if cached is not None:
+        return cached
+
+    import pandas as pd
+
+    # ── 1. Health snapshot from live cache ────────────────────────────────────
+    health_snapshot: dict = {
+        "health_score": None,
+        "status": "UNKNOWN",
+        "fleet_rank": None,
+        "fleet_total": None,
+        "module_contribs": {},
+    }
+    fleet_live = _get_live("fleet-summary")
+    if fleet_live:
+        vehicles = fleet_live.get("vehicles", [])
+        vehicle_entry = next((v for v in vehicles if v.get("vehicle_id") == vehicle_id), None)
+        if vehicle_entry:
+            h = vehicle_entry.get("health_score", 0)
+            health_snapshot = {
+                "health_score": h,
+                "status": vehicle_entry.get("status", "UNKNOWN"),
+                "fleet_rank": None,
+                "fleet_total": len(vehicles),
+                "module_contribs": {mod: vehicle_entry.get(f"{mod}_contrib") for mod in _VEHICLE_MODULES},
+            }
+            sorted_vehicles = sorted(vehicles, key=lambda v: v.get("health_score", 0), reverse=True)
+            for rank, v in enumerate(sorted_vehicles, 1):
+                if v.get("vehicle_id") == vehicle_id:
+                    health_snapshot["fleet_rank"] = rank
+                    break
+
+    # ── 2. KPI snapshot (latest bronze sensor values per module) ──────────────
+    kpi_snapshot: dict = {}
+    for mod in _VEHICLE_MODULES:
+        sensors = _KPI_SENSORS.get(mod, [])
+        kpi_snapshot[mod] = {"sensors": []}
+        partition_path = os.path.join(_DELTA_ROOT, mod, f"source_id={vehicle_id}")
+        sensor_vals: dict = {}
+        if os.path.exists(partition_path):
+            pfiles = dr.list_files(partition_path, max_files=5)
+            if pfiles:
+                col_list = list(dict.fromkeys([s[0] for s in sensors] + ["timestamp"]))
+                col_sql = ", ".join(f'"{c}"' for c in col_list)
+                try:
+                    df = dr.query_df(f"SELECT {col_sql} FROM read_parquet(?)", pfiles)
+                    if not df.empty:
+                        if "timestamp" in df.columns:
+                            df = df.sort_values("timestamp")
+                        last_row = df.iloc[-1]
+                        for skey, _, _ in sensors:
+                            if skey in df.columns:
+                                raw = last_row[skey]
+                                try:
+                                    sensor_vals[skey] = round(float(raw), 2) if raw is not None and str(raw) != "nan" else None
+                                except Exception:
+                                    sensor_vals[skey] = None
+                except Exception:
+                    pass
+        for skey, slabel, sunit in sensors:
+            spec = _KEY_SENSOR_SPECS.get(mod, {}).get(skey)
+            lo, hi = (spec[0], spec[1]) if spec else (None, None)
+            kpi_snapshot[mod]["sensors"].append({
+                "key": skey,
+                "label": slabel,
+                "unit": sunit,
+                "value": sensor_vals.get(skey),
+                "range_lo": lo,
+                "range_hi": hi,
+            })
+
+    # ── 3. Service info (odometer from body bronze) ───────────────────────────
+    odometer_km: float | None = None
+    body_partition = os.path.join(_DELTA_ROOT, "body", f"source_id={vehicle_id}")
+    if os.path.exists(body_partition):
+        bfiles = dr.list_files(body_partition, max_files=5)
+        if bfiles:
+            try:
+                bdf = dr.query_df('SELECT "odometer_reading", "timestamp" FROM read_parquet(?)', bfiles)
+                if not bdf.empty and "odometer_reading" in bdf.columns:
+                    if "timestamp" in bdf.columns:
+                        bdf = bdf.sort_values("timestamp")
+                    raw_odo = bdf["odometer_reading"].iloc[-1]
+                    if raw_odo is not None and str(raw_odo) != "nan":
+                        odometer_km = round(float(raw_odo), 1)
+            except Exception:
+                pass
+
+    next_service_in_km: float | None = None
+    if odometer_km is not None:
+        next_service_in_km = round(_SERVICE_INTERVAL_KM - (odometer_km % _SERVICE_INTERVAL_KM), 1)
+
+    service_info = {
+        "odometer_km": odometer_km,
+        "next_service_in_km": next_service_in_km,
+        "service_interval_km": _SERVICE_INTERVAL_KM,
+    }
+
+    # ── 4. Top anomaly drivers (cross-module, per-vehicle silver top_features) ─
+    feature_scores: dict = {}
+    feature_modules: dict = {}
+    for mod in _VEHICLE_MODULES:
+        silver_path = os.path.join(_SILVER_ROOT, mod)
+        if not os.path.exists(silver_path):
+            continue
+        try:
+            combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
+            if combined.empty or "top_features" not in combined.columns:
+                continue
+            for raw in combined["top_features"].dropna():
+                try:
+                    feats = json.loads(str(raw))
+                    for f, v in feats.items():
+                        feature_scores[f] = feature_scores.get(f, 0.0) + abs(float(v))
+                        if f not in feature_modules:
+                            feature_modules[f] = mod
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    top_anomaly_drivers = sorted(
+        [{"feature": f, "score": round(s, 4), "module": feature_modules.get(f, "")} for f, s in feature_scores.items()],
+        key=lambda x: x["score"],
+        reverse=True,
+    )[:5]
+
+    # ── 5. Last DTC run for this vehicle ──────────────────────────────────────
+    last_dtc = None
+    if os.path.exists(_DTC_HISTORY_FILE):
+        try:
+            with open(_DTC_HISTORY_FILE, "r") as fh:
+                all_runs: list = json.load(fh)
+            vehicle_runs = [r for r in all_runs if r.get("source_id") == vehicle_id]
+            vehicle_runs.sort(key=lambda r: r.get("run_ts", ""), reverse=True)
+            if vehicle_runs:
+                last_dtc = vehicle_runs[0]
+        except Exception:
+            pass
+
+    # ── 6. Alerts summary from live cache ────────────────────────────────────
+    alerts_live = _get_live(f"alerts-{vehicle_id}")
+    open_alerts: list = alerts_live.get("open", []) if alerts_live else []
+    closed_alerts: list = alerts_live.get("closed", []) if alerts_live else []
+    alerts_summary = {
+        "open_count": len(open_alerts),
+        "closed_count": len(closed_alerts),
+        "recent_open": open_alerts[:8],
+    }
+
+    # ── 7. Fleet sim data (optional — returns empty dict if simulator offline) ─
+    fleet_sim: dict = {}
+    try:
+        import urllib.request as _urllib_req
+        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=2)
+        fleet_sim = json.loads(_req.read())
+    except Exception:
+        pass
+
+    result = {
+        "vehicle_id": vehicle_id,
+        "health_snapshot": health_snapshot,
+        "kpi_snapshot": kpi_snapshot,
+        "service_info": service_info,
+        "top_anomaly_drivers": top_anomaly_drivers,
+        "last_dtc": last_dtc,
+        "alerts_summary": alerts_summary,
+        "fleet_sim": fleet_sim,
+    }
+    _set_cache(cache_key, result)
+    return result
+
+
 _DTC_MASTER_FILE = os.path.join(_PROJECT_ROOT, "contracts", "DTC_master.json")
 
 
