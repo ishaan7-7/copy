@@ -913,6 +913,15 @@ export default function AutomotiveDive({
     refetchInterval: isActive && autoRefresh && viewMode === "summary" ? 5000 : false,
   });
 
+  const bronzeStatsQuery = useQuery({
+    queryKey: ["vehicleBronzeStats", selectedVehicle],
+    queryFn: () =>
+      axios.get(`${API}/api/automotive/vehicle-bronze-stats/${selectedVehicle}`).then((r) => r.data),
+    enabled: !!selectedVehicle && viewMode === "summary",
+    refetchInterval: isActive && autoRefresh && viewMode === "summary" ? 30000 : false,
+    staleTime: 25000,
+  });
+
   const fleetSimBehaviorQuery = useQuery({
     queryKey: ["fleetSimBehavior", selectedVehicle],
     queryFn: () =>
@@ -963,6 +972,14 @@ export default function AutomotiveDive({
   useEffect(() => {
     if (selectedVehicle) setViewMode("summary");
   }, [selectedVehicle]);
+
+  const _paramVehicle = searchParams.get("vehicle") ?? "";
+  const _paramModule = searchParams.get("module") ?? "";
+
+  useEffect(() => {
+    if (_paramVehicle && _paramVehicle !== selectedVehicle) setSelectedVehicle(_paramVehicle);
+    if (_paramModule && ALL_MODULES.includes(_paramModule) && _paramModule !== selectedModule) setSelectedModule(_paramModule);
+  }, [_paramVehicle, _paramModule]);
 
   const vehicles: any[] = fleetQuery.data?.vehicles || [];
   const fleetStats = fleetQuery.data?.fleet_stats || {};
@@ -1929,15 +1946,18 @@ export default function AutomotiveDive({
           }}
         >
           {viewMode === "summary" ? (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, pb: 2 }}>
 
             {/* ── SUMMARY CONTROL BAR ── */}
             <Paper sx={{ p: 1, borderRadius: 2, display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.8) : alpha("#f8fafc", 0.95) }}>
-              <FormControl size="small" sx={{ minWidth: 180, "& .MuiOutlinedInput-root": { bgcolor: darkMode ? "#1e293b" : "#fff", borderRadius: 1, fontSize: "10px", "& fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.2) : alpha("#94a3b8", 0.35) }, "&:hover fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.4) : alpha("#94a3b8", 0.6) }, "&.Mui-focused fieldset": { borderColor: darkMode ? "#38bdf8" : "#005071" } }, "& .MuiInputLabel-root": { fontSize: "10px", color: darkMode ? "#64748b" : "#94a3b8", "&.Mui-focused": { color: darkMode ? "#38bdf8" : "#005071" } } }}>
+              <FormControl size="small" sx={{ minWidth: 200, "& .MuiOutlinedInput-root": { bgcolor: darkMode ? "#1e293b" : "#fff", borderRadius: 1.5, fontSize: "12px", fontWeight: 600, "& fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.25) : alpha("#94a3b8", 0.4) }, "&:hover fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.5) : alpha("#94a3b8", 0.7) }, "&.Mui-focused fieldset": { borderColor: darkMode ? "#38bdf8" : "#005071", borderWidth: 2 } }, "& .MuiInputLabel-root": { fontSize: "11px", fontWeight: 600, color: darkMode ? "#64748b" : "#94a3b8", "&.Mui-focused": { color: darkMode ? "#38bdf8" : "#005071" } } }}>
                 <InputLabel>Vehicle</InputLabel>
-                <Select value={selectedVehicle} onChange={(e) => setSelectedVehicle(e.target.value)} label="Vehicle" sx={{ height: 30, "& .MuiSelect-select": { fontSize: "10px", py: 0.5 } }} MenuProps={{ PaperProps: { sx: { "& .MuiMenuItem-root": { fontSize: "10px" } } } }}>
+                <Select displayEmpty value={selectedVehicle} onChange={(e) => setSelectedVehicle(e.target.value)} label="Vehicle" sx={{ height: 34, "& .MuiSelect-select": { fontSize: "12px", fontWeight: 600, py: 0.75 } }} MenuProps={{ PaperProps: { sx: { borderRadius: 2, mt: 0.5, "& .MuiMenuItem-root": { fontSize: "12px", fontWeight: 500, borderRadius: 1, mx: 0.5, my: 0.25 } } } }}>
+                  <MenuItem value="" disabled sx={{ fontSize: "12px", fontStyle: "italic", color: darkMode ? "#475569" : "#94a3b8" }}>
+                    {vehicles.length === 0 ? "Loading…" : "Select vehicle"}
+                  </MenuItem>
                   {vehicles.map((v: any) => (
-                    <MenuItem key={v.vehicle_id} value={v.vehicle_id} sx={{ fontSize: "10px" }}>{v.vehicle_id}</MenuItem>
+                    <MenuItem key={v.vehicle_id} value={v.vehicle_id} sx={{ fontSize: "12px", fontWeight: 500 }}>{v.vehicle_id}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -1971,13 +1991,13 @@ export default function AutomotiveDive({
 
               <Badge badgeContent={alertsSummary.open_count} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "9px", height: 16, minWidth: 16 } }}>
                 <Button size="small" onClick={() => setAlertsOpen(true)} disabled={!selectedVehicle} sx={{ height: 28, fontSize: "10px", fontWeight: 700, px: 1.5, borderRadius: "4px", textTransform: "uppercase", bgcolor: darkMode ? alpha("#ef4444", 0.12) : alpha("#ef4444", 0.08), color: darkMode ? "#f87171" : "#dc2626", border: `1px solid ${darkMode ? alpha("#ef4444", 0.3) : alpha("#ef4444", 0.22)}`, "&:hover": { bgcolor: darkMode ? alpha("#ef4444", 0.2) : alpha("#ef4444", 0.14) }, "&.Mui-disabled": { bgcolor: darkMode ? alpha("#475569", 0.1) : alpha("#94a3b8", 0.08), color: darkMode ? "#475569" : "#94a3b8", borderColor: darkMode ? alpha("#475569", 0.2) : alpha("#94a3b8", 0.2) } }}>
-                  Alerts ({allVehicleAlerts.length})
+                  Alerts
                 </Button>
               </Badge>
             </Paper>
 
             {/* ── 3-COLUMN MAIN CONTENT ── */}
-            <Box sx={{ display: "flex", gap: 1 }}>
+            <Box sx={{ display: "flex", gap: 1, alignItems: "stretch" }}>
 
               {/* ─── LEFT COL: Health trend + Anomaly drivers ─── */}
               <Box sx={{ flex: "0 0 44%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
@@ -2072,6 +2092,30 @@ export default function AutomotiveDive({
                       })}
                     </Box>
                   )}
+                  {Object.keys(moduleContribs).length > 0 && (
+                    <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 0.8)}` }}>
+                      <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, mb: 0.75 }}>Module Health</Typography>
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.55 }}>
+                        {ALL_MODULES.map((mod) => {
+                          const score = moduleContribs[mod] ?? null;
+                          const modColor = (MODULE_COLORS as Record<string, string>)[mod];
+                          const statusColor = score == null ? (darkMode ? "#475569" : "#94a3b8") : score >= 80 ? "#22c55e" : score >= 60 ? "#f59e0b" : "#ef4444";
+                          return (
+                            <Box key={mod} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: modColor, flexShrink: 0 }} />
+                              <Typography sx={{ fontSize: "8px", fontWeight: 600, color: darkMode ? alpha(modColor, 0.8) : modColor, textTransform: "uppercase", letterSpacing: 0.3, width: 52, flexShrink: 0 }}>{mod}</Typography>
+                              <Box sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: darkMode ? alpha(statusColor, 0.1) : alpha(statusColor, 0.08), overflow: "hidden" }}>
+                                <Box sx={{ height: "100%", width: `${score ?? 0}%`, bgcolor: statusColor, borderRadius: 2, transition: "width 0.3s ease" }} />
+                              </Box>
+                              <Typography sx={{ fontSize: "9px", fontFamily: "monospace", width: 38, textAlign: "right", color: statusColor, flexShrink: 0, fontWeight: 600 }}>
+                                {score != null ? `${score.toFixed(1)}%` : "--"}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
                 </Paper>
               </Box>
 
@@ -2115,36 +2159,80 @@ export default function AutomotiveDive({
 
                 {/* Observer Live */}
                 <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
-                    <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#a855f7" }} />
-                    <SensorsRoundedIcon sx={{ fontSize: 12, color: "#a855f7" }} />
-                    <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Live Observer</Typography>
-                    {observerVehicleEntry && (
-                      <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#22c55e" }} />
-                        <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#22c55e" }}>Active</Typography>
-                      </Box>
-                    )}
-                  </Box>
-                  {observerVehicleEntry ? (
-                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
-                      {[
-                        { label: "Rows Processed", value: observerVehicleEntry.rows_processed != null ? Number(observerVehicleEntry.rows_processed).toLocaleString() : "--" },
-                        { label: "Rejected", value: observerVehicleEntry.rejected_rows != null ? String(observerVehicleEntry.rejected_rows) : "--" },
-                        { label: "Validation Rate", value: observerVehicleEntry.validation_rate != null ? `${(Number(observerVehicleEntry.validation_rate) * 100).toFixed(1)}%` : "--" },
-                        { label: "Avg Latency", value: observerVehicleEntry.avg_latency != null ? `${Number(observerVehicleEntry.avg_latency).toFixed(0)} ms` : "--" },
-                      ].map(({ label, value }) => (
-                        <Box key={label} sx={{ p: 0.75, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8) }}>
-                          <Typography sx={{ fontSize: "8px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</Typography>
-                          <Typography sx={{ fontSize: "12px", fontWeight: 700, fontFamily: "monospace", color: darkMode ? "#e2e8f0" : "#0f172a" }}>{value}</Typography>
+                  {(() => {
+                    const kafkaEntry = (() => {
+                      const vList: any[] = (observerQuery.data as any)?.vehicles || [];
+                      return vList.find((v: any) => v.vehicle_id === selectedVehicle || v.source_id === selectedVehicle) ?? null;
+                    })();
+                    const bronze = bronzeStatsQuery.data as any;
+                    const hasData = kafkaEntry != null || (bronze?.total_rows > 0);
+                    const totalRows = kafkaEntry?.rows_processed ?? bronze?.total_rows ?? 0;
+                    const activeMods: string[] = kafkaEntry ? [] : (bronze?.active_modules ?? []);
+                    const latestTs: string = bronze?.latest_timestamp ?? "";
+                    const isKafka = kafkaEntry != null;
+                    return (
+                      <>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
+                          <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#a855f7" }} />
+                          <SensorsRoundedIcon sx={{ fontSize: 12, color: "#a855f7" }} />
+                          <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Live Observer</Typography>
+                          {hasData && (
+                            <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5 }}>
+                              <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#22c55e" }} />
+                              <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#22c55e" }}>{isKafka ? "Kafka" : "Bronze"}</Typography>
+                            </Box>
+                          )}
                         </Box>
-                      ))}
-                    </Box>
-                  ) : (
-                    <Typography sx={{ fontSize: "10px", color: "text.secondary", py: 1, textAlign: "center" }}>
-                      {observerQuery.isLoading ? "Loading observer data…" : "Not active in observer"}
-                    </Typography>
-                  )}
+                        {hasData ? (
+                          <>
+                            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
+                              {[
+                                { label: "Total Rows", value: totalRows > 0 ? Number(totalRows).toLocaleString() : "--" },
+                                { label: isKafka ? "Rejected" : "Modules", value: isKafka ? String(kafkaEntry?.rejected_rows ?? 0) : String(activeMods.length) },
+                                { label: isKafka ? "Validation Rate" : "Latest Data", value: isKafka ? `${(Number(kafkaEntry?.validation_rate) * 100).toFixed(1)}%` : (latestTs ? latestTs.slice(0, 16).replace("T", " ") : "--") },
+                                { label: isKafka ? "Avg Latency" : "Source", value: isKafka ? `${Number(kafkaEntry?.avg_latency ?? 0).toFixed(0)} ms` : "Bronze Delta" },
+                              ].map(({ label, value }) => (
+                                <Box key={label} sx={{ p: 0.75, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8) }}>
+                                  <Typography sx={{ fontSize: "8px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</Typography>
+                                  <Typography sx={{ fontSize: "12px", fontWeight: 700, fontFamily: "monospace", color: darkMode ? "#e2e8f0" : "#0f172a" }}>{value}</Typography>
+                                </Box>
+                              ))}
+                            </Box>
+                            {!isKafka && bronze?.module_row_counts && Object.keys(bronze.module_row_counts).length > 0 && (
+                              <Box sx={{ mt: 0.75 }}>
+                                <Typography sx={{ fontSize: "8px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, mb: 0.5 }}>Module Coverage</Typography>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.45 }}>
+                                  {Object.entries(bronze.module_row_counts as Record<string, number>)
+                                    .sort(([, a], [, b]) => b - a)
+                                    .map(([mod, cnt]) => {
+                                      const mColor = (MODULE_COLORS as Record<string, string>)[mod] ?? "#94a3b8";
+                                      const maxCnt = Math.max(...Object.values(bronze.module_row_counts as Record<string, number>));
+                                      const pct = maxCnt > 0 ? (cnt / maxCnt) * 100 : 0;
+                                      return (
+                                        <Box key={mod} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                                          <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: mColor, flexShrink: 0 }} />
+                                          <Typography sx={{ fontSize: "8px", fontWeight: 600, color: mColor, textTransform: "uppercase", letterSpacing: 0.3, width: 44, flexShrink: 0 }}>{mod}</Typography>
+                                          <Box sx={{ flex: 1, height: 3, borderRadius: 2, bgcolor: alpha(mColor, 0.12), overflow: "hidden" }}>
+                                            <Box sx={{ height: "100%", width: `${pct}%`, bgcolor: mColor, borderRadius: 2 }} />
+                                          </Box>
+                                          <Typography sx={{ fontSize: "8px", fontFamily: "monospace", color: darkMode ? "#64748b" : "#94a3b8", flexShrink: 0, width: 38, textAlign: "right" }}>
+                                            {Number(cnt).toLocaleString()}
+                                          </Typography>
+                                        </Box>
+                                      );
+                                    })}
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        ) : (
+                          <Typography sx={{ fontSize: "10px", color: "text.secondary", py: 1, textAlign: "center" }}>
+                            {bronzeStatsQuery.isLoading ? "Loading…" : "No data in bronze delta"}
+                          </Typography>
+                        )}
+                      </>
+                    );
+                  })()}
                 </Paper>
               </Box>
 
@@ -2493,8 +2581,8 @@ export default function AutomotiveDive({
                         <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: modColor, flexShrink: 0, boxShadow: `0 0 5px ${alpha(modColor, 0.55)}` }} />
                         <Typography sx={{ fontSize: "10px", fontWeight: 800, color: modColor, textTransform: "uppercase", letterSpacing: 0.9 }}>{mod}</Typography>
                       </Box>
-                      {/* Sensor tiles — wrap for tyre's 12 */}
-                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, flex: 1 }}>
+                      {/* Sensor tiles */}
+                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(124px, 1fr))", gap: 0.75, flex: 1, minWidth: 0 }}>
                         {sensors.map((s: any, si: number) => {
                           const lo = s.range_lo as number | null;
                           const hi = s.range_hi as number | null;
@@ -2506,7 +2594,7 @@ export default function AutomotiveDive({
                             <Box
                               key={`${s.key}-${si}`}
                               onClick={() => setKpiChartSensor({ module: mod, key: s.key, label: s.label, unit: s.unit })}
-                              sx={{ width: 132, flexShrink: 0, p: "8px 10px", borderRadius: 1.5, bgcolor: darkMode ? alpha("#1e293b", 0.65) : alpha("#fff", 0.9), border: `1px solid ${darkMode ? alpha(modColor, 0.14) : alpha(modColor, 0.12)}`, cursor: "pointer", transition: "all 0.12s", "&:hover": { bgcolor: darkMode ? alpha(modColor, 0.1) : alpha(modColor, 0.06), borderColor: alpha(modColor, 0.35), transform: "translateY(-1px)", boxShadow: `0 3px 10px ${alpha(modColor, 0.15)}` } }}
+                              sx={{ p: "8px 10px", borderRadius: 1.5, bgcolor: darkMode ? alpha("#1e293b", 0.65) : alpha("#fff", 0.9), border: `1px solid ${darkMode ? alpha(modColor, 0.14) : alpha(modColor, 0.12)}`, cursor: "pointer", transition: "all 0.12s", "&:hover": { bgcolor: darkMode ? alpha(modColor, 0.1) : alpha(modColor, 0.06), borderColor: alpha(modColor, 0.35), transform: "translateY(-1px)", boxShadow: `0 3px 10px ${alpha(modColor, 0.15)}` } }}
                             >
                               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.35 }}>
                                 {icon}
@@ -2601,17 +2689,19 @@ export default function AutomotiveDive({
             <FormControl
               size="small"
               sx={{
-                minWidth: 180,
+                minWidth: 200,
                 "& .MuiOutlinedInput-root": {
                   bgcolor: darkMode ? "#1e293b" : "#fff",
-                  borderRadius: 1,
-                  fontSize: "10px",
-                  "& fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.2) : alpha("#94a3b8", 0.35) },
-                  "&:hover fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.4) : alpha("#94a3b8", 0.6) },
-                  "&.Mui-focused fieldset": { borderColor: darkMode ? "#38bdf8" : "#005071" },
+                  borderRadius: 1.5,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  "& fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.25) : alpha("#94a3b8", 0.4) },
+                  "&:hover fieldset": { borderColor: darkMode ? alpha("#7dd3fc", 0.5) : alpha("#94a3b8", 0.7) },
+                  "&.Mui-focused fieldset": { borderColor: darkMode ? "#38bdf8" : "#005071", borderWidth: 2 },
                 },
                 "& .MuiInputLabel-root": {
-                  fontSize: "10px",
+                  fontSize: "11px",
+                  fontWeight: 600,
                   color: darkMode ? "#64748b" : "#94a3b8",
                   "&.Mui-focused": { color: darkMode ? "#38bdf8" : "#005071" },
                 },
@@ -2619,14 +2709,18 @@ export default function AutomotiveDive({
             >
               <InputLabel>Vehicle</InputLabel>
               <Select
+                displayEmpty
                 value={selectedVehicle}
                 onChange={(e) => setSelectedVehicle(e.target.value)}
                 label="Vehicle"
-                sx={{ height: 30, "& .MuiSelect-select": { fontSize: "10px", py: 0.5 } }}
-                MenuProps={{ PaperProps: { sx: { "& .MuiMenuItem-root": { fontSize: "10px" } } } }}
+                sx={{ height: 34, "& .MuiSelect-select": { fontSize: "12px", fontWeight: 600, py: 0.75 } }}
+                MenuProps={{ PaperProps: { sx: { borderRadius: 2, mt: 0.5, "& .MuiMenuItem-root": { fontSize: "12px", fontWeight: 500, borderRadius: 1, mx: 0.5, my: 0.25 } } } }}
               >
+                <MenuItem value="" disabled sx={{ fontSize: "12px", fontStyle: "italic", color: darkMode ? "#475569" : "#94a3b8" }}>
+                  {vehicles.length === 0 ? "Loading…" : "Select vehicle"}
+                </MenuItem>
                 {vehicles.map((v: any) => (
-                  <MenuItem key={v.vehicle_id} value={v.vehicle_id} sx={{ fontSize: "10px" }}>
+                  <MenuItem key={v.vehicle_id} value={v.vehicle_id} sx={{ fontSize: "12px", fontWeight: 500 }}>
                     {v.vehicle_id}
                   </MenuItem>
                 ))}
@@ -2711,7 +2805,7 @@ export default function AutomotiveDive({
             <Box sx={{ flex: 1 }} />
 
             <Badge
-              badgeContent={unanalyzedVehicleAlerts.length}
+              badgeContent={unanalyzedVehicleAlerts.filter((a: any) => a.module?.toLowerCase() === selectedModule).length}
               color="error"
               sx={{ "& .MuiBadge-badge": { fontSize: "9px", height: 16, minWidth: 16 } }}
             >
@@ -2739,7 +2833,7 @@ export default function AutomotiveDive({
                   },
                 }}
               >
-                Alerts ({allVehicleAlerts.length})
+                Alerts
               </Button>
             </Badge>
           </Paper>
@@ -3949,6 +4043,34 @@ export default function AutomotiveDive({
                                 </Box>
                               )}
                             </Box>
+                            {(() => {
+                              const popupDtcRun = dtcRunMap[`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`];
+                              const popupTriggers: any[] = popupDtcRun?.triggers ?? [];
+                              if (!isAnalyzed) return null;
+                              return (
+                                <Box sx={{ mb: 0.75 }}>
+                                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "3px", textTransform: "uppercase", letterSpacing: 0.4 }}>DTC Analysis</Typography>
+                                  {popupTriggers.length === 0 ? (
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                      <CheckCircleRoundedIcon sx={{ fontSize: 11, color: "#22c55e" }} />
+                                      <Typography sx={{ fontSize: "10px", color: "#22c55e", fontWeight: 600 }}>No fault codes triggered</Typography>
+                                    </Box>
+                                  ) : (
+                                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                                      {popupTriggers.map((t: any, ti: number) => {
+                                        const tColor = t.severity === "critical" || t.severity === "CRITICAL" ? "#ef4444" : "#f59e0b";
+                                        return (
+                                          <Box key={ti} sx={{ display: "flex", alignItems: "center", gap: 0.4, px: 0.75, py: "2px", borderRadius: 1, bgcolor: alpha(tColor, 0.12), border: `1px solid ${alpha(tColor, 0.3)}` }}>
+                                            <Typography sx={{ fontSize: "9px", fontWeight: 800, fontFamily: "monospace", color: tColor }}>{t.code}</Typography>
+                                            {t.message && <Typography sx={{ fontSize: "9px", color: darkMode ? "#94a3b8" : "#64748b", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.message}</Typography>}
+                                          </Box>
+                                        );
+                                      })}
+                                    </Box>
+                                  )}
+                                </Box>
+                              );
+                            })()}
                             {featureEntries.length > 0 && (
                               <Box>
                               <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "3px", textTransform: "uppercase", letterSpacing: 0.4 }}>

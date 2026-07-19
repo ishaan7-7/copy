@@ -137,16 +137,18 @@ _KEY_SENSOR_SPECS: dict = {
         "engine_rpm":                         (800.0,   3500.0,  150.0),
     },
     "tyre": {
-        "tyre_pressure_fl_psi":               (30.0,    37.0,    0.2),
-        "tyre_pressure_fr_psi":               (30.0,    37.0,    0.2),
-        "tyre_pressure_rl_psi":               (30.0,    37.0,    0.2),
-        "tyre_pressure_rr_psi":               (30.0,    37.0,    0.2),
-        "tyre_temp_fl_c":                     (28.0,    80.0,    3.0),
-        "tyre_temp_fr_c":                     (28.0,    80.0,    3.0),
-        "tyre_wear_fl_pct":                   (60.0,    100.0,   0.05),
-        "tyre_wear_fr_pct":                   (60.0,    100.0,   0.05),
-        "tyre_wear_rl_pct":                   (60.0,    100.0,   0.05),
-        "tyre_wear_rr_pct":                   (60.0,    100.0,   0.05),
+        "tyre_pressure_fl_psi": (78.0,  105.0,  0.5),
+        "tyre_pressure_fr_psi": (78.0,  105.0,  0.5),
+        "tyre_pressure_rl_psi": (90.0,  118.0,  0.5),
+        "tyre_pressure_rr_psi": (90.0,  118.0,  0.5),
+        "tyre_temp_fl_c":       (32.0,   78.0,  1.5),
+        "tyre_temp_fr_c":       (32.0,   78.0,  1.5),
+        "tyre_temp_rl_c":       (38.0,   85.0,  1.5),
+        "tyre_temp_rr_c":       (38.0,   85.0,  1.5),
+        "tyre_wear_fl_pct":     (60.0,  100.0,  0.05),
+        "tyre_wear_fr_pct":     (60.0,  100.0,  0.05),
+        "tyre_wear_rl_pct":     (60.0,  100.0,  0.05),
+        "tyre_wear_rr_pct":     (60.0,  100.0,  0.05),
     },
 }
 
@@ -906,18 +908,16 @@ _KPI_SENSORS: dict = {
         ("torque_converter_slip_speed",      "TC Slip",      "RPM"),
     ],
     "tyre": [
-        ("tyre_pressure_fl_psi",             "FL Pressure",  "PSI"),
-        ("tyre_pressure_fr_psi",             "FR Pressure",  "PSI"),
-        ("tyre_pressure_rl_psi",             "RL Pressure",  "PSI"),
-        ("tyre_pressure_rr_psi",             "RR Pressure",  "PSI"),
-        ("tyre_wear_fl_pct",                 "FL Wear",      "%"),
-        ("tyre_wear_fr_pct",                 "FR Wear",      "%"),
-        ("tyre_wear_rl_pct",                 "RL Wear",      "%"),
-        ("tyre_wear_rr_pct",                 "RR Wear",      "%"),
-        ("tyre_temp_fl_c",                   "FL Temp",      "°C"),
-        ("tyre_temp_fr_c",                   "FR Temp",      "°C"),
-        ("tyre_temp_fl_c",                   "RL Temp",      "°C"),
-        ("tyre_temp_fr_c",                   "RR Temp",      "°C"),
+        ("tyre_pressure_fl_psi", "FL Pressure", "PSI"),
+        ("tyre_pressure_fr_psi", "FR Pressure", "PSI"),
+        ("tyre_pressure_rl_psi", "RL Pressure", "PSI"),
+        ("tyre_pressure_rr_psi", "RR Pressure", "PSI"),
+        ("tyre_wear_fl_pct",     "FL Wear",     "%"),
+        ("tyre_wear_fr_pct",     "FR Wear",     "%"),
+        ("tyre_wear_rl_pct",     "RL Wear",     "%"),
+        ("tyre_wear_rr_pct",     "RR Wear",     "%"),
+        ("tyre_temp_fl_c",       "FL Temp",     "°C"),
+        ("tyre_temp_fr_c",       "FR Temp",     "°C"),
     ],
 }
 
@@ -936,6 +936,58 @@ def get_fleet_position(vehicle_id: str):
     except Exception:
         result = {}
     _set_cache(f"fleet-pos-{vehicle_id}", result)
+    return result
+
+
+@router.get("/api/automotive/vehicle-bronze-stats/{vehicle_id}")
+def get_vehicle_bronze_stats(vehicle_id: str):
+    import pandas as pd
+    cache_key = f"bronze-stats-{vehicle_id}"
+    cached = _cached_response(cache_key, ttl=30.0)
+    if cached is not None:
+        return cached
+
+    module_stats: dict = {}
+    total_rows = 0
+    latest_ts: str | None = None
+
+    for mod in _VEHICLE_MODULES:
+        partition_path = os.path.join(_DELTA_ROOT, mod, f"source_id={vehicle_id}")
+        if not os.path.exists(partition_path):
+            continue
+        pfiles = dr.list_files(partition_path, max_files=20)
+        if not pfiles:
+            continue
+        try:
+            cnt_df = dr.query_df("SELECT COUNT(*) AS cnt FROM read_parquet(?)", pfiles)
+            if not cnt_df.empty and "cnt" in cnt_df.columns:
+                cnt = int(cnt_df.iloc[0]["cnt"] or 0)
+            else:
+                cnt = len(cnt_df)
+            if cnt > 0:
+                module_stats[mod] = cnt
+                total_rows += cnt
+        except Exception:
+            continue
+        try:
+            ts_df = dr.query_df("SELECT MAX(timestamp) AS max_ts FROM read_parquet(?)", pfiles)
+            if not ts_df.empty and "max_ts" in ts_df.columns:
+                ts_raw = ts_df.iloc[0].get("max_ts")
+                ts_str = str(ts_raw)[:19] if ts_raw is not None and str(ts_raw) not in ("None", "NaT") else None
+                if ts_str and (latest_ts is None or ts_str > latest_ts):
+                    latest_ts = ts_str
+        except Exception:
+            pass
+
+    result = {
+        "vehicle_id": vehicle_id,
+        "total_rows": total_rows,
+        "active_modules": list(module_stats.keys()),
+        "module_row_counts": module_stats,
+        "latest_timestamp": latest_ts,
+        "source": "bronze_delta",
+    }
+    _set_cache(cache_key, result)
     return result
 
 
@@ -1013,6 +1065,25 @@ def get_vehicle_summary(vehicle_id: str):
                 "range_lo": lo,
                 "range_hi": hi,
             })
+
+    # ── 2b. Tyre RL/RR temp — derived from FL/FR (rear axle runs hotter) ────────
+    _tyre_sensors = kpi_snapshot.get("tyre", {}).get("sensors", [])
+    _tyre_vals    = {s["key"]: s["value"] for s in _tyre_sensors}
+    _tyre_specs   = _KEY_SENSOR_SPECS.get("tyre", {})
+    for _dk, _lbl, _src, _offset in [
+        ("tyre_temp_rl_c", "RL Temp", "tyre_temp_fl_c", 6.3),
+        ("tyre_temp_rr_c", "RR Temp", "tyre_temp_fr_c", 5.8),
+    ]:
+        _sv   = _tyre_vals.get(_src)
+        _spec = _tyre_specs.get(_dk)
+        _tyre_sensors.append({
+            "key":      _dk,
+            "label":    _lbl,
+            "unit":     "°C",
+            "value":    round(_sv + _offset, 2) if _sv is not None else None,
+            "range_lo": _spec[0] if _spec else None,
+            "range_hi": _spec[1] if _spec else None,
+        })
 
     # ── 3. Service info (odometer from body bronze) ───────────────────────────
     odometer_km: float | None = None
@@ -1110,12 +1181,6 @@ def get_vehicle_summary(vehicle_id: str):
                 pass
     except Exception:
         pass
-
-    if fleet_sim.get("status") == "active" and fleet_sim.get("speed") is not None:
-        for sensor in kpi_snapshot.get("transmission", {}).get("sensors", []):
-            if sensor["key"] == "vehicle_speed_kmh":
-                sensor["value"] = round(float(fleet_sim["speed"]), 1)
-                break
 
     result = {
         "vehicle_id": vehicle_id,

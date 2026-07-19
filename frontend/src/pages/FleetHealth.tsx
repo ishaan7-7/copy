@@ -12,6 +12,13 @@ import {
   Button,
   CircularProgress,
   LinearProgress,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import SyncIcon from "@mui/icons-material/Sync";
@@ -219,6 +226,20 @@ function deduplicateAlerts(alerts: AlertEntry[]): AlertEntry[] {
     }
   }
   return Array.from(map.values());
+}
+
+function normPeakTs(ts: string): string {
+  return String(ts || "").slice(0, 16).replace(" ", "T");
+}
+
+function timeAgo(ts: string): string {
+  if (!ts) return "—";
+  const diffMs = Date.now() - new Date(ts.replace(" ", "T")).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  return `${Math.floor(diffH / 24)}d ago`;
 }
 
 function healthColor(score: number): string {
@@ -527,6 +548,8 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [ageSec, setAgeSec] = useState(0);
   const [showClosedAlerts, setShowClosedAlerts] = useState(false);
+  const [alertsPage, setAlertsPage] = useState(0);
+  const [alertsRowsPerPage, setAlertsRowsPerPage] = useState(10);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
   const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
@@ -717,18 +740,32 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const openAlerts = alertsData?.open_alerts ?? [];
   const closedAlerts = alertsData?.closed_alerts ?? [];
   const displayedAlerts = showClosedAlerts ? closedAlerts : openAlerts;
+  const alertsStartIdx = alertsPage * alertsRowsPerPage;
+  const alertsPageSlice = displayedAlerts.slice(alertsStartIdx, alertsStartIdx + alertsRowsPerPage);
+  const alertsTotal = displayedAlerts.length;
+  const alertsTotalPages = Math.max(1, Math.ceil(alertsTotal / alertsRowsPerPage));
+
+  useEffect(() => { setAlertsPage(0); }, [showClosedAlerts]);
+
+  const dtcHistoryRuns: any[] = dtcHistQuery.data?.runs ?? [];
+  const analyzedKeySet = useMemo(
+    () => new Set(dtcHistoryRuns.map((r: any) => `${r.source_id}|${r.module}|${normPeakTs(r.peak_ts)}`)),
+    [dtcHistQuery.data]
+  );
 
   const alertCoverage = useMemo(() => {
     const deduped = deduplicateAlerts(openAlerts);
-    const analyzed = deduped.filter((a: any) => a.analyzed === true).length;
+    const analyzed = deduped.filter((a: any) =>
+      analyzedKeySet.has(`${a.source_id}|${a.module}|${normPeakTs(a.peak_anomaly_ts)}`)
+    ).length;
     return { analyzed, total: deduped.length, remaining: deduped.length - analyzed };
-  }, [openAlerts]);
+  }, [openAlerts, analyzedKeySet]);
 
   const handleLoadLatest = async () => {
     if (batchRunning) return;
     const deduped = deduplicateAlerts(openAlerts);
     const toAnalyze = deduped
-      .filter((a: any) => !a.analyzed)
+      .filter((a: any) => !analyzedKeySet.has(`${a.source_id}|${a.module}|${normPeakTs(a.peak_anomaly_ts)}`))
       .sort((a, b) => (b.max_composite_score ?? 0) - (a.max_composite_score ?? 0));
 
     const queued = toAnalyze.slice(0, BATCH_CAP);
@@ -986,94 +1023,6 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
     },
   ];
 
-  const alertGridCols: ColDef<AlertEntry>[] = [
-    {
-      field: "source_id",
-      headerName: "VEHICLE",
-      width: 100,
-      cellRenderer: (p: { value: string }) => (
-        <span style={{ fontFamily: "monospace", fontSize: 10, fontWeight: 600 }}>{p.value}</span>
-      ),
-    },
-    {
-      field: "module",
-      headerName: "MODULE",
-      width: 110,
-      cellRenderer: (p: { value: string }) => {
-        const mod = (p.value ?? "").toLowerCase() as Module;
-        const c = MODULE_COLORS[mod] ?? "#94a3b8";
-        return (
-          <Chip
-            label={(p.value ?? "").toUpperCase()}
-            size="small"
-            sx={{
-              height: 16,
-              fontSize: "8px",
-              fontWeight: 700,
-              bgcolor: alpha(c, 0.15),
-              color: c,
-              "& .MuiChip-label": { px: 0.75 },
-            }}
-          />
-        );
-      },
-    },
-    {
-      field: "max_composite_score",
-      headerName: "SCORE",
-      width: 85,
-      type: "numericColumn",
-      cellRenderer: (p: { value: number }) => {
-        const v = p.value ?? 0;
-        const c = v >= 0.8 ? "#ef4444" : v >= 0.5 ? "#f59e0b" : "#22c55e";
-        return (
-          <span style={{ color: c, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-            {v.toFixed(3)}
-          </span>
-        );
-      },
-    },
-    {
-      field: "peak_anomaly_ts",
-      headerName: "PEAK TS",
-      width: 150,
-      cellRenderer: (p: { value: string }) => (
-        <span style={{ fontSize: 10, fontFamily: "monospace" }}>
-          {p.value ? p.value.slice(0, 19).replace("T", " ") : "—"}
-        </span>
-      ),
-    },
-    {
-      headerName: "ACTION",
-      width: 110,
-      sortable: false,
-      cellRenderer: (p: { data: AlertEntry }) => {
-        const { source_id, module, peak_anomaly_ts } = p.data ?? {};
-        return (
-          <Chip
-            label="Root Cause"
-            size="small"
-            icon={<OpenInNewRoundedIcon style={{ fontSize: 10 }} />}
-            clickable
-            onClick={() =>
-              navigate(
-                `/dtc?vehicle=${encodeURIComponent(source_id)}&module=${encodeURIComponent(module)}&peak_ts=${encodeURIComponent(peak_anomaly_ts)}`
-              )
-            }
-            sx={{
-              height: 16,
-              fontSize: "8px",
-              fontWeight: 700,
-              bgcolor: alpha("#38bdf8", 0.12),
-              color: "#38bdf8",
-              "& .MuiChip-label": { px: 0.5 },
-              "&:hover": { bgcolor: alpha("#38bdf8", 0.22) },
-            }}
-          />
-        );
-      },
-    },
-  ];
 
   const modHealthSeries = useMemo(() => {
     const raw = modHealthQuery.data?.series ?? [];
@@ -1794,18 +1743,164 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
               </Box>
             }
           />
-          <Box
-            className={isDark ? "ag-theme-balham-dark" : "ag-theme-balham"}
-            sx={{ height: 280, width: "100%", ...agGridSx(isDark) }}
-          >
-            <AgGridReact
-              rowData={displayedAlerts}
-              columnDefs={alertGridCols}
-              defaultColDef={{ resizable: true, sortable: true }}
-              suppressMovableColumns
-              rowHeight={28}
-              headerHeight={32}
-            />
+          <Box sx={{ overflowX: "auto" }}>
+            <Table size="small" sx={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: isDark ? alpha("#1e293b", 0.9) : alpha("#f1f5f9", 1) }}>
+                  {(["VEHICLE", "MODULE", "SEVERITY", "SCORE", "STATUS", "PEAK TS", "AGE", "ACTION"] as const).map((col) => (
+                    <TableCell
+                      key={col}
+                      sx={{
+                        fontSize: "9px", fontWeight: 700, color: isDark ? "#64748b" : "#94a3b8",
+                        textTransform: "uppercase", letterSpacing: 0.5, py: 0.75, px: 1,
+                        borderBottom: `1px solid ${isDark ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1)}`,
+                        whiteSpace: "nowrap",
+                        width: col === "VEHICLE" ? "13%" : col === "MODULE" ? "10%" : col === "SEVERITY" ? "10%" : col === "SCORE" ? "16%" : col === "STATUS" ? "9%" : col === "PEAK TS" ? "17%" : col === "AGE" ? "9%" : "16%",
+                      }}
+                    >
+                      {col}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {alertsPageSlice.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} sx={{ textAlign: "center", py: 3, color: "text.secondary", fontSize: "11px", border: "none" }}>
+                      {alertsTotal === 0 ? "No alerts" : "Loading…"}
+                    </TableCell>
+                  </TableRow>
+                ) : alertsPageSlice.map((a: AlertEntry, i: number) => {
+                  const score = a.max_composite_score ?? 0;
+                  const scoreColor = score >= 0.8 ? "#ef4444" : score >= 0.5 ? "#f59e0b" : "#22c55e";
+                  const sevLabel = score >= 0.8 ? "CRITICAL" : score >= 0.5 ? "WARNING" : "LOW";
+                  const modColor = MODULE_COLORS[(a.module ?? "").toLowerCase() as Module] ?? "#94a3b8";
+                  const statusLabel = showClosedAlerts ? "RESOLVED" : "OPEN";
+                  const statusColor = showClosedAlerts ? "#22c55e" : "#f59e0b";
+                  const cellSx = { py: 0.85, px: 1, borderBottom: `1px solid ${isDark ? alpha("#334155", 0.35) : alpha("#e2e8f0", 0.8)}` };
+                  return (
+                    <TableRow
+                      key={a.alert_id ?? i}
+                      sx={{
+                        bgcolor: i % 2 === 0 ? "transparent" : (isDark ? alpha("#1e293b", 0.3) : alpha("#f8fafc", 0.8)),
+                        "&:hover": { bgcolor: isDark ? alpha("#334155", 0.4) : alpha("#eff6ff", 0.8) },
+                      }}
+                    >
+                      <TableCell sx={{ ...cellSx, fontFamily: "monospace", fontSize: "10px", fontWeight: 600, color: isDark ? "#cbd5e1" : "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {a.source_id}
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        <Chip label={(a.module ?? "").toUpperCase()} size="small" sx={{ height: 16, fontSize: "8px", fontWeight: 700, bgcolor: alpha(modColor, 0.15), color: modColor, "& .MuiChip-label": { px: 0.75 } }} />
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        <Chip label={sevLabel} size="small" sx={{ height: 16, fontSize: "8px", fontWeight: 700, bgcolor: alpha(scoreColor, isDark ? 0.2 : 0.1), color: scoreColor, "& .MuiChip-label": { px: 0.75 } }} />
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography sx={{ fontSize: "11px", fontWeight: 700, fontFamily: "monospace", color: scoreColor, fontVariantNumeric: "tabular-nums", flexShrink: 0, lineHeight: 1 }}>
+                            {score.toFixed(3)}
+                          </Typography>
+                          <Box sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: alpha(scoreColor, isDark ? 0.1 : 0.08), overflow: "hidden", minWidth: 0 }}>
+                            <Box sx={{ height: "100%", width: `${Math.min(score * 100, 100)}%`, bgcolor: scoreColor, borderRadius: 2 }} />
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, px: 0.75, py: "2px", borderRadius: 1, bgcolor: alpha(statusColor, isDark ? 0.15 : 0.1) }}>
+                          <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: statusColor, flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: "8px", fontWeight: 700, color: statusColor, lineHeight: 1 }}>{statusLabel}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ ...cellSx, fontSize: "9px", fontFamily: "monospace", color: isDark ? "#94a3b8" : "#475569", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {a.peak_anomaly_ts ? a.peak_anomaly_ts.slice(0, 19).replace("T", " ") : "—"}
+                      </TableCell>
+                      <TableCell sx={{ ...cellSx, fontSize: "9px", color: isDark ? "#64748b" : "#94a3b8", whiteSpace: "nowrap" }}>
+                        {timeAgo(a.peak_anomaly_ts)}
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        <Chip
+                          label="Root Cause"
+                          size="small"
+                          icon={<OpenInNewRoundedIcon style={{ fontSize: 10 }} />}
+                          clickable
+                          onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(a.source_id)}&module=${encodeURIComponent(a.module)}&peak_ts=${encodeURIComponent(a.peak_anomaly_ts)}`)}
+                          sx={{ height: 18, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#38bdf8", 0.12), color: "#38bdf8", "& .MuiChip-label": { px: 0.5 }, "&:hover": { bgcolor: alpha("#38bdf8", 0.22) } }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pt: 1.25, mt: 0.75, borderTop: `1px solid ${isDark ? alpha("#334155", 0.5) : alpha("#e2e8f0", 1)}` }}>
+            <Typography sx={{ fontSize: "9px", color: isDark ? "#64748b" : "#94a3b8", minWidth: 130 }}>
+              {alertsTotal === 0
+                ? "No alerts"
+                : `${alertsStartIdx + 1}–${Math.min(alertsStartIdx + alertsRowsPerPage, alertsTotal)} of ${alertsTotal} ${showClosedAlerts ? "resolved" : "open"} alerts`}
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
+              <IconButton
+                size="small"
+                disabled={alertsPage === 0}
+                onClick={() => setAlertsPage((p) => Math.max(0, p - 1))}
+                sx={{ width: 22, height: 22, fontSize: "14px", color: isDark ? "#94a3b8" : "#64748b", "&.Mui-disabled": { color: isDark ? "#334155" : "#e2e8f0" } }}
+              >
+                ‹
+              </IconButton>
+              {Array.from({ length: alertsTotalPages }, (_, idx) => idx)
+                .filter((idx) => idx === 0 || idx === alertsTotalPages - 1 || Math.abs(idx - alertsPage) <= 1)
+                .reduce<(number | "…")[]>((acc, idx, i, arr) => {
+                  if (i > 0 && (idx as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(idx);
+                  return acc;
+                }, [])
+                .map((item, i) =>
+                  item === "…" ? (
+                    <Typography key={`ellipsis-${i}`} sx={{ fontSize: "10px", color: isDark ? "#475569" : "#94a3b8", px: 0.5, lineHeight: 1 }}>…</Typography>
+                  ) : (
+                    <Box
+                      key={item}
+                      onClick={() => setAlertsPage(item as number)}
+                      sx={{
+                        width: 22, height: 22, borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", fontSize: "10px", fontWeight: 700, userSelect: "none",
+                        bgcolor: item === alertsPage ? (isDark ? "#38bdf8" : "#0284c7") : "transparent",
+                        color: item === alertsPage ? "#fff" : (isDark ? "#94a3b8" : "#64748b"),
+                        "&:hover": { bgcolor: item !== alertsPage ? (isDark ? alpha("#334155", 0.8) : alpha("#e2e8f0", 0.8)) : undefined },
+                      }}
+                    >
+                      {(item as number) + 1}
+                    </Box>
+                  )
+                )}
+              <IconButton
+                size="small"
+                disabled={alertsPage >= alertsTotalPages - 1}
+                onClick={() => setAlertsPage((p) => Math.min(alertsTotalPages - 1, p + 1))}
+                sx={{ width: 22, height: 22, fontSize: "14px", color: isDark ? "#94a3b8" : "#64748b", "&.Mui-disabled": { color: isDark ? "#334155" : "#e2e8f0" } }}
+              >
+                ›
+              </IconButton>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Typography sx={{ fontSize: "9px", color: isDark ? "#64748b" : "#94a3b8", whiteSpace: "nowrap" }}>Rows per page</Typography>
+              <Select
+                value={alertsRowsPerPage}
+                onChange={(e) => { setAlertsRowsPerPage(Number(e.target.value)); setAlertsPage(0); }}
+                size="small"
+                variant="outlined"
+                sx={{
+                  height: 22, fontSize: "9px",
+                  "& .MuiSelect-select": { py: 0, px: 0.75, fontSize: "9px", fontWeight: 600 },
+                  "& .MuiOutlinedInput-notchedOutline": { borderColor: isDark ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1) },
+                  bgcolor: isDark ? alpha("#1e293b", 0.5) : "transparent",
+                }}
+                MenuProps={{ PaperProps: { sx: { borderRadius: 1.5, "& .MuiMenuItem-root": { fontSize: "11px", py: 0.5 } } } }}
+              >
+                {[5, 10, 25].map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
+              </Select>
+            </Box>
           </Box>
         </Paper>
       </Box>

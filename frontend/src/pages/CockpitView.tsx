@@ -3024,6 +3024,18 @@ export default function CockpitView({
       refetchInterval: isActive && autoRefresh ? 8000 : false,
     });
 
+  const { data: alertsMetrics } = useQuery({
+    queryKey: ["alertsMetrics"],
+    queryFn: () => axios.get(`${PIPELINE_API}/api/alerts/metrics`).then((r) => r.data),
+    refetchInterval: isActive && autoRefresh ? 20000 : false,
+    staleTime: 8000,
+  });
+
+  useEffect(() => {
+    const count = alertsMetrics?.active_alerts_count;
+    if (count != null) setAlertTotal(count);
+  }, [alertsMetrics]);
+
   useEffect(() => {
     if (isActive && !wasActiveRef.current) {
       refetchPositions();
@@ -3702,6 +3714,10 @@ export default function CockpitView({
     return h >= 50 && h < 80;
   }).length;
 
+  const openAlerts: any[] = alertsMetrics?.open_alerts ?? [];
+  const criticalAlertCount = openAlerts.filter((a: any) => Number(a.max_composite_score) >= 0.8).length;
+  const warningAlertCount = openAlerts.filter((a: any) => { const s = Number(a.max_composite_score); return s >= 0.5 && s < 0.8; }).length;
+
   const executiveMetrics = useMemo(() => {
     const total = allPositions.length || summary.total || 0;
     const available = activeCount + parkedCount;
@@ -3712,7 +3728,7 @@ export default function CockpitView({
       : 0;
     const predictedFailures = criticalCount + Math.ceil(warningCount * 0.35);
     const maintenanceForecast = serviceCount + predictedFailures;
-    const resolvedToday = Math.max(0, Math.round((alertTotal ?? 0) * 0.32));
+    const resolvedToday = 0;
     const backendSummaryDriver = Number(summary.avg_driver_score);
     const hasSummaryDriver =
       summary.avg_driver_score !== null &&
@@ -3919,22 +3935,21 @@ export default function CockpitView({
   const alertChartRows = [
     {
       label: "Critical Alerts",
-      value: criticalCount,
+      value: criticalAlertCount,
       color: "#ef4444",
-      reason: `${criticalCount} vehicles are below the poor-health threshold and need immediate triage.`,
+      reason: `${criticalAlertCount} open alerts with anomaly score ≥ 0.8 require immediate triage.`,
     },
     {
       label: "Warning Alerts",
-      value: warningCount,
+      value: warningAlertCount,
       color: "#f59e0b",
-      reason: `${warningCount} vehicles are trending average/good but have risk signals that can become failures.`,
+      reason: `${warningAlertCount} open alerts with anomaly score 0.5–0.8 have risk signals that can escalate.`,
     },
     {
       label: "Resolved Today",
-      value: executiveMetrics.resolvedToday,
+      value: 0,
       color: "#3b82f6",
-      reason:
-        "Resolved today is estimated from active alert throughput until the alerts backend provides closed-alert history.",
+      reason: "Resolved-alert history is not yet tracked by the alerts backend.",
     },
   ];
 
@@ -4393,7 +4408,7 @@ export default function CockpitView({
             color="#ef4444"
             trend="down"
             iconLogo={true}
-            onClick={() => navigate("/fleet-health")}
+            onClick={() => navigate("/fleet-health#alerts-feed")}
           />
         </Box>
 

@@ -142,9 +142,24 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
   const [loadEvidence, setLoadEvidence] = useState<boolean>(
     !!initPeakTs && !!initVehicle
   );
+
   const [eventAnchor, setEventAnchor] = useState<HTMLElement | null>(null);
   const [shouldRunAnalysis, setShouldRunAnalysis] = useState<boolean>(false);
   const [manualTs, setManualTs] = useState<string>("");
+
+  const _paramVehicle = searchParams.get("vehicle") ?? "";
+  const _paramModule = searchParams.get("module") ?? "";
+  const _paramPeakTs = searchParams.get("peak_ts") ?? "";
+
+  useEffect(() => {
+    if (_paramVehicle && _paramVehicle !== selectedVehicle) setSelectedVehicle(_paramVehicle);
+    if (_paramModule && ALL_MODULES.includes(_paramModule) && _paramModule !== selectedModule) setSelectedModule(_paramModule);
+    if (_paramPeakTs && _paramPeakTs !== peakTs) {
+      setPeakTs(_paramPeakTs);
+      setLoadEvidence(true);
+      setShouldRunAnalysis(true);
+    }
+  }, [_paramVehicle, _paramModule, _paramPeakTs]);
 
   const sensorKeys = MODULE_SENSOR_KEYS[selectedModule] || [];
 
@@ -275,7 +290,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
 
   useEffect(() => {
     if (!selectedDtcCode) return;
-    const detail = selectedDtcCode ? dtcMasterFlat[selectedDtcCode] : null;
+    const detail = dtcMasterFlat[selectedDtcCode];
     if (!detail) return;
     const features: string[] = detail.features || [];
     const validSensors = features.filter((f: string) =>
@@ -285,7 +300,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
       setSelectedSensor(validSensors[0]);
       if (peakTs) setLoadEvidence(true);
     }
-  }, [selectedDtcCode]);
+  }, [selectedDtcCode, dtcMasterQuery.dataUpdatedAt]);
 
   const dtcMasterFlat = useMemo((): Record<string, any> => {
     const modules = dtcMasterQuery.data?.modules || {};
