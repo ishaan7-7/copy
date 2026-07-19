@@ -8010,10 +8010,13 @@ export default function CockpitView({
 
                           fontFamily: CHART_FONT,
 
-                          formatter: (v: any) =>
-                            timelineXAxis === "mileage"
-                              ? Math.round(Number(v)).toLocaleString()
-                              : String(v).slice(5, 16).replace("T", " "),
+                          formatter: (v: any) => {
+                            if (timelineXAxis === "mileage") {
+                              const km = Math.round(Number(v));
+                              return km >= 1000 ? `${(km / 1000).toFixed(1)}k` : `${km}`;
+                            }
+                            return String(v).slice(5, 16).replace("T", " ");
+                          },
                         },
 
                         axisTick: { show: false },

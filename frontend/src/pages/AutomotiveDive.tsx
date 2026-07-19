@@ -82,6 +82,17 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import SensorsRoundedIcon from "@mui/icons-material/SensorsRounded";
 import ShowChartRoundedIcon from "@mui/icons-material/ShowChartRounded";
+import ThermostatRoundedIcon from "@mui/icons-material/ThermostatRounded";
+import LocalGasStationRoundedIcon from "@mui/icons-material/LocalGasStationRounded";
+import BatteryFullRoundedIcon from "@mui/icons-material/BatteryFullRounded";
+import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+import WaterDropRoundedIcon from "@mui/icons-material/WaterDropRounded";
+import AcUnitRoundedIcon from "@mui/icons-material/AcUnitRounded";
+import AirRoundedIcon from "@mui/icons-material/AirRounded";
+import DonutLargeRoundedIcon from "@mui/icons-material/DonutLargeRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import RotateRightRoundedIcon from "@mui/icons-material/RotateRightRounded";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
@@ -463,7 +474,10 @@ function buildPlotLayout(darkMode: boolean) {
 }
 
 function formatXTick(val: string | number, mode: XAxisMode): string {
-  if (mode === "mileage") return `${Math.round(Number(val)).toLocaleString()}`;
+  if (mode === "mileage") {
+    const km = Math.round(Number(val));
+    return km >= 1000 ? `${(km / 1000).toFixed(1)}k` : `${km}`;
+  }
   const s = String(val);
   if (s.includes("T")) return s.slice(5, 16).replace("T", " ");
   if (s.length >= 16) return s.slice(5, 16);
@@ -509,6 +523,26 @@ function formatFeatureKey(k: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ")
     .slice(0, 22);
+}
+
+function getSensorIcon(key: string, color: string, size = "11px"): React.ReactElement {
+  const sx = { fontSize: `${size} !important`, color };
+  if (key.includes("rpm")) return <SpeedRoundedIcon sx={sx} />;
+  if (key.includes("temperature") || key.includes("temp") || key.includes("thermal")) return <ThermostatRoundedIcon sx={sx} />;
+  if (key.includes("fuel")) return <LocalGasStationRoundedIcon sx={sx} />;
+  if (key.includes("soc") || key.includes("state_of_charge") || key.includes("charge")) return <BatteryFullRoundedIcon sx={sx} />;
+  if (key.includes("soh") || key.includes("state_of_health") || key.includes("health")) return <FavoriteRoundedIcon sx={sx} />;
+  if (key.includes("voltage") || key.includes("_v") || key.includes("hv_battery")) return <BoltRoundedIcon sx={sx} />;
+  if (key.includes("humidity")) return <WaterDropRoundedIcon sx={sx} />;
+  if (key.includes("coolant")) return <WaterDropRoundedIcon sx={sx} />;
+  if (key.includes("ac_") || key.includes("hvac") || key.includes("blower") || key.includes("compressor")) return <AcUnitRoundedIcon sx={sx} />;
+  if (key.includes("pressure")) return <AirRoundedIcon sx={sx} />;
+  if (key.includes("wear")) return <DonutLargeRoundedIcon sx={sx} />;
+  if (key.includes("gear")) return <SettingsRoundedIcon sx={sx} />;
+  if (key.includes("speed")) return <SpeedRoundedIcon sx={sx} />;
+  if (key.includes("torque") || key.includes("slip") || key.includes("clutch")) return <RotateRightRoundedIcon sx={sx} />;
+  if (key.includes("load") || key.includes("pct")) return <ShowChartRoundedIcon sx={sx} />;
+  return <SensorsRoundedIcon sx={sx} />;
 }
 
 function SensorChart({
@@ -652,6 +686,7 @@ export default function AutomotiveDive({
     useState<string>("");
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [alertsTab, setAlertsTab] = useState(0);
+  const [alertsInlineTab, setAlertsInlineTab] = useState(0);
   const [viewMode, setViewMode] = useState<"summary" | "module">("summary");
   const [kpiChartSensor, setKpiChartSensor] = useState<{ module: string; key: string; label: string; unit: string } | null>(null);
   const navigate = useNavigate();
@@ -803,6 +838,10 @@ export default function AutomotiveDive({
   const unanalyzedVehicleAlerts = allVehicleAlerts.filter((a: any) =>
     !analyzedSet.has(`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`)
   );
+  const dtcRunMap: Record<string, any> = {};
+  for (const r of dtcRuns) {
+    dtcRunMap[`${r.module}|${normPeakTs(r.peak_ts)}`] = r;
+  }
 
   // Module tab sensor timeline  -  separate from vehicle tab's sensorQuery
   const moduleTimelineQuery = useQuery({
@@ -880,6 +919,15 @@ export default function AutomotiveDive({
       axios.get(`${API}/api/fleet/vehicle/${selectedVehicle}/behavior`).then((r) => r.data),
     enabled: !!selectedVehicle && viewMode === "summary",
     refetchInterval: isActive && autoRefresh && viewMode === "summary" ? 5000 : false,
+  });
+
+  const fleetPositionQuery = useQuery({
+    queryKey: ["autoFleetPosition", selectedVehicle],
+    queryFn: () =>
+      axios.get(`${API}/api/automotive/fleet-position/${selectedVehicle}`).then((r) => r.data),
+    enabled: !!selectedVehicle && viewMode === "summary",
+    refetchInterval: viewMode === "summary" ? 5000 : false,
+    staleTime: 3000,
   });
 
   const kpiSensorHistoryQuery = useQuery({
@@ -1022,7 +1070,9 @@ export default function AutomotiveDive({
   const topDrivers: any[] = summaryData?.top_anomaly_drivers ?? [];
   const maxDriverScore = topDrivers.length > 0 ? Math.max(...topDrivers.map((d: any) => d.score)) : 1;
   const alertsSummary: { open_count: number; closed_count: number; recent_open: any[] } = summaryData?.alerts_summary ?? { open_count: 0, closed_count: 0, recent_open: [] };
-  const fleetSimData: any = summaryData?.fleet_sim ?? {};
+  const fleetSimData: any = fleetPositionQuery.data ?? summaryData?.fleet_sim ?? {};
+  const tripData: any = summaryData?.trip_data ?? null;
+  const isVehicleActive = fleetSimData?.status === "active";
 
   // Fleet/module analysis derived
   const fleetChartData = useMemo(
@@ -1811,7 +1861,7 @@ export default function AutomotiveDive({
             whiteSpace: "nowrap",
           }}
         >
-          AUTOMOTIVE DEEP DIVE
+          VEHICLE DEEP DIVE
         </Typography>
         <Box
           sx={{
@@ -1926,54 +1976,8 @@ export default function AutomotiveDive({
               </Badge>
             </Paper>
 
-            {/* ── MODULE KPI STRIP ── */}
-            <Box sx={{ display: "flex", gap: 1, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { height: 3 }, "&::-webkit-scrollbar-track": { bgcolor: "transparent" }, "&::-webkit-scrollbar-thumb": { bgcolor: darkMode ? alpha("#334155", 0.8) : alpha("#cbd5e1", 0.8), borderRadius: 2 } }}>
-              {ALL_MODULES.map((mod) => {
-                const modColor = (MODULE_COLORS as Record<string, string>)[mod];
-                const modKpi = summaryData?.kpi_snapshot?.[mod];
-                const modHealth = moduleContribs[mod];
-                const modStatusColor = modHealth == null ? (darkMode ? "#475569" : "#94a3b8") : modHealth >= 80 ? "#22c55e" : modHealth >= 60 ? "#f59e0b" : "#ef4444";
-                return (
-                  <Paper
-                    key={mod}
-                    elevation={3}
-                    sx={{ minWidth: 175, flexShrink: 0, p: 1.5, borderRadius: 2, borderTop: `3px solid ${modColor}`, background: getCardGradient(darkMode ? alpha(modColor, 0.05) : alpha(modColor, 0.025), modColor, darkMode), cursor: "pointer", transition: "box-shadow 0.15s", "&:hover": { boxShadow: `0 4px 20px ${alpha(modColor, darkMode ? 0.3 : 0.14)}` } }}
-                    onClick={() => { setSelectedModule(mod); setViewMode("module"); }}
-                  >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                      <Typography sx={{ fontSize: "10px", fontWeight: 800, color: modColor, textTransform: "uppercase", letterSpacing: 0.8 }}>{mod}</Typography>
-                      <Box sx={{ px: 0.75, py: "1px", borderRadius: 1, bgcolor: alpha(modStatusColor, darkMode ? 0.18 : 0.1), border: `1px solid ${alpha(modStatusColor, 0.3)}` }}>
-                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: modStatusColor }}>{modHealth != null ? `${modHealth.toFixed(1)}%` : "--"}</Typography>
-                      </Box>
-                    </Box>
-                    {(modKpi?.sensors || []).map((s: any) => (
-                      <Box key={s.key} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                        <Typography sx={{ fontSize: "9px", color: darkMode ? "#64748b" : "#94a3b8", fontWeight: 500, flex: 1, minWidth: 0 }}>{s.label}</Typography>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
-                          <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.25 }}>
-                            <Typography sx={{ fontSize: "11px", fontWeight: 700, fontFamily: "monospace", color: darkMode ? "#cbd5e1" : "#1e293b" }}>{s.value != null ? s.value : "--"}</Typography>
-                            <Typography sx={{ fontSize: "8px", color: darkMode ? "#475569" : "#94a3b8" }}>{s.unit}</Typography>
-                          </Box>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); setKpiChartSensor({ module: mod, key: s.key, label: s.label, unit: s.unit }); }}
-                            sx={{ p: "2px", color: alpha(modColor, 0.55), "&:hover": { color: modColor, bgcolor: alpha(modColor, 0.12) } }}
-                          >
-                            <ShowChartRoundedIcon sx={{ fontSize: "11px !important" }} />
-                          </IconButton>
-                        </Box>
-                      </Box>
-                    ))}
-                    <Button size="small" fullWidth endIcon={<TuneRoundedIcon sx={{ fontSize: "10px !important" }} />} sx={{ mt: 1, fontSize: "9px", fontWeight: 700, height: 22, bgcolor: alpha(modColor, darkMode ? 0.15 : 0.08), color: modColor, border: `1px solid ${alpha(modColor, 0.3)}`, borderRadius: 1, "&:hover": { bgcolor: alpha(modColor, darkMode ? 0.25 : 0.14) } }}>
-                      Deep Dive
-                    </Button>
-                  </Paper>
-                );
-              })}
-            </Box>
-
             {/* ── 3-COLUMN MAIN CONTENT ── */}
-            <Box sx={{ display: "flex", gap: 1, minHeight: 0 }}>
+            <Box sx={{ display: "flex", gap: 1 }}>
 
               {/* ─── LEFT COL: Health trend + Anomaly drivers ─── */}
               <Box sx={{ flex: "0 0 44%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
@@ -1981,35 +1985,58 @@ export default function AutomotiveDive({
                 {/* Health Trend */}
                 <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc" }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                    <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: darkMode ? "#38bdf8" : "#005071" }} />
+                    <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#3b82f6" }} />
                     <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Health Trend</Typography>
-                    <Chip size="small" label={`${summaryHealthData.length} pts`} sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: darkMode ? alpha("#38bdf8", 0.12) : alpha("#0284c7", 0.08), color: darkMode ? "#38bdf8" : "#0369a1" }} />
+                    <Chip size="small" label={`${summaryHealthData.length} pts`} sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: darkMode ? alpha("#3b82f6", 0.12) : alpha("#3b82f6", 0.08), color: darkMode ? "#93c5fd" : "#2563eb" }} />
+                    <Chip size="small" label="Gold" sx={{ height: 16, borderRadius: 1, fontSize: "9px", fontWeight: 700, bgcolor: darkMode ? alpha("#3b82f6", 0.12) : alpha("#3b82f6", 0.08), color: darkMode ? "#93c5fd" : "#2563eb", border: `1px solid ${alpha("#3b82f6", 0.2)}` }} />
                     <Box sx={{ flex: 1 }} />
                     <Typography sx={{ fontSize: "9px", color: darkMode ? "#475569" : "#94a3b8" }}>Fused + module breakdown</Typography>
                   </Box>
-                  <ResponsiveContainer width="100%" height={170}>
-                    <AreaChart data={summaryHealthData} margin={{ top: 2, right: 6, bottom: 0, left: -10 }}>
-                      <defs>
-                        {ALL_MODULES.map((mod) => (
-                          <linearGradient key={mod} id={`summGrad${mod}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={(MODULE_COLORS as Record<string, string>)[mod]} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={(MODULE_COLORS as Record<string, string>)[mod]} stopOpacity={0.02} />
-                          </linearGradient>
-                        ))}
-                        <linearGradient id="summGradHealth" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={darkMode ? "#38bdf8" : "#005071"} stopOpacity={0.45} />
-                          <stop offset="95%" stopColor={darkMode ? "#38bdf8" : "#005071"} stopOpacity={0.03} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke={ct.gridColor} vertical={false} />
-                      <XAxis dataKey={xAxisMode === "mileage" ? "mileage" : "ts"} tick={axisStyle} tickFormatter={(v) => formatXTick(v, xAxisMode)} interval="preserveStartEnd" />
-                      <YAxis domain={[0, 100]} tick={axisStyle} width={28} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`${Number(v).toFixed(1)}%`, ""]} />
-                      <Area type="monotone" dataKey="health" stroke={darkMode ? "#38bdf8" : "#005071"} fill="url(#summGradHealth)" strokeWidth={2} dot={false} name="Fused Health" />
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={summaryHealthData} margin={{ top: 4, right: 15, left: -25, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={ct.gridColor} />
+                      <XAxis
+                        dataKey={xAxisMode === "mileage" ? "mileage" : "ts"}
+                        tick={axisStyle}
+                        axisLine={{ stroke: ct.tableBorder }}
+                        tickLine={false}
+                        minTickGap={40}
+                        tickFormatter={(v) => formatXTick(v, xAxisMode)}
+                      />
+                      <YAxis domain={[0, 100]} tick={axisStyle} axisLine={{ stroke: ct.tableBorder }} tickLine={false} />
+                      <Tooltip
+                        cursor={{ stroke: darkMode ? alpha("#7dd3fc", 0.3) : alpha("#3b82f6", 0.2), strokeWidth: 1 }}
+                        contentStyle={tooltipStyle}
+                        formatter={(v: any) => [`${Number(v).toFixed(1)}%`, ""]}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: "9px", paddingTop: 4 }}
+                        formatter={(value) => <span style={{ color: darkMode ? "#94a3b8" : "#64748b", fontSize: "9px" }}>{value}</span>}
+                      />
+                      <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="4 4" label={{ value: "CRIT", fontSize: 9, fill: "#ef4444", position: "insideTopRight" }} />
+                      <ReferenceLine y={80} stroke="#eab308" strokeDasharray="4 4" label={{ value: "WARN", fontSize: 9, fill: "#eab308", position: "insideTopRight" }} />
+                      <Line type="monotone" dataKey="health" name="Fused Health" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
                       {ALL_MODULES.map((mod) => (
-                        <Area key={mod} type="monotone" dataKey={`${mod}_contrib`} stroke={(MODULE_COLORS as Record<string, string>)[mod]} fill={`url(#summGrad${mod})`} strokeWidth={1} strokeDasharray="4 2" dot={false} name={mod.charAt(0).toUpperCase() + mod.slice(1)} />
+                        <Line
+                          key={mod}
+                          type="monotone"
+                          dataKey={`${mod}_contrib`}
+                          name={mod.charAt(0).toUpperCase() + mod.slice(1)}
+                          stroke={(MODULE_COLORS as Record<string, string>)[mod]}
+                          strokeWidth={1.5}
+                          strokeDasharray="4 2"
+                          dot={false}
+                          isAnimationActive={false}
+                        />
                       ))}
-                    </AreaChart>
+                      <Brush
+                        dataKey={xAxisMode === "mileage" ? "mileage" : "ts"}
+                        height={18}
+                        stroke={darkMode ? alpha("#7dd3fc", 0.5) : alpha("#3b82f6", 0.5)}
+                        fill={darkMode ? alpha("#0d2137", 0.85) : alpha("#e2eaf4", 0.9)}
+                        travellerWidth={6}
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </Paper>
 
@@ -2085,55 +2112,9 @@ export default function AutomotiveDive({
                   )}
                 </Paper>
 
-                {/* Alerts Summary */}
-                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
-                    <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#ef4444" }} />
-                    <WarningAmberRoundedIcon sx={{ fontSize: 12, color: "#ef4444" }} />
-                    <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Alerts</Typography>
-                    <Box sx={{ ml: "auto", display: "flex", gap: 0.5 }}>
-                      <Box sx={{ px: 0.75, py: "1px", borderRadius: 1, bgcolor: alpha("#ef4444", darkMode ? 0.15 : 0.08), border: `1px solid ${alpha("#ef4444", 0.25)}` }}>
-                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#ef4444" }}>{alertsSummary.open_count} Open</Typography>
-                      </Box>
-                      <Box sx={{ px: 0.75, py: "1px", borderRadius: 1, bgcolor: alpha("#22c55e", darkMode ? 0.12 : 0.07), border: `1px solid ${alpha("#22c55e", 0.22)}` }}>
-                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#22c55e" }}>{alertsSummary.closed_count} Closed</Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-                  {alertsSummary.recent_open.length === 0 ? (
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 2, gap: 0.75 }}>
-                      <CheckCircleRoundedIcon sx={{ fontSize: 16, color: "#22c55e", opacity: 0.7 }} />
-                      <Typography sx={{ fontSize: "11px", color: "text.secondary" }}>No open alerts</Typography>
-                    </Box>
-                  ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                      {alertsSummary.recent_open.slice(0, 5).map((a: any, i: number) => {
-                        const modColor = (MODULE_COLORS as Record<string, string>)[a.module?.toLowerCase()] || (darkMode ? "#7dd3fc" : "#0369a1");
-                        return (
-                          <Box key={a.alert_id || i} sx={{ display: "flex", alignItems: "center", gap: 0.75, p: 0.75, borderRadius: 1.5, bgcolor: darkMode ? alpha("#1e293b", 0.4) : alpha("#f8fafc", 0.8), border: `1px solid ${darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 1)}`, cursor: "pointer", "&:hover": { bgcolor: darkMode ? alpha("#1e293b", 0.7) : alpha("#f1f5f9", 1) } }}
-                            onClick={() => { setSelectedModule(a.module?.toLowerCase() || "engine"); setViewMode("module"); setAlertsOpen(true); }}>
-                            <Box sx={{ width: 3, minHeight: 28, borderRadius: 2, bgcolor: modColor, flexShrink: 0 }} />
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                <Typography sx={{ fontSize: "9px", fontWeight: 800, color: modColor, textTransform: "uppercase" }}>{a.module}</Typography>
-                                <Typography sx={{ fontSize: "9px", fontFamily: "monospace", color: darkMode ? "#475569" : "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(a.peak_anomaly_ts || "").slice(0, 16)}</Typography>
-                              </Box>
-                              {a.max_composite_score != null && (
-                                <Typography sx={{ fontSize: "8px", color: Number(a.max_composite_score) >= 0.8 ? "#ef4444" : "#f59e0b" }}>score: {Number(a.max_composite_score).toFixed(3)}</Typography>
-                              )}
-                            </Box>
-                          </Box>
-                        );
-                      })}
-                      {alertsSummary.open_count > 5 && (
-                        <Typography sx={{ fontSize: "9px", color: darkMode ? "#475569" : "#94a3b8", textAlign: "center", pt: 0.25 }}>+{alertsSummary.open_count - 5} more → click Alerts button</Typography>
-                      )}
-                    </Box>
-                  )}
-                </Paper>
 
                 {/* Observer Live */}
-                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc" }}>
+                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1 }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
                     <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#a855f7" }} />
                     <SensorsRoundedIcon sx={{ fontSize: 12, color: "#a855f7" }} />
@@ -2182,7 +2163,7 @@ export default function AutomotiveDive({
                       <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75, mb: 0.75 }}>
                         {[
                           { label: "Vehicle", value: fleetSimData.name || selectedVehicle },
-                          { label: "Type", value: fleetSimData.vehicle_type || "--" },
+                          { label: "Type", value: fleetSimData.type || "--" },
                           { label: "Driver", value: fleetSimData.driver || "--" },
                           { label: "Status", value: String(fleetSimData.status || "--").replace(/_/g, " ") },
                         ].map(({ label, value }) => (
@@ -2192,17 +2173,17 @@ export default function AutomotiveDive({
                           </Box>
                         ))}
                       </Box>
-                      {fleetSimData.position && (
+                      {fleetSimData.lat != null && (
                         <Box sx={{ p: 0.75, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.3) : alpha("#f8fafc", 0.8), border: `1px solid ${darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 1)}` }}>
                           <Typography sx={{ fontSize: "8px", color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", mb: 0.25 }}>Position</Typography>
                           <Typography sx={{ fontSize: "10px", fontFamily: "monospace", color: darkMode ? "#94a3b8" : "#475569" }}>
-                            {Number(fleetSimData.position.lat ?? 0).toFixed(4)}°N, {Number(fleetSimData.position.lng ?? 0).toFixed(4)}°E
+                            {Number(fleetSimData.lat).toFixed(4)}°N, {Number(fleetSimData.lng ?? 0).toFixed(4)}°E
                           </Typography>
-                          {fleetSimData.route && (
-                            <Typography sx={{ fontSize: "9px", color: darkMode ? "#64748b" : "#94a3b8", mt: 0.25 }}>Route: {String(fleetSimData.route).replace(/_/g, " → ")}</Typography>
+                          {fleetSimData.route_name && (
+                            <Typography sx={{ fontSize: "9px", color: darkMode ? "#64748b" : "#94a3b8", mt: 0.25 }}>Route: {String(fleetSimData.route_name).replace(/_/g, " → ")}</Typography>
                           )}
-                          {fleetSimData.speed_kmh != null && (
-                            <Typography sx={{ fontSize: "9px", color: darkMode ? "#64748b" : "#94a3b8" }}>Speed: {Number(fleetSimData.speed_kmh).toFixed(0)} km/h</Typography>
+                          {fleetSimData.speed != null && (
+                            <Typography sx={{ fontSize: "9px", color: darkMode ? "#64748b" : "#94a3b8" }}>Speed: {Number(fleetSimData.speed).toFixed(0)} km/h</Typography>
                           )}
                         </Box>
                       )}
@@ -2213,6 +2194,60 @@ export default function AutomotiveDive({
                     </Typography>
                   )}
                 </Paper>
+
+                {/* Active Trip — only shown when vehicle is active in fleet sim */}
+                {isVehicleActive && tripData && (
+                  <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
+                      <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#22c55e" }} />
+                      <SpeedRoundedIcon sx={{ fontSize: 12, color: "#22c55e" }} />
+                      <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Active Trip</Typography>
+                      {fleetSimData.road_type && (
+                        <Chip size="small" label={String(fleetSimData.road_type).replace(/_/g, " ")} sx={{ height: 14, borderRadius: 1, fontSize: "8px", fontWeight: 700, ml: "auto", bgcolor: darkMode ? alpha("#22c55e", 0.12) : alpha("#22c55e", 0.08), color: "#22c55e" }} />
+                      )}
+                    </Box>
+
+                    {/* Route origin → destination */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.75, p: 0.75, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8) }}>
+                      <Typography sx={{ fontSize: "10px", fontWeight: 700, color: darkMode ? "#94a3b8" : "#475569", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tripData.origin || "--"}</Typography>
+                      <Typography sx={{ fontSize: "9px", color: darkMode ? "#475569" : "#94a3b8", flexShrink: 0, mx: 0.25 }}>→</Typography>
+                      <Typography sx={{ fontSize: "10px", fontWeight: 700, color: darkMode ? "#94a3b8" : "#475569", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{tripData.destination || "--"}</Typography>
+                    </Box>
+
+                    {/* Progress bar */}
+                    <Box sx={{ mb: 0.75 }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.4 }}>
+                        <Typography sx={{ fontSize: "8px", color: darkMode ? "#475569" : "#94a3b8" }}>
+                          {tripData.distance_completed_km != null ? `${tripData.distance_completed_km} km` : "--"} completed
+                        </Typography>
+                        <Typography sx={{ fontSize: "8px", fontFamily: "monospace", color: darkMode ? "#64748b" : "#94a3b8" }}>
+                          {tripData.progress_pct != null ? `${tripData.progress_pct.toFixed(0)}%` : "--"} of {tripData.distance_total_km != null ? `${tripData.distance_total_km} km` : "--"}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ height: 5, borderRadius: 3, bgcolor: darkMode ? alpha("#1e293b", 0.8) : alpha("#e2e8f0", 0.8), overflow: "hidden" }}>
+                        <Box sx={{ height: "100%", width: `${Math.min(tripData.progress_pct ?? 0, 100)}%`, bgcolor: "#22c55e", borderRadius: 3, transition: "width 0.3s ease" }} />
+                      </Box>
+                    </Box>
+
+                    {/* Speed + heading */}
+                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.5 }}>
+                      <Box sx={{ p: 0.75, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8) }}>
+                        <Typography sx={{ fontSize: "8px", color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", letterSpacing: 0.3 }}>Speed</Typography>
+                        <Typography sx={{ fontSize: "16px", fontWeight: 900, fontFamily: "monospace", lineHeight: 1, color: darkMode ? "#e2e8f0" : "#0f172a" }}>
+                          {fleetSimData.speed != null ? Math.round(fleetSimData.speed) : "--"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "8px", color: darkMode ? "#475569" : "#94a3b8" }}>km/h</Typography>
+                      </Box>
+                      <Box sx={{ p: 0.75, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8) }}>
+                        <Typography sx={{ fontSize: "8px", color: darkMode ? "#475569" : "#94a3b8", textTransform: "uppercase", letterSpacing: 0.3 }}>Heading</Typography>
+                        <Typography sx={{ fontSize: "16px", fontWeight: 900, fontFamily: "monospace", lineHeight: 1, color: darkMode ? "#e2e8f0" : "#0f172a" }}>
+                          {fleetSimData.heading != null ? Math.round(fleetSimData.heading) : "--"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "8px", color: darkMode ? "#475569" : "#94a3b8" }}>°</Typography>
+                      </Box>
+                    </Box>
+                  </Paper>
+                )}
 
                 {/* Driver Behavior */}
                 <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1 }}>
@@ -2254,9 +2289,9 @@ export default function AutomotiveDive({
                       {behaviorData.event_summary && (
                         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0.5 }}>
                           {[
-                            { label: "Braking", value: behaviorData.event_summary.total_braking, color: "#ef4444" },
-                            { label: "Accel", value: behaviorData.event_summary.total_accel, color: "#f59e0b" },
-                            { label: "Corners", value: behaviorData.event_summary.total_cornering, color: "#a855f7" },
+                            { label: "Braking", value: behaviorData.event_summary.braking, color: "#ef4444" },
+                            { label: "Accel", value: behaviorData.event_summary.accel, color: "#f59e0b" },
+                            { label: "Corners", value: behaviorData.event_summary.cornering, color: "#a855f7" },
                           ].map(({ label, value, color }) => (
                             <Box key={label} sx={{ p: 0.5, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8), textAlign: "center" }}>
                               <Typography sx={{ fontSize: "12px", fontWeight: 700, fontFamily: "monospace", color }}>{value ?? "--"}</Typography>
@@ -2273,47 +2308,270 @@ export default function AutomotiveDive({
                   )}
                 </Paper>
 
-                {/* DTC History */}
-                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc" }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
-                    <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#f59e0b" }} />
-                    <ErrorRoundedIcon sx={{ fontSize: 12, color: "#f59e0b" }} />
-                    <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>DTC History</Typography>
-                    <Typography sx={{ fontSize: "9px", color: darkMode ? "#475569" : "#94a3b8", ml: "auto" }}>{dtcRuns.length} runs</Typography>
+              </Box>
+            </Box>
+
+            {/* ── VEHICLE ALERTS ── */}
+            {selectedVehicle && (() => {
+              const tabRows = alertsInlineTab === 0 ? allVehicleAlerts : alertsInlineTab === 1 ? vehicleOpenAlerts : alertsInlineTab === 2 ? unanalyzedVehicleAlerts : analyzedVehicleAlerts;
+              return (
+                <Paper sx={{ borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden" }}>
+                  {/* Header */}
+                  <Box sx={{ px: 2, pt: 1.5, pb: 0, background: darkMode ? `linear-gradient(135deg, ${alpha("#1e3a5f", 0.6)}, ${alpha("#0c1628", 0.8)})` : `linear-gradient(135deg, ${alpha("#eff6ff", 1)}, ${alpha("#f8fafc", 1)})`, borderBottom: `1px solid ${darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1)}` }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                      <Box sx={{ width: 3, height: 16, borderRadius: 2, bgcolor: "#ef4444" }} />
+                      <WarningAmberRoundedIcon sx={{ fontSize: 14, color: "#ef4444" }} />
+                      <Typography sx={{ fontSize: "12px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Vehicle Alerts</Typography>
+                      <Box sx={{ display: "flex", gap: 0.75, ml: 1 }}>
+                        {[
+                          { label: `${allVehicleAlerts.length} Total`, color: darkMode ? "#94a3b8" : "#475569", bg: darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 0.8) },
+                          { label: `${vehicleOpenAlerts.length} Open`, color: "#ef4444", bg: alpha("#ef4444", darkMode ? 0.14 : 0.08) },
+                          { label: `${vehicleClosedAlerts.length} Closed`, color: "#22c55e", bg: alpha("#22c55e", darkMode ? 0.12 : 0.07) },
+                          { label: `${analyzedVehicleAlerts.length} Analyzed`, color: "#38bdf8", bg: alpha("#38bdf8", darkMode ? 0.12 : 0.07) },
+                          { label: `${unanalyzedVehicleAlerts.length} Unanalyzed`, color: "#f59e0b", bg: alpha("#f59e0b", darkMode ? 0.12 : 0.07) },
+                        ].map(({ label, color, bg }) => (
+                          <Box key={label} sx={{ px: 1, py: "3px", borderRadius: 1.5, bgcolor: bg, border: `1px solid ${alpha(color, 0.28)}` }}>
+                            <Typography sx={{ fontSize: "10px", fontWeight: 700, color }}>{label}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                    <Tabs value={alertsInlineTab} onChange={(_e, v) => setAlertsInlineTab(v)} sx={{ minHeight: 30, "& .MuiTabs-indicator": { height: 2, borderRadius: "2px 2px 0 0", bgcolor: darkMode ? "#38bdf8" : "#0284c7" }, "& .MuiTab-root": { minHeight: 30, fontSize: "11px", fontWeight: 600, textTransform: "none", px: 1.5, color: darkMode ? "#64748b" : "#94a3b8", "&.Mui-selected": { color: darkMode ? "#38bdf8" : "#0284c7", fontWeight: 700 } } }}>
+                      <Tab label="All" />
+                      <Tab label="Open" />
+                      <Tab label="Unanalyzed" />
+                      <Tab label="Analyzed" />
+                    </Tabs>
                   </Box>
-                  {dtcRuns.length === 0 ? (
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 1.5, gap: 0.75 }}>
-                      <CheckCircleRoundedIcon sx={{ fontSize: 14, color: "#22c55e", opacity: 0.7 }} />
-                      <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No DTC runs recorded</Typography>
+                  {/* Body */}
+                  {vehicleAlertsQuery.isLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                      <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>Loading alerts…</Typography>
+                    </Box>
+                  ) : tabRows.length === 0 ? (
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75, py: 4 }}>
+                      <CheckCircleRoundedIcon sx={{ fontSize: 20, color: "#22c55e", opacity: 0.7 }} />
+                      <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>No alerts in this category</Typography>
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                      {dtcRuns.slice(0, 3).map((run: any, i: number) => {
-                        const triggerCount = run.triggers?.length ?? 0;
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1.5 }}>
+                      {tabRows.map((a: any, i: number) => {
+                        const isOpen = a.status === "OPEN";
+                        const isAnalyzed = analyzedSet.has(`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`);
+                        const dtcRun = dtcRunMap[`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`];
+                        const scoreNum = Number(a.max_composite_score ?? 0);
+                        const scoreColor = scoreNum >= 0.8 ? "#ef4444" : scoreNum >= 0.5 ? "#f59e0b" : "#22c55e";
+                        const scoreBg = scoreNum >= 0.8 ? alpha("#ef4444", darkMode ? 0.14 : 0.08) : scoreNum >= 0.5 ? alpha("#f59e0b", darkMode ? 0.14 : 0.08) : alpha("#22c55e", darkMode ? 0.14 : 0.08);
+                        const modColor = (MODULE_COLORS as Record<string, string>)[a.module?.toLowerCase()] || (darkMode ? "#7dd3fc" : "#0369a1");
+                        type FEntry = { label: string; value: number };
+                        let featureEntries: FEntry[] = [];
+                        if (a.top_10_features) {
+                          try {
+                            const parsed = JSON.parse(a.top_10_features) as Record<string, number>;
+                            const total = Object.values(parsed).reduce((s, v) => s + Math.abs(v), 0);
+                            featureEntries = Object.entries(parsed).slice(0, 5).map(([k, v]) => ({ label: formatFeatureKey(k), value: total > 0 ? Math.round((Math.abs(v) / total) * 100) : 0 }));
+                          } catch { featureEntries = []; }
+                        }
+                        const triggers: any[] = dtcRun?.triggers ?? [];
                         return (
-                          <Box key={run.run_id || i} sx={{ display: "flex", alignItems: "center", gap: 1, p: 0.75, borderRadius: 1.5, bgcolor: darkMode ? alpha("#1e293b", 0.4) : alpha("#f8fafc", 0.8), border: `1px solid ${darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 1)}`, cursor: "pointer", "&:hover": { bgcolor: darkMode ? alpha("#1e293b", 0.7) : alpha("#f1f5f9", 1) } }}
-                            onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle)}`)}>
-                            <Box sx={{ width: 3, minHeight: 28, borderRadius: 2, bgcolor: triggerCount > 0 ? "#ef4444" : "#22c55e", flexShrink: 0 }} />
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography sx={{ fontSize: "9px", fontFamily: "monospace", color: darkMode ? "#94a3b8" : "#64748b" }}>{String(run.run_ts || "").slice(0, 16)}</Typography>
-                              <Typography sx={{ fontSize: "10px", fontWeight: 700, color: darkMode ? "#cbd5e1" : "#1e293b" }}>{triggerCount > 0 ? `${triggerCount} code${triggerCount > 1 ? "s" : ""} found` : "No codes"}</Typography>
-                            </Box>
-                            <Box sx={{ px: 0.75, py: "2px", borderRadius: 1, bgcolor: triggerCount > 0 ? alpha("#ef4444", darkMode ? 0.15 : 0.08) : alpha("#22c55e", darkMode ? 0.12 : 0.07) }}>
-                              <Typography sx={{ fontSize: "9px", fontWeight: 700, color: triggerCount > 0 ? "#ef4444" : "#22c55e" }}>{run.module?.toUpperCase() || "ALL"}</Typography>
+                          <Box key={a.alert_id || i} sx={{ display: "flex", borderRadius: 2, overflow: "hidden", border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#1e293b", 0.5) : "#fafbfc", "&:hover": { boxShadow: darkMode ? `0 4px 20px ${alpha("#000", 0.3)}` : `0 4px 16px ${alpha("#0f172a", 0.08)}` } }}>
+                            <Box sx={{ width: 4, flexShrink: 0, bgcolor: isOpen ? "#ef4444" : "#22c55e" }} />
+                            <Box sx={{ flex: 1, p: 1.5, display: "flex", gap: 2, alignItems: "flex-start", minWidth: 0 }}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                {/* Chips row */}
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75, flexWrap: "wrap" }}>
+                                  <Box sx={{ px: 0.85, py: "2px", borderRadius: "5px", fontSize: "9px", fontWeight: 800, letterSpacing: 0.5, bgcolor: isOpen ? alpha("#ef4444", darkMode ? 0.18 : 0.1) : alpha("#22c55e", darkMode ? 0.14 : 0.08), color: isOpen ? "#ef4444" : "#22c55e", border: `1px solid ${isOpen ? alpha("#ef4444", 0.3) : alpha("#22c55e", 0.25)}` }}>{a.status}</Box>
+                                  <Box sx={{ px: 0.85, py: "2px", borderRadius: "5px", fontSize: "9px", fontWeight: 800, letterSpacing: 0.5, bgcolor: alpha(modColor, darkMode ? 0.16 : 0.1), color: modColor, border: `1px solid ${alpha(modColor, 0.28)}` }}>{String(a.module || "").toUpperCase()}</Box>
+                                  {isAnalyzed && (
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+                                      <CheckCircleRoundedIcon sx={{ fontSize: 12, color: "#22c55e" }} />
+                                      <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#22c55e" }}>Analyzed</Typography>
+                                    </Box>
+                                  )}
+                                </Box>
+                                {/* Timestamps */}
+                                <Box sx={{ display: "flex", gap: 2.5, mb: featureEntries.length > 0 || triggers.length > 0 ? 0.75 : 0 }}>
+                                  <Box>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Peak</Typography>
+                                    <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#cbd5e1" : "#334155" }}>{String(a.peak_anomaly_ts || "").slice(0, 19)}</Typography>
+                                  </Box>
+                                  {a.alert_start_ts && (
+                                    <Box>
+                                      <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Started</Typography>
+                                      <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#94a3b8" : "#64748b" }}>{String(a.alert_start_ts).slice(0, 19)}</Typography>
+                                    </Box>
+                                  )}
+                                </Box>
+                                {/* Anomaly drivers */}
+                                {featureEntries.length > 0 && (
+                                  <Box sx={{ mb: triggers.length > 0 ? 0.75 : 0 }}>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "3px", textTransform: "uppercase", letterSpacing: 0.4 }}>Top anomaly drivers</Typography>
+                                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                                      {featureEntries.map((f, fi) => (
+                                        <Box key={fi} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 0.85, py: "2px", borderRadius: "5px", bgcolor: darkMode ? alpha("#1e293b", 0.9) : alpha("#f1f5f9", 1), border: `1px solid ${darkMode ? alpha("#475569", 0.35) : alpha("#cbd5e1", 1)}` }}>
+                                          <Typography sx={{ fontSize: "9px", fontWeight: 500, color: darkMode ? "#94a3b8" : "#475569" }}>{f.label}</Typography>
+                                          <Typography sx={{ fontSize: "9px", fontWeight: 800, color: darkMode ? "#e2e8f0" : "#0f172a", fontVariantNumeric: "tabular-nums", fontFamily: "monospace" }}>{f.value}%</Typography>
+                                        </Box>
+                                      ))}
+                                    </Box>
+                                  </Box>
+                                )}
+                                {/* DTC triggers — only for analyzed alerts */}
+                                {isAnalyzed && (
+                                  <Box sx={{ mt: 0.75, pt: 0.75, borderTop: `1px solid ${darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 1)}` }}>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 700, color: darkMode ? "#475569" : "#94a3b8", mb: "4px", textTransform: "uppercase", letterSpacing: 0.5 }}>DTC Analysis</Typography>
+                                    {triggers.length === 0 ? (
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                        <CheckCircleRoundedIcon sx={{ fontSize: 12, color: "#22c55e" }} />
+                                        <Typography sx={{ fontSize: "10px", color: darkMode ? "#94a3b8" : "#475569" }}>No fault codes triggered</Typography>
+                                      </Box>
+                                    ) : (
+                                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                                        {triggers.map((t: any, ti: number) => {
+                                          const isCrit = t.severity === "CRITICAL";
+                                          const trigColor = isCrit ? "#ef4444" : "#f59e0b";
+                                          return (
+                                            <Box key={ti} sx={{ display: "flex", alignItems: "flex-start", gap: 1, p: 0.75, borderRadius: 1.5, bgcolor: darkMode ? alpha("#0f172a", 0.5) : alpha("#fff", 0.8), border: `1px solid ${darkMode ? alpha(trigColor, 0.2) : alpha(trigColor, 0.18)}` }}>
+                                              <Box sx={{ px: 0.75, py: "2px", borderRadius: 1, bgcolor: alpha(trigColor, darkMode ? 0.15 : 0.09), border: `1px solid ${alpha(trigColor, 0.3)}`, flexShrink: 0 }}>
+                                                <Typography sx={{ fontSize: "10px", fontWeight: 800, color: trigColor, fontFamily: "monospace", letterSpacing: 0.5 }}>{t.code}</Typography>
+                                              </Box>
+                                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                <Typography sx={{ fontSize: "10px", fontWeight: 600, color: darkMode ? "#cbd5e1" : "#1e293b", lineHeight: 1.3 }}>{t.message || "—"}</Typography>
+                                                <Typography sx={{ fontSize: "9px", color: trigColor, fontWeight: 600 }}>{t.severity}</Typography>
+                                              </Box>
+                                            </Box>
+                                          );
+                                        })}
+                                      </Box>
+                                    )}
+                                    {dtcRun?.run_ts && (
+                                      <Typography sx={{ fontSize: "8px", color: darkMode ? "#334155" : "#cbd5e1", mt: 0.5, fontFamily: "monospace" }}>Analyzed at {String(dtcRun.run_ts).slice(0, 16)}</Typography>
+                                    )}
+                                  </Box>
+                                )}
+                              </Box>
+                              {/* Right side: score + button */}
+                              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
+                                {a.max_composite_score != null && (
+                                  <Box sx={{ px: 1.25, py: 0.5, borderRadius: 1.5, bgcolor: scoreBg, border: `1px solid ${alpha(scoreColor, 0.25)}`, textAlign: "center" }}>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: scoreColor, textTransform: "uppercase", letterSpacing: 0.5, lineHeight: 1.2 }}>Score</Typography>
+                                    <Typography sx={{ fontSize: "15px", fontWeight: 800, color: scoreColor, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{scoreNum.toFixed(3)}</Typography>
+                                  </Box>
+                                )}
+                                <Button size="small" endIcon={<OpenInNewRoundedIcon sx={{ fontSize: "11px !important" }} />}
+                                  onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle)}&module=${encodeURIComponent(a.module)}&peak_ts=${encodeURIComponent(a.peak_anomaly_ts)}`)}
+                                  sx={{ fontSize: "10px", fontWeight: 700, height: 28, px: 1.5, borderRadius: "6px", bgcolor: darkMode ? alpha("#38bdf8", 0.1) : alpha("#0284c7", 0.07), color: darkMode ? "#38bdf8" : "#0369a1", border: `1px solid ${darkMode ? alpha("#38bdf8", 0.22) : alpha("#0284c7", 0.18)}`, "&:hover": { bgcolor: darkMode ? alpha("#38bdf8", 0.18) : alpha("#0284c7", 0.13) } }}>
+                                  Investigate
+                                </Button>
+                              </Box>
                             </Box>
                           </Box>
                         );
                       })}
-                      {dtcRuns.length > 3 && (
-                        <Button size="small" onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle)}`)} sx={{ fontSize: "9px", fontWeight: 600, height: 22, color: darkMode ? "#64748b" : "#94a3b8" }}>
-                          +{dtcRuns.length - 3} more → View full history
-                        </Button>
-                      )}
                     </Box>
                   )}
                 </Paper>
+              );
+            })()}
+
+            {/* ── LIVE SENSORS ── */}
+            <Paper sx={{ borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 2, py: 1.25, borderBottom: `1px solid ${darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1)}`, background: darkMode ? `linear-gradient(90deg, ${alpha("#1e3a5f", 0.5)}, transparent)` : `linear-gradient(90deg, ${alpha("#eff6ff", 1)}, transparent)` }}>
+                <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#38bdf8" }} />
+                <SensorsRoundedIcon sx={{ fontSize: 13, color: "#38bdf8" }} />
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Live Sensors</Typography>
+                <Typography sx={{ fontSize: "9px", color: darkMode ? "#475569" : "#94a3b8" }}>Latest bronze readings · click any tile to chart history</Typography>
               </Box>
+              <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1.25 }}>
+                {ALL_MODULES.map((mod) => {
+                  const modColor = (MODULE_COLORS as Record<string, string>)[mod];
+                  const sensors: any[] = summaryData?.kpi_snapshot?.[mod]?.sensors ?? [];
+                  return (
+                    <Box key={mod} sx={{ display: "flex", alignItems: "flex-start", gap: 1.25 }}>
+                      {/* Module label */}
+                      <Box sx={{ width: 88, flexShrink: 0, display: "flex", alignItems: "center", gap: 0.6, pt: "9px" }}>
+                        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: modColor, flexShrink: 0, boxShadow: `0 0 5px ${alpha(modColor, 0.55)}` }} />
+                        <Typography sx={{ fontSize: "10px", fontWeight: 800, color: modColor, textTransform: "uppercase", letterSpacing: 0.9 }}>{mod}</Typography>
+                      </Box>
+                      {/* Sensor tiles — wrap for tyre's 12 */}
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, flex: 1 }}>
+                        {sensors.map((s: any, si: number) => {
+                          const lo = s.range_lo as number | null;
+                          const hi = s.range_hi as number | null;
+                          const val = s.value as number | null;
+                          const pct = lo != null && hi != null && val != null && hi > lo ? Math.max(0, Math.min(100, ((val - lo) / (hi - lo)) * 100)) : null;
+                          const valStr = val != null ? (Number.isInteger(val) ? String(val) : val.toFixed(1)) : "--";
+                          const icon = getSensorIcon(s.key, alpha(modColor, 0.8), "10px");
+                          return (
+                            <Box
+                              key={`${s.key}-${si}`}
+                              onClick={() => setKpiChartSensor({ module: mod, key: s.key, label: s.label, unit: s.unit })}
+                              sx={{ width: 132, flexShrink: 0, p: "8px 10px", borderRadius: 1.5, bgcolor: darkMode ? alpha("#1e293b", 0.65) : alpha("#fff", 0.9), border: `1px solid ${darkMode ? alpha(modColor, 0.14) : alpha(modColor, 0.12)}`, cursor: "pointer", transition: "all 0.12s", "&:hover": { bgcolor: darkMode ? alpha(modColor, 0.1) : alpha(modColor, 0.06), borderColor: alpha(modColor, 0.35), transform: "translateY(-1px)", boxShadow: `0 3px 10px ${alpha(modColor, 0.15)}` } }}
+                            >
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.35 }}>
+                                {icon}
+                                <Typography sx={{ fontSize: "8px", fontWeight: 600, color: darkMode ? alpha(modColor, 0.7) : alpha(modColor, 0.75), textTransform: "uppercase", letterSpacing: 0.35, lineHeight: 1, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</Typography>
+                              </Box>
+                              <Box sx={{ display: "flex", alignItems: "baseline", gap: "3px", mb: pct != null ? 0.5 : 0 }}>
+                                <Typography sx={{ fontSize: "17px", fontWeight: 900, fontFamily: "monospace", lineHeight: 1.1, color: val != null ? (darkMode ? "#e2e8f0" : "#0f172a") : (darkMode ? "#334155" : "#cbd5e1"), fontVariantNumeric: "tabular-nums" }}>{valStr}</Typography>
+                                {s.unit && <Typography sx={{ fontSize: "8px", fontWeight: 500, color: darkMode ? "#475569" : "#94a3b8", lineHeight: 1 }}>{s.unit}</Typography>}
+                              </Box>
+                              {pct != null ? (
+                                <Box sx={{ height: 3, borderRadius: 2, bgcolor: darkMode ? alpha(modColor, 0.1) : alpha(modColor, 0.09), overflow: "hidden" }}>
+                                  <Box sx={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${alpha(modColor, 0.45)}, ${modColor})`, borderRadius: 2 }} />
+                                </Box>
+                              ) : (
+                                <Box sx={{ height: 3 }} />
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Paper>
+
+            {/* ── MODULE DEEP DIVE ── */}
+            <Box sx={{ display: "flex", gap: 1 }}>
+              {ALL_MODULES.map((mod) => {
+                const modColor = (MODULE_COLORS as Record<string, string>)[mod];
+                const modHealth = moduleContribs[mod];
+                const modStatusColor = modHealth == null ? (darkMode ? "#475569" : "#94a3b8") : modHealth >= 80 ? "#22c55e" : modHealth >= 60 ? "#f59e0b" : "#ef4444";
+                return (
+                  <Paper
+                    key={mod}
+                    elevation={0}
+                    onClick={() => { setSelectedModule(mod); setViewMode("module"); }}
+                    sx={{ flex: 1, p: 1.25, borderRadius: 2, borderTop: `3px solid ${modColor}`, background: darkMode ? `linear-gradient(160deg, ${alpha(modColor, 0.07)} 0%, ${alpha("#0f172a", 0.7)} 100%)` : `linear-gradient(160deg, ${alpha(modColor, 0.05)} 0%, #f8fafc 100%)`, border: `1px solid ${darkMode ? alpha(modColor, 0.18) : alpha(modColor, 0.13)}`, cursor: "pointer", transition: "all 0.15s", "&:hover": { boxShadow: `0 4px 20px ${alpha(modColor, darkMode ? 0.22 : 0.11)}`, borderColor: darkMode ? alpha(modColor, 0.32) : alpha(modColor, 0.22), transform: "translateY(-1px)" } }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.75 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.65 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: modColor, boxShadow: `0 0 6px ${alpha(modColor, 0.6)}` }} />
+                        <Typography sx={{ fontSize: "11px", fontWeight: 800, color: modColor, textTransform: "uppercase", letterSpacing: 0.9 }}>{mod}</Typography>
+                      </Box>
+                      <Box sx={{ px: 0.85, py: "2px", borderRadius: 1.5, bgcolor: alpha(modStatusColor, darkMode ? 0.18 : 0.1), border: `1px solid ${alpha(modStatusColor, 0.3)}` }}>
+                        <Typography sx={{ fontSize: "9px", fontWeight: 800, color: modStatusColor, fontVariantNumeric: "tabular-nums" }}>{modHealth != null ? `${modHealth.toFixed(1)}%` : "--"}</Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ height: 4, borderRadius: 2, bgcolor: darkMode ? alpha("#1e293b", 0.8) : alpha("#e2e8f0", 0.9), overflow: "hidden", mb: 1.25 }}>
+                      <Box sx={{ height: "100%", width: `${modHealth ?? 0}%`, background: `linear-gradient(90deg, ${alpha(modStatusColor, 0.55)}, ${modStatusColor})`, borderRadius: 2, transition: "width 0.45s ease" }} />
+                    </Box>
+                    <Button
+                      size="small"
+                      fullWidth
+                      endIcon={<TuneRoundedIcon sx={{ fontSize: "10px !important" }} />}
+                      onClick={(e) => { e.stopPropagation(); setSelectedModule(mod); setViewMode("module"); }}
+                      sx={{ fontSize: "9px", fontWeight: 700, height: 26, bgcolor: alpha(modColor, darkMode ? 0.13 : 0.08), color: modColor, border: `1px solid ${alpha(modColor, 0.28)}`, borderRadius: 1.5, "&:hover": { bgcolor: alpha(modColor, darkMode ? 0.23 : 0.14) } }}
+                    >
+                      Deep Dive
+                    </Button>
+                  </Paper>
+                );
+              })}
             </Box>
+
           </Box>
           ) : (
           <>

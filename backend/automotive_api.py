@@ -366,12 +366,12 @@ def _attach_mileage(combined, vehicle_id: str):
         combined = merged
         if combined.get("odometer_reading") is not None and combined["odometer_reading"].notna().any():
             raw = combined["odometer_reading"].ffill().bfill().fillna(odo_base)
-            combined["mileage"] = (raw - odo_base).round(3)
+            combined["mileage"] = raw.round(1)
         else:
             odo_max = float(body_merged["odometer_reading"].max())
             n = len(combined)
             total = max(odo_max - odo_base, 0.0)
-            combined["mileage"] = [round(total * i / max(n - 1, 1), 3) for i in range(n)]
+            combined["mileage"] = [round(odo_base + total * i / max(n - 1, 1), 1) for i in range(n)]
     else:
         combined["mileage"] = range(len(combined))
     return combined
@@ -576,7 +576,7 @@ def get_automotive_sensor_history(vehicle_id: str, module: str):
                     sorted(combined["odometer_reading"].values),
                     index=combined.index,
                 )
-                combined["mileage"] = (odo_sorted - float(odo_sorted.iloc[0])).round(3)
+                combined["mileage"] = odo_sorted.round(1)
             elif module != "body":
                 combined = _attach_mileage(combined, vehicle_id)
             if "mileage" not in combined.columns:
@@ -881,14 +881,62 @@ def get_vehicle_dtc_history(vehicle_id: str):
 
 
 _KPI_SENSORS: dict = {
-    "engine":       [("engine_rpm_rpm", "Engine RPM", "RPM"), ("engine_oil_temperature", "Oil Temp", "°C")],
-    "battery":      [("battery_state_of_charge_soc_pct", "State of Charge", "%"), ("battery_state_of_health_soh_pct", "State of Health", "%")],
-    "body":         [("cabin_temperature", "Cabin Temp", "°C"), ("fuel_level_pct", "Fuel Level", "%")],
-    "transmission": [("transmission_oil_temperature", "Trans Oil Temp", "°C"), ("vehicle_speed_kmh", "Vehicle Speed", "km/h")],
-    "tyre":         [("tyre_pressure_fl_psi", "FL Pressure", "PSI"), ("tyre_wear_fl_pct", "FL Tyre Wear", "%")],
+    "engine": [
+        ("engine_rpm_rpm",                    "Engine RPM",   "RPM"),
+        ("engine_oil_temperature",            "Oil Temp",     "°C"),
+        ("ecu_7ea_engine_coolant_temperature","Coolant Temp", "°C"),
+        ("engine_load_absolute",              "Engine Load",  "%"),
+    ],
+    "battery": [
+        ("battery_state_of_charge_soc_pct",  "State of Charge", "%"),
+        ("battery_state_of_health_soh_pct",  "State of Health", "%"),
+        ("battery_temperature_cell",          "Cell Temp",       "°C"),
+        ("battery_voltage_ecu_7ee",           "Voltage",         "V"),
+    ],
+    "body": [
+        ("fuel_level_pct",                   "Fuel Level",   "%"),
+        ("cabin_temperature",                "Cabin Temp",   "°C"),
+        ("cabin_humidity_pct",               "Humidity",     "%"),
+        ("ac_compressor_load_pct",           "AC Load",      "%"),
+    ],
+    "transmission": [
+        ("transmission_oil_temperature",     "Oil Temp",     "°C"),
+        ("vehicle_speed_kmh",                "Speed",        "km/h"),
+        ("gear_position_actual",             "Gear",         ""),
+        ("torque_converter_slip_speed",      "TC Slip",      "RPM"),
+    ],
+    "tyre": [
+        ("tyre_pressure_fl_psi",             "FL Pressure",  "PSI"),
+        ("tyre_pressure_fr_psi",             "FR Pressure",  "PSI"),
+        ("tyre_pressure_rl_psi",             "RL Pressure",  "PSI"),
+        ("tyre_pressure_rr_psi",             "RR Pressure",  "PSI"),
+        ("tyre_wear_fl_pct",                 "FL Wear",      "%"),
+        ("tyre_wear_fr_pct",                 "FR Wear",      "%"),
+        ("tyre_wear_rl_pct",                 "RL Wear",      "%"),
+        ("tyre_wear_rr_pct",                 "RR Wear",      "%"),
+        ("tyre_temp_fl_c",                   "FL Temp",      "°C"),
+        ("tyre_temp_fr_c",                   "FR Temp",      "°C"),
+        ("tyre_temp_fl_c",                   "RL Temp",      "°C"),
+        ("tyre_temp_fr_c",                   "RR Temp",      "°C"),
+    ],
 }
 
 _SERVICE_INTERVAL_KM = 15000
+
+
+@router.get("/api/automotive/fleet-position/{vehicle_id}")
+def get_fleet_position(vehicle_id: str):
+    cached = _cached_response(f"fleet-pos-{vehicle_id}", ttl=3.0)
+    if cached is not None:
+        return cached
+    try:
+        import urllib.request as _urllib_req
+        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=2)
+        result = json.loads(_req.read())
+    except Exception:
+        result = {}
+    _set_cache(f"fleet-pos-{vehicle_id}", result)
+    return result
 
 
 @router.get("/api/automotive/vehicle-summary/{vehicle_id}")
@@ -1008,6 +1056,8 @@ def get_vehicle_summary(vehicle_id: str):
                 try:
                     feats = json.loads(str(raw))
                     for f, v in feats.items():
+                        if f == "odometer_reading":
+                            continue
                         feature_scores[f] = feature_scores.get(f, 0.0) + abs(float(v))
                         if f not in feature_modules:
                             feature_modules[f] = mod
@@ -1047,12 +1097,25 @@ def get_vehicle_summary(vehicle_id: str):
 
     # ── 7. Fleet sim data (optional — returns empty dict if simulator offline) ─
     fleet_sim: dict = {}
+    trip_data: dict = {}
     try:
         import urllib.request as _urllib_req
         _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=2)
         fleet_sim = json.loads(_req.read())
+        if fleet_sim.get("status") == "active":
+            try:
+                _treq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/trip", timeout=2)
+                trip_data = json.loads(_treq.read())
+            except Exception:
+                pass
     except Exception:
         pass
+
+    if fleet_sim.get("status") == "active" and fleet_sim.get("speed") is not None:
+        for sensor in kpi_snapshot.get("transmission", {}).get("sensors", []):
+            if sensor["key"] == "vehicle_speed_kmh":
+                sensor["value"] = round(float(fleet_sim["speed"]), 1)
+                break
 
     result = {
         "vehicle_id": vehicle_id,
@@ -1063,6 +1126,7 @@ def get_vehicle_summary(vehicle_id: str):
         "last_dtc": last_dtc,
         "alerts_summary": alerts_summary,
         "fleet_sim": fleet_sim,
+        "trip_data": trip_data,
     }
     _set_cache(cache_key, result)
     return result
