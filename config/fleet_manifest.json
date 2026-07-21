@@ -1,0 +1,18 @@
+{
+  "active_sims": [
+    "sim001", "sim002", "sim003", "sim004", "sim005",
+    "sim007", "sim008", "sim009", "sim010",
+    "sim012", "sim013", "sim014", "sim015", "sim016",
+    "sim018", "sim019", "sim020", "sim021",
+    "sim023", "sim024", "sim025",
+    "sim027", "sim028", "sim029", "sim030"
+  ],
+  "in_service_sims": [
+    "sim006", "sim011", "sim017", "sim022",
+    "sim026", "sim031", "sim034", "sim037"
+  ],
+  "parked_sims": [
+    "sim032", "sim033", "sim035", "sim036",
+    "sim038", "sim039", "sim040"
+  ]
+}
