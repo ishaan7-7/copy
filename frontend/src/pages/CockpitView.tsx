@@ -279,6 +279,31 @@ interface BehaviorData {
   trip_distance_km: number;
 }
 
+interface LastTripData {
+  last_trip: {
+    trip_id: string;
+    start_time: string;
+    end_time: string;
+    distance_km: number;
+    duration_secs: number;
+    avg_speed_kmh: number;
+    max_speed_kmh: number;
+    harsh_braking_count: number;
+    harsh_accel_count: number;
+    harsh_cornering_count: number;
+    event_count: number;
+  } | null;
+  driver_summary: {
+    score: number;
+    total_km: number;
+    total_hours: number;
+    harsh_braking_count: number;
+    harsh_accel_count: number;
+    harsh_cornering_count: number;
+  };
+  is_historical: boolean;
+}
+
 const fallbackSummary: FleetSummary = {
   total: 40,
   active: 18,
@@ -3075,7 +3100,7 @@ export default function CockpitView({
       return `${Math.floor(secs / 60)}m ago`;
     })();
     if (!positions?.length) return fallbackVehicles;
-    return positions.slice(0, 12).map((v, index) => {
+    return positions.map((v, index) => {
       const pipeline = pipelineFleet?.vehicles?.find(
         (item) => item.vehicle_id === v.vehicle_id
       );
@@ -3451,6 +3476,16 @@ export default function CockpitView({
         .then((r) => r.data),
     enabled: !!selectedVehicle && selectedIsActive,
     staleTime: 30000,
+  });
+
+  const { data: lastTripData } = useQuery<LastTripData>({
+    queryKey: ["fleet-last-trip", selectedVehicle],
+    queryFn: () =>
+      axios
+        .get(`${FLEET_API}/vehicle/${selectedVehicle}/last-trip`)
+        .then((r) => r.data),
+    enabled: !!selectedVehicle && !selectedIsActive,
+    staleTime: Infinity,
   });
 
   const SERVICE_INTERVAL_KM = 15000;
@@ -6344,6 +6379,249 @@ export default function CockpitView({
                                     </Typography>
                                   </Stack>
                                 )}
+                              </Stack>
+                            </Box>
+                          )}
+
+                          {/* ── LAST TRIP SUMMARY ───────────────── */}
+                          {lastTripData?.last_trip && (
+                            <Box
+                              sx={{
+                                px: 1.5,
+                                py: 1.25,
+                                borderTop: `1px solid ${dividerColor}`,
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "9px !important",
+                                  fontWeight: 700,
+                                  color: "text.secondary",
+                                  textTransform: "uppercase",
+                                  letterSpacing: ".06em",
+                                  mb: 0.75,
+                                }}
+                              >
+                                Last Trip
+                              </Typography>
+                              <Stack spacing={0.6}>
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px !important",
+                                      color: "text.secondary",
+                                    }}
+                                  >
+                                    {new Date(
+                                      lastTripData.last_trip.end_time
+                                    ).toLocaleDateString("en-IN", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}
+                                  </Typography>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px !important",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {lastTripData.last_trip.distance_km.toFixed(
+                                      1
+                                    )}{" "}
+                                    km
+                                  </Typography>
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px !important",
+                                      color: "text.secondary",
+                                    }}
+                                  >
+                                    {Math.floor(
+                                      lastTripData.last_trip.duration_secs /
+                                        3600
+                                    )}
+                                    h{" "}
+                                    {Math.round(
+                                      (lastTripData.last_trip.duration_secs %
+                                        3600) /
+                                        60
+                                    )}
+                                    m ·{" "}
+                                    {lastTripData.last_trip.avg_speed_kmh.toFixed(
+                                      0
+                                    )}{" "}
+                                    km/h avg
+                                  </Typography>
+                                </Stack>
+                                {lastTripData.last_trip.event_count > 0 && (
+                                  <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    sx={{ mt: 0.25 }}
+                                  >
+                                    {[
+                                      [
+                                        "Brake",
+                                        lastTripData.last_trip
+                                          .harsh_braking_count,
+                                        "#ef4444",
+                                      ],
+                                      [
+                                        "Accel",
+                                        lastTripData.last_trip
+                                          .harsh_accel_count,
+                                        "#f59e0b",
+                                      ],
+                                      [
+                                        "Corner",
+                                        lastTripData.last_trip
+                                          .harsh_cornering_count,
+                                        "#3b82f6",
+                                      ],
+                                    ].map(([label, count, color]) => (
+                                      <Box
+                                        key={label as string}
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.3,
+                                          px: 0.6,
+                                          py: 0.2,
+                                          borderRadius: 1,
+                                          bgcolor: alpha(
+                                            color as string,
+                                            0.1
+                                          ),
+                                        }}
+                                      >
+                                        <Typography
+                                          sx={{
+                                            fontSize: "9px !important",
+                                            fontWeight: 700,
+                                            color: color as string,
+                                          }}
+                                        >
+                                          {count as number}
+                                        </Typography>
+                                        <Typography
+                                          sx={{
+                                            fontSize: "9px !important",
+                                            color: "text.secondary",
+                                          }}
+                                        >
+                                          {label as string}
+                                        </Typography>
+                                      </Box>
+                                    ))}
+                                  </Stack>
+                                )}
+                              </Stack>
+                            </Box>
+                          )}
+
+                          {/* ── FLEET TOTALS (driver summary) ───── */}
+                          {lastTripData?.driver_summary && (
+                            <Box
+                              sx={{
+                                px: 1.5,
+                                py: 1.25,
+                                borderTop: `1px solid ${dividerColor}`,
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "9px !important",
+                                  fontWeight: 700,
+                                  color: "text.secondary",
+                                  textTransform: "uppercase",
+                                  letterSpacing: ".06em",
+                                  mb: 0.75,
+                                }}
+                              >
+                                Lifetime Stats
+                              </Typography>
+                              <Stack
+                                direction="row"
+                                justifyContent="space-between"
+                              >
+                                <Box sx={{ textAlign: "center" }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "14px !important",
+                                      fontWeight: 800,
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {lastTripData.driver_summary.total_km.toFixed(
+                                      0
+                                    )}
+                                  </Typography>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "8px !important",
+                                      color: "text.secondary",
+                                      mt: 0.25,
+                                    }}
+                                  >
+                                    km
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ textAlign: "center" }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "14px !important",
+                                      fontWeight: 800,
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {lastTripData.driver_summary.total_hours.toFixed(
+                                      1
+                                    )}
+                                  </Typography>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "8px !important",
+                                      color: "text.secondary",
+                                      mt: 0.25,
+                                    }}
+                                  >
+                                    hrs
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ textAlign: "center" }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "14px !important",
+                                      fontWeight: 800,
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {lastTripData.driver_summary
+                                      .harsh_braking_count +
+                                      lastTripData.driver_summary
+                                        .harsh_accel_count +
+                                      lastTripData.driver_summary
+                                        .harsh_cornering_count}
+                                  </Typography>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "8px !important",
+                                      color: "text.secondary",
+                                      mt: 0.25,
+                                    }}
+                                  >
+                                    events
+                                  </Typography>
+                                </Box>
                               </Stack>
                             </Box>
                           )}

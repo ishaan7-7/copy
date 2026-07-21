@@ -98,6 +98,12 @@ ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
 const API = "http://127.0.0.1:8005";
 
+const _HISTORICAL_VEHICLE_IDS = new Set<string>([
+  "sim006", "sim011", "sim017", "sim022", "sim026", "sim031",
+  "sim032", "sim033", "sim034", "sim035", "sim036", "sim037",
+  "sim038", "sim039", "sim040",
+]);
+
 const ALL_MODULES = ["engine", "transmission", "battery", "body", "tyre"];
 
 const ALL_MODULES_NEW = [
@@ -724,6 +730,8 @@ export default function AutomotiveDive({
     background: ct.tableRowOdd,
   };
 
+  const isHistorical = !!selectedVehicle && _HISTORICAL_VEHICLE_IDS.has(selectedVehicle);
+
   const fleetQuery = useQuery({
     queryKey: ["autoFleetSummary"],
     queryFn: () =>
@@ -748,7 +756,7 @@ export default function AutomotiveDive({
           `${API}/api/automotive/sensor-history/${selectedVehicle}/${selectedModule}`
         )
         .then((r) => r.data),
-    enabled: !!selectedVehicle,
+    enabled: !!selectedVehicle && !isHistorical,
     refetchInterval: false,
   });
 
@@ -758,7 +766,7 @@ export default function AutomotiveDive({
       axios
         .get(`${API}/api/automotive/sensor-history/${selectedVehicle}/body`)
         .then((r) => r.data),
-    enabled: !!selectedVehicle,
+    enabled: !!selectedVehicle && !isHistorical,
     refetchInterval: false,
     staleTime: 60000,
   });
@@ -791,7 +799,7 @@ export default function AutomotiveDive({
       axios
         .get(`${API}/api/automotive/vehicle-decomposition/${selectedVehicle}`)
         .then((r) => r.data),
-    enabled: !!selectedVehicle,
+    enabled: !!selectedVehicle && !isHistorical,
     refetchInterval: false,
   });
 
@@ -852,7 +860,7 @@ export default function AutomotiveDive({
           `${API}/api/automotive/sensor-history/${selectedVehicle}/${analysisModule}`
         )
         .then((r) => r.data),
-    enabled: !!selectedVehicle && !!analysisModule && isActive,
+    enabled: !!selectedVehicle && !!analysisModule && isActive && !isHistorical,
     refetchInterval: isActive && autoRefresh ? 10_000 : false,
   });
 
@@ -901,24 +909,24 @@ export default function AutomotiveDive({
     queryKey: ["autoVehicleSummary", selectedVehicle],
     queryFn: () =>
       axios.get(`${API}/api/automotive/vehicle-summary/${selectedVehicle}`).then((r) => r.data),
-    enabled: !!selectedVehicle && viewMode === "summary",
-    refetchInterval: isActive && autoRefresh && viewMode === "summary" ? 10000 : false,
+    enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
+    refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 10000 : false,
   });
 
   const observerQuery = useQuery({
     queryKey: ["observerSnapshot"],
     queryFn: () =>
       axios.get(`${API}/api/observer/snapshot`).then((r) => r.data),
-    enabled: !!selectedVehicle && viewMode === "summary",
-    refetchInterval: isActive && autoRefresh && viewMode === "summary" ? 5000 : false,
+    enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
+    refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 5000 : false,
   });
 
   const bronzeStatsQuery = useQuery({
     queryKey: ["vehicleBronzeStats", selectedVehicle],
     queryFn: () =>
       axios.get(`${API}/api/automotive/vehicle-bronze-stats/${selectedVehicle}`).then((r) => r.data),
-    enabled: !!selectedVehicle && viewMode === "summary",
-    refetchInterval: isActive && autoRefresh && viewMode === "summary" ? 30000 : false,
+    enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
+    refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 30000 : false,
     staleTime: 25000,
   });
 
@@ -945,8 +953,49 @@ export default function AutomotiveDive({
       axios
         .get(`${API}/api/automotive/sensor-history/${selectedVehicle}/${kpiChartSensor!.module}`)
         .then((r) => r.data),
-    enabled: !!selectedVehicle && !!kpiChartSensor,
+    enabled: !!selectedVehicle && !!kpiChartSensor && !isHistorical,
     staleTime: 60_000,
+  });
+
+  const histLastStateQuery = useQuery({
+    queryKey: ["histLastState", selectedVehicle],
+    queryFn: () =>
+      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/last-state`).then((r) => r.data),
+    enabled: !!selectedVehicle && isHistorical,
+    staleTime: Infinity,
+  });
+
+  const histDriverSummaryQuery = useQuery({
+    queryKey: ["histDriverSummary", selectedVehicle],
+    queryFn: () =>
+      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/driver-summary`).then((r) => r.data),
+    enabled: !!selectedVehicle && isHistorical,
+    staleTime: Infinity,
+  });
+
+  const histTripsQuery = useQuery({
+    queryKey: ["histTrips", selectedVehicle],
+    queryFn: () =>
+      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/trips`).then((r) => r.data),
+    enabled: !!selectedVehicle && isHistorical,
+    staleTime: Infinity,
+  });
+
+  const histDtcsQuery = useQuery({
+    queryKey: ["histDtcs", selectedVehicle],
+    queryFn: () =>
+      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/dtcs`).then((r) => r.data),
+    enabled: !!selectedVehicle && isHistorical,
+    staleTime: Infinity,
+  });
+
+  const histAlertsQuery = useQuery({
+    queryKey: ["histAlerts", selectedVehicle],
+    queryFn: () =>
+      axios.get(`${API}/api/automotive/alerts/${selectedVehicle}`)
+        .then((r) => [...(r.data.open ?? []), ...(r.data.closed ?? [])]),
+    enabled: !!selectedVehicle && isHistorical,
+    staleTime: Infinity,
   });
 
   useEffect(() => {
@@ -1996,6 +2045,179 @@ export default function AutomotiveDive({
               </Badge>
             </Paper>
 
+            {isHistorical ? (
+              <Box sx={{ display: "flex", gap: 1.5, flex: 1, minHeight: 0, overflow: "auto", pb: 2 }}>
+                {/* LEFT: Vehicle info + Driver Summary + DTCs */}
+                <Box sx={{ flex: "0 0 360px", display: "flex", flexDirection: "column", gap: 1 }}>
+                  {(() => {
+                    const ls: any = histLastStateQuery.data ?? {};
+                    const ds: any = histDriverSummaryQuery.data ?? {};
+                    const h: number = ls.health ?? 0;
+                    const hColor = h >= 80 ? "#22c55e" : h >= 60 ? "#f59e0b" : "#ef4444";
+                    const st = ls.status === "in_service" ? { color: "#8b5cf6", label: "In Workshop" } : { color: "#3b82f6", label: "Parked" };
+                    const score: number = ds.score ?? ls.driver_score ?? 0;
+                    const scoreColor = score >= 80 ? "#22c55e" : score >= 60 ? "#f59e0b" : "#ef4444";
+                    return (
+                      <Paper sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc" }}>
+                        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.25 }}>
+                          <Box>
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 0.9, py: 0.2, borderRadius: 5, bgcolor: alpha(st.color, 0.12), border: `1px solid ${alpha(st.color, 0.25)}`, mb: 0.5 }}>
+                              <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: st.color }} />
+                              <Typography sx={{ fontSize: "9px", fontWeight: 700, color: st.color, textTransform: "uppercase", letterSpacing: ".06em" }}>{st.label}</Typography>
+                            </Box>
+                            <Typography sx={{ fontSize: "16px", fontWeight: 800, color: darkMode ? "#f1f5f9" : "#0f172a", lineHeight: 1.2 }}>{(ls.name || selectedVehicle).toUpperCase()}</Typography>
+                            <Typography sx={{ fontSize: "10px", color: "text.secondary", mt: 0.25 }}>{ls.vehicle_id || selectedVehicle} · {ls.type || "Heavy Truck"}{ls.city ? ` · ${ls.city}` : ""}</Typography>
+                          </Box>
+                          <Box sx={{ textAlign: "right" }}>
+                            <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "text.secondary", textTransform: "uppercase", mb: 0.25 }}>Health</Typography>
+                            <Typography sx={{ fontSize: "22px", fontWeight: 900, color: hColor, lineHeight: 1, fontFamily: "monospace" }}>{h.toFixed(0)}</Typography>
+                          </Box>
+                        </Box>
+                        {ls.module_health && Object.keys(ls.module_health).length > 0 && (
+                          <Box sx={{ mb: 1.25 }}>
+                            {Object.entries(ls.module_health as Record<string, number>).map(([mod, val]) => {
+                              const mc = (val as number) >= 80 ? "#22c55e" : (val as number) >= 60 ? "#f59e0b" : "#ef4444";
+                              return (
+                                <Box key={mod} sx={{ mb: 0.75 }}>
+                                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.3 }}>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, textTransform: "capitalize" }}>{mod}</Typography>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 700, color: mc }}>{(val as number).toFixed(0)}%</Typography>
+                                  </Box>
+                                  <Box sx={{ height: 4, borderRadius: 2, bgcolor: darkMode ? alpha("#1e293b", 0.8) : alpha("#e2e8f0", 0.9), overflow: "hidden" }}>
+                                    <Box sx={{ height: "100%", width: `${val}%`, bgcolor: mc, borderRadius: 2 }} />
+                                  </Box>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        )}
+                        {histDriverSummaryQuery.data && (
+                          <Box sx={{ pt: 1.25, borderTop: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1 }}>
+                            {([
+                              ["Score", score.toFixed(0), scoreColor],
+                              ["Total km", (ds.total_km ?? 0).toFixed(0), darkMode ? "#e2e8f0" : "#0f172a"],
+                              ["Hours", (ds.total_hours ?? 0).toFixed(1), darkMode ? "#e2e8f0" : "#0f172a"],
+                            ] as [string, string, string][]).map(([label, value, color]) => (
+                              <Box key={label} sx={{ textAlign: "center" }}>
+                                <Typography sx={{ fontSize: "18px", fontWeight: 900, color, lineHeight: 1, fontFamily: "monospace" }}>{value}</Typography>
+                                <Typography sx={{ fontSize: "8px", color: "text.secondary", mt: 0.25, textTransform: "uppercase" }}>{label}</Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </Paper>
+                    );
+                  })()}
+
+                  <Paper sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                    <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8, mb: 1 }}>Fault Codes (DTCs)</Typography>
+                    {histDtcsQuery.isLoading ? (<CircularProgress size={20} />) : (
+                      <Box sx={{ overflow: "auto", flex: 1 }}>
+                        {((histDtcsQuery.data as any[]) ?? []).length === 0 ? (
+                          <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No fault codes recorded</Typography>
+                        ) : (
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+                            <thead><tr>{["Module", "Code", "Severity", "Description"].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
+                            <tbody>
+                              {((histDtcsQuery.data as any[]) ?? []).map((dtc: any, i: number) => {
+                                const sev = dtc.severity === "CRITICAL" ? "#ef4444" : dtc.severity === "WARNING" ? "#f59e0b" : "#22c55e";
+                                return (
+                                  <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
+                                    <td style={{ padding: "5px 8px", color: (MODULE_COLORS as any)[dtc.module] || (darkMode ? "#94a3b8" : "#64748b"), fontWeight: 700, textTransform: "capitalize" }}>{dtc.module}</td>
+                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{dtc.code}</td>
+                                    <td style={{ padding: "5px 8px" }}><span style={{ color: sev, fontWeight: 700, fontSize: "9px" }}>{dtc.severity}</span></td>
+                                    <td style={{ padding: "5px 8px", color: darkMode ? "#94a3b8" : "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }} title={dtc.description}>{dtc.description}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </Box>
+                    )}
+                  </Paper>
+                </Box>
+
+                {/* RIGHT: Trips + Alerts */}
+                <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                  <Paper sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                      <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#22c55e" }} />
+                      <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Trip History</Typography>
+                      {histTripsQuery.data && (<Chip size="small" label={`${((histTripsQuery.data as any[]) ?? []).length} trips`} sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: darkMode ? alpha("#22c55e", 0.12) : alpha("#22c55e", 0.08), color: "#22c55e" }} />)}
+                      <Typography sx={{ fontSize: "9px", color: "text.secondary" }}>Historical · read-only</Typography>
+                    </Box>
+                    {histTripsQuery.isLoading ? (<CircularProgress size={20} />) : (
+                      <Box sx={{ overflow: "auto", flex: 1 }}>
+                        {((histTripsQuery.data as any[]) ?? []).length === 0 ? (
+                          <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No trip records</Typography>
+                        ) : (
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+                            <thead><tr>{["Date", "km", "Duration", "Avg km/h", "Brake", "Accel", "Corner", "Score"].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
+                            <tbody>
+                              {[...((histTripsQuery.data as any[]) ?? [])].reverse().map((trip: any, i: number) => {
+                                const dur = trip.duration_secs ?? 0;
+                                const hh = Math.floor(dur / 3600);
+                                const mm = Math.round((dur % 3600) / 60);
+                                const tripKm = trip.distance_km ?? 0;
+                                const weighted = (trip.harsh_braking_count ?? 0) * 2.2 + (trip.harsh_accel_count ?? 0) * 1.4 + (trip.harsh_cornering_count ?? 0) * 2.2;
+                                const sc = Math.max(0, 100 - (weighted / Math.max(tripKm, 0.1)) * 33);
+                                const scColor = sc >= 80 ? "#22c55e" : sc >= 60 ? "#f59e0b" : "#ef4444";
+                                const evTotal = (trip.harsh_braking_count ?? 0) + (trip.harsh_accel_count ?? 0) + (trip.harsh_cornering_count ?? 0);
+                                return (
+                                  <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
+                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{String(trip.end_time || "").slice(0, 10)}</td>
+                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{tripKm.toFixed(1)}</td>
+                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{hh}h {mm}m</td>
+                                    <td style={{ padding: "5px 8px", fontFamily: "monospace" }}>{(trip.avg_speed_kmh ?? 0).toFixed(0)}</td>
+                                    <td style={{ padding: "5px 8px", color: "#ef4444", fontWeight: 700 }}>{trip.harsh_braking_count ?? 0}</td>
+                                    <td style={{ padding: "5px 8px", color: "#f59e0b", fontWeight: 700 }}>{trip.harsh_accel_count ?? 0}</td>
+                                    <td style={{ padding: "5px 8px", color: "#3b82f6", fontWeight: 700 }}>{trip.harsh_cornering_count ?? 0}</td>
+                                    <td style={{ padding: "5px 8px", color: scColor, fontWeight: 700, fontFamily: "monospace" }}>{evTotal === 0 ? "100" : sc.toFixed(0)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </Box>
+                    )}
+                  </Paper>
+
+                  <Paper sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", maxHeight: 260, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                      <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#f59e0b" }} />
+                      <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Recorded Alerts</Typography>
+                      {histAlertsQuery.data && (<Chip size="small" label={`${((histAlertsQuery.data as any[]) ?? []).length} alerts`} sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: darkMode ? alpha("#22c55e", 0.12) : alpha("#22c55e", 0.08), color: "#22c55e" }} />)}
+                    </Box>
+                    <Box sx={{ overflow: "auto", flex: 1 }}>
+                      {((histAlertsQuery.data as any[]) ?? []).length === 0 ? (
+                        <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No recorded alerts</Typography>
+                      ) : (
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+                          <thead><tr>{["Module", "Status", "Score", "Peak", "Start"].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
+                          <tbody>
+                            {((histAlertsQuery.data as any[]) ?? []).map((alert: any, i: number) => {
+                              const sev = alert.status === "OPEN" ? "#f59e0b" : "#22c55e";
+                              return (
+                                <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
+                                  <td style={{ padding: "5px 8px", color: (MODULE_COLORS as any)[alert.module] || (darkMode ? "#94a3b8" : "#64748b"), fontWeight: 700, textTransform: "capitalize" }}>{alert.module}</td>
+                                  <td style={{ padding: "5px 8px" }}><span style={{ color: sev, fontWeight: 700, fontSize: "9px" }}>{alert.status}</span></td>
+                                  <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{(alert.max_composite_score ?? 0).toFixed(3)}</td>
+                                  <td style={{ padding: "5px 8px", fontFamily: "monospace", whiteSpace: "nowrap", color: darkMode ? "#94a3b8" : "#64748b" }}>{String(alert.peak_anomaly_ts || "").slice(0, 16)}</td>
+                                  <td style={{ padding: "5px 8px", fontFamily: "monospace", whiteSpace: "nowrap", color: darkMode ? "#64748b" : "#94a3b8" }}>{String(alert.alert_start_ts || "").slice(0, 10)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </Box>
+                  </Paper>
+                </Box>
+              </Box>
+            ) : (
+            <>
             {/* ── 3-COLUMN MAIN CONTENT ── */}
             <Box sx={{ display: "flex", gap: 1, alignItems: "stretch" }}>
 
@@ -2659,6 +2881,8 @@ export default function AutomotiveDive({
                 );
               })}
             </Box>
+            </>
+            )}
 
           </Box>
           ) : (

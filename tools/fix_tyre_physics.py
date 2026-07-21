@@ -42,7 +42,7 @@ TEMP_DELTA_IDLE    = 4.0    # above ambient at standstill
 TEMP_DELTA_HWY     = 28.0   # above ambient at HWY_REF km/h
 TEMP_HWY_REF       = 80.0   # reference highway speed
 TEMP_TAU_S         = 900.0  # 15-min thermal time constant
-TEMP_MEAS_NOISE    = 0.5    # measurement noise (degC)
+TEMP_MEAS_NOISE    = 0.12   # measurement noise (degC)
 TEMP_TYRE_OFFSET   = 1.5    # std of FL vs FR random offset
 
 # ── Tyre wear ─────────────────────────────────────────────────────────────────

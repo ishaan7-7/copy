@@ -79,13 +79,30 @@ def _set_cache(key: str, value):
             oldest_key = min(_response_cache, key=lambda k: _response_cache[k][0])
             del _response_cache[oldest_key]
 
-_PROJECT_ROOT   = _PROJECT_ROOT_FOR_IMPORT
-_DELTA_ROOT     = os.path.join(_PROJECT_ROOT, "data", "delta", "bronze")
-_SILVER_ROOT    = os.path.join(_PROJECT_ROOT, "data", "delta", "silver")
-_GOLD_ROOT      = os.path.join(_PROJECT_ROOT, "data", "delta", "gold", "vehicle_health")
+_PROJECT_ROOT    = _PROJECT_ROOT_FOR_IMPORT
+_DELTA_ROOT      = os.path.join(_PROJECT_ROOT, "data", "delta", "bronze")
+_SILVER_ROOT     = os.path.join(_PROJECT_ROOT, "data", "delta", "silver")
+_GOLD_ROOT       = os.path.join(_PROJECT_ROOT, "data", "delta", "gold", "vehicle_health")
+_COMPUTED_ROOT   = os.path.join(_PROJECT_ROOT, "data", "computed")
+_BATCH_SILVER_ROOT = os.path.join(_PROJECT_ROOT, "data", "batch", "silver")
+_BATCH_GOLD_ROOT   = os.path.join(_PROJECT_ROOT, "data", "batch", "gold", "vehicle_health")
+_BATCH_ALERTS_ROOT = os.path.join(_PROJECT_ROOT, "data", "batch", "gold", "alerts")
 _VEHICLE_MODULES = ["battery", "body", "engine", "transmission", "tyre"]
-_GOLD_MAX_FILES = 200
+_GOLD_MAX_FILES  = 200
 _SILVER_MAX_FILES = 200
+
+from tools.fleet_simulator.fleet_config import VEHICLES as _FLEET_VEHICLES
+_HISTORICAL_IDS: frozenset[str] = frozenset(
+    v["id"] for v in _FLEET_VEHICLES if v["status"] != "active"
+)
+
+
+def _load_historical_layer(vehicle_id: str, layer: str):
+    path = os.path.join(_COMPUTED_ROOT, vehicle_id, f"{layer}.json")
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
 
 # ── Demo / Presentation Mode state ──────────────────────────────────────────
 
@@ -94,10 +111,7 @@ _DEMO_SEED_CACHE: dict = {}
 _DEMO_SILVER_CACHE: dict = {}
 _DEMO_VEHICLE_HEALTH_CACHE: dict = {}
 
-_DEMO_VEHICLES: list = [
-    "sim001", "sim002", "sim003", "sim004",
-    "sim005", "sim006", "sim007",
-]
+_DEMO_VEHICLES: list = [f"sim{i:03d}" for i in range(1, 41)]
 
 _KEY_SENSOR_SPECS: dict = {
     "engine": {
@@ -613,27 +627,30 @@ def get_automotive_module_health(vehicle_id: str, module: str):
     rows: list = []
     data_source = "none"
 
-    silver_path = os.path.join(_SILVER_ROOT, module)
-    if os.path.exists(silver_path):
-        combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
+    if vehicle_id in _HISTORICAL_IDS:
+        _bp = os.path.join(_BATCH_SILVER_ROOT, module, f"source_id={vehicle_id}", "silver.parquet")
+        combined = pd.read_parquet(_bp) if os.path.exists(_bp) else pd.DataFrame()
+    else:
+        _sp = os.path.join(_SILVER_ROOT, module)
+        combined = _query_vehicle_df(_sp, vehicle_id, _SILVER_MAX_FILES) if os.path.exists(_sp) else pd.DataFrame()
 
-        if not combined.empty:
-            ts_col = next((c for c in ("inference_ts", "ingest_ts", "timestamp") if c in combined.columns), None)
-            if ts_col:
-                combined["timestamp"] = pd.to_datetime(combined[ts_col]).dt.strftime("%Y-%m-%d %H:%M:%S.%f").str[:-3]
-            else:
-                combined["timestamp"] = combined.index.astype(str)
-            combined = combined.fillna(0)
-            combined = _attach_mileage(combined, vehicle_id)
-            combined = combined.sort_values("timestamp")
-            keep = ["timestamp", "source_id", "mileage"]
-            for col in ("health_score", "severity", "top_features"):
-                if col in combined.columns:
-                    keep.append(col)
-            for col in combined.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
-                combined[col] = combined[col].astype(str)
-            rows = combined[[c for c in keep if c in combined.columns]].tail(2000).to_dict(orient="records")
-            data_source = "live"
+    if not combined.empty:
+        ts_col = next((c for c in ("inference_ts", "ingest_ts", "timestamp") if c in combined.columns), None)
+        if ts_col:
+            combined["timestamp"] = pd.to_datetime(combined[ts_col]).dt.strftime("%Y-%m-%d %H:%M:%S.%f").str[:-3]
+        else:
+            combined["timestamp"] = combined.index.astype(str)
+        combined = combined.fillna(0)
+        combined = _attach_mileage(combined, vehicle_id)
+        combined = combined.sort_values("timestamp")
+        keep = ["timestamp", "source_id", "mileage"]
+        for col in ("health_score", "severity", "top_features"):
+            if col in combined.columns:
+                keep.append(col)
+        for col in combined.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
+            combined[col] = combined[col].astype(str)
+        rows = combined[[c for c in keep if c in combined.columns]].tail(2000).to_dict(orient="records")
+        data_source = "batch" if vehicle_id in _HISTORICAL_IDS else "live"
 
     if not rows and _PRESENTATION_MODE_ACTIVE and vehicle_id in _DEMO_SILVER_CACHE:
         rows = _DEMO_SILVER_CACHE[vehicle_id].get(module, [])
@@ -663,36 +680,40 @@ def get_automotive_vehicle_health_history(
     rows: list = []
     data_source = "none"
 
-    if os.path.exists(_GOLD_ROOT):
-        combined = _query_vehicle_df(_GOLD_ROOT, vehicle_id, _GOLD_MAX_FILES)
-        if not combined.empty:
-            if "gold_window_ts" in combined.columns:
-                combined["gold_window_ts"] = pd.to_datetime(combined["gold_window_ts"])
-                # Gold is append-only — the same (source_id, window) gets a
-                # new row every time that window's state is touched, not just
-                # once. Without dedup the scatter/timeline plots show multiple
-                # stacked points per window instead of one (confirmed on real
-                # data: 337 rows for only 98 unique windows).
-                sort_col = "gold_write_ts" if "gold_write_ts" in combined.columns else "gold_window_ts"
-                combined = combined.sort_values(sort_col).drop_duplicates(subset=["gold_window_ts"], keep="last")
-                combined = combined.sort_values("gold_window_ts")
-                combined["ts"] = combined["gold_window_ts"].dt.strftime("%Y-%m-%d %H:%M:%S.%f")
-            if "ts" not in combined.columns:
-                combined["ts"] = combined.index.astype(str)
-            combined["timestamp"] = combined["ts"]
-            combined = _attach_mileage(combined, vehicle_id)
-            combined = combined.fillna(0)
-            if "mileage" in combined.columns:
-                first_mileage = combined["mileage"].iloc[0]
-                combined["mileage_rel"] = (combined["mileage"] - first_mileage).round(1)
-            for col in combined.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
-                combined[col] = combined[col].astype(str)
+    if vehicle_id in _HISTORICAL_IDS:
+        _bf = os.path.join(_BATCH_GOLD_ROOT, f"{vehicle_id}.parquet")
+        combined = pd.read_parquet(_bf) if os.path.exists(_bf) else pd.DataFrame()
+    else:
+        combined = _query_vehicle_df(_GOLD_ROOT, vehicle_id, _GOLD_MAX_FILES) if os.path.exists(_GOLD_ROOT) else pd.DataFrame()
 
-            keep = [c for c in ("ts", "vehicle_health_score", "mileage", "mileage_rel") if c in combined.columns]
-            keep += [c for c in combined.columns if c.endswith("_contrib")]
-            out = combined[keep].tail(limit).rename(columns={"vehicle_health_score": "health"})
-            rows = out.to_dict(orient="records")
-            data_source = "live"
+    if not combined.empty:
+        if "gold_window_ts" in combined.columns:
+            combined["gold_window_ts"] = pd.to_datetime(combined["gold_window_ts"])
+            # Gold is append-only — the same (source_id, window) gets a
+            # new row every time that window's state is touched, not just
+            # once. Without dedup the scatter/timeline plots show multiple
+            # stacked points per window instead of one (confirmed on real
+            # data: 337 rows for only 98 unique windows).
+            sort_col = "gold_write_ts" if "gold_write_ts" in combined.columns else "gold_window_ts"
+            combined = combined.sort_values(sort_col).drop_duplicates(subset=["gold_window_ts"], keep="last")
+            combined = combined.sort_values("gold_window_ts")
+            combined["ts"] = combined["gold_window_ts"].dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+        if "ts" not in combined.columns:
+            combined["ts"] = combined.index.astype(str)
+        combined["timestamp"] = combined["ts"]
+        combined = _attach_mileage(combined, vehicle_id)
+        combined = combined.fillna(0)
+        if "mileage" in combined.columns:
+            first_mileage = combined["mileage"].iloc[0]
+            combined["mileage_rel"] = (combined["mileage"] - first_mileage).round(1)
+        for col in combined.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
+            combined[col] = combined[col].astype(str)
+
+        keep = [c for c in ("ts", "vehicle_health_score", "mileage", "mileage_rel") if c in combined.columns]
+        keep += [c for c in combined.columns if c.endswith("_contrib")]
+        out = combined[keep].tail(limit).rename(columns={"vehicle_health_score": "health"})
+        rows = out.to_dict(orient="records")
+        data_source = "batch" if vehicle_id in _HISTORICAL_IDS else "live"
 
     if not rows and _PRESENTATION_MODE_ACTIVE and vehicle_id in _DEMO_VEHICLE_HEALTH_CACHE:
         rows = _DEMO_VEHICLE_HEALTH_CACHE[vehicle_id]
@@ -833,9 +854,14 @@ def get_vehicle_alerts(vehicle_id: str):
     live = _get_live(f"alerts-{vehicle_id}")
     if live is not None:
         return live
-    if not os.path.exists(_GOLD_ALERTS_DIR):
-        return {"vehicle_id": vehicle_id, "open": [], "closed": []}
-    vehicle_df = _query_vehicle_df(_GOLD_ALERTS_DIR, vehicle_id, max_files=100)
+    import pandas as pd
+    if vehicle_id in _HISTORICAL_IDS:
+        _bf = os.path.join(_BATCH_ALERTS_ROOT, f"{vehicle_id}.parquet")
+        vehicle_df = pd.read_parquet(_bf) if os.path.exists(_bf) else pd.DataFrame()
+    else:
+        if not os.path.exists(_GOLD_ALERTS_DIR):
+            return {"vehicle_id": vehicle_id, "open": [], "closed": []}
+        vehicle_df = _query_vehicle_df(_GOLD_ALERTS_DIR, vehicle_id, max_files=100)
     if vehicle_df.empty:
         return {"vehicle_id": vehicle_id, "open": [], "closed": []}
     # Alerts is upsert-style (same alert_id rewritten on every status
@@ -1783,3 +1809,58 @@ def _compute_and_broadcast_sse_delta() -> None:
         return
     payload = json.dumps({"type": "gold_delta", "vehicles": vehicle_streams, "delta": delta})
     _sse_broadcast(payload)
+
+
+# ── Historical vehicle read-only endpoints ────────────────────────────────────
+
+@router.get("/api/automotive/vehicle/{vehicle_id}/is-historical")
+def check_historical(vehicle_id: str):
+    return {"vehicle_id": vehicle_id, "is_historical": vehicle_id in _HISTORICAL_IDS}
+
+
+@router.get("/api/automotive/vehicle/{vehicle_id}/last-state")
+def get_last_state(vehicle_id: str):
+    data = _load_historical_layer(vehicle_id, "last_state")
+    if data is None:
+        raise HTTPException(status_code=404, detail="No computed data for vehicle")
+    return data
+
+
+@router.get("/api/automotive/vehicle/{vehicle_id}/trips")
+def get_historical_trips(vehicle_id: str):
+    data = _load_historical_layer(vehicle_id, "trips")
+    if data is None:
+        raise HTTPException(status_code=404, detail="No computed data for vehicle")
+    return {"vehicle_id": vehicle_id, "trips": data, "count": len(data)}
+
+
+@router.get("/api/automotive/vehicle/{vehicle_id}/events")
+def get_historical_events(vehicle_id: str, limit: int = Query(default=200, ge=1, le=2000)):
+    data = _load_historical_layer(vehicle_id, "events")
+    if data is None:
+        raise HTTPException(status_code=404, detail="No computed data for vehicle")
+    return {"vehicle_id": vehicle_id, "events": data[-limit:], "count": len(data)}
+
+
+@router.get("/api/automotive/vehicle/{vehicle_id}/dtcs")
+def get_historical_dtcs(vehicle_id: str):
+    data = _load_historical_layer(vehicle_id, "dtcs")
+    if data is None:
+        raise HTTPException(status_code=404, detail="No computed data for vehicle")
+    return {"vehicle_id": vehicle_id, "dtcs": data, "count": len(data)}
+
+
+@router.get("/api/automotive/vehicle/{vehicle_id}/alerts")
+def get_historical_alerts(vehicle_id: str):
+    data = _load_historical_layer(vehicle_id, "alerts")
+    if data is None:
+        raise HTTPException(status_code=404, detail="No computed data for vehicle")
+    return {"vehicle_id": vehicle_id, "alerts": data, "count": len(data)}
+
+
+@router.get("/api/automotive/vehicle/{vehicle_id}/driver-summary")
+def get_driver_summary(vehicle_id: str):
+    data = _load_historical_layer(vehicle_id, "driver_summary")
+    if data is None:
+        raise HTTPException(status_code=404, detail="No computed data for vehicle")
+    return data
