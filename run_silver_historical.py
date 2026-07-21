@@ -120,11 +120,11 @@ def main() -> None:
                 print(f"    {module:14s}: inference failed: {e}")
                 continue
 
-            if not silver_rows:
+            df_silver = pd.DataFrame(silver_rows) if isinstance(silver_rows, list) else silver_rows
+
+            if df_silver is None or (isinstance(df_silver, pd.DataFrame) and df_silver.empty):
                 print(f"    {module:14s}: 0 Silver rows produced")
                 continue
-
-            df_silver = pd.DataFrame(silver_rows) if isinstance(silver_rows, list) else silver_rows
 
             tag = "[DRY] " if args.dry_run else ""
             print(f"    {tag}{module:14s}: {len(df_silver):,} Silver rows")
