@@ -292,7 +292,20 @@ interface LastTripData {
     harsh_accel_count: number;
     harsh_cornering_count: number;
     event_count: number;
+    route_waypoints?: [number, number][];
   } | null;
+  trip_events: Array<{
+    event_id: string;
+    trip_id: string;
+    timestamp: string;
+    type: string;
+    severity: string;
+    speed_kmh: number;
+    acc_g: number;
+    distance_km: number;
+    lat?: number;
+    lng?: number;
+  }>;
   driver_summary: {
     score: number;
     total_km: number;
@@ -2799,6 +2812,7 @@ export default function CockpitView({
 
   const [statusFilterMap, setStatusFilterMap] = useState("all");
   const [vehicleType, setVehicleType] = useState("all");
+  const [showHistTripOverlay, setShowHistTripOverlay] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState("all");
 
   const [search, setSearch] = useState("");
@@ -3487,6 +3501,39 @@ export default function CockpitView({
     enabled: !!selectedVehicle && !selectedIsActive,
     staleTime: Infinity,
   });
+
+  const historicalRouteOverlay = useMemo(() => {
+    if (!showHistTripOverlay || !lastTripData?.last_trip || !liveSelectedPosition) return null;
+    const trip = lastTripData.last_trip;
+    const rawWaypoints = trip.route_waypoints;
+    let polyline: [number, number][];
+    if (rawWaypoints && rawWaypoints.length >= 2) {
+      polyline = rawWaypoints as [number, number][];
+    } else {
+      const endLat = liveSelectedPosition.lat;
+      const endLng = liveSelectedPosition.lng;
+      const distKm = trip.distance_km ?? 0;
+      let hash = 0;
+      for (const c of selectedVehicle ?? "") hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+      const angleRad = ((hash % 360) * Math.PI) / 180;
+      const dLat = (distKm / 111) * Math.cos(angleRad);
+      const dLng = (distKm / (111 * Math.cos((endLat * Math.PI) / 180))) * Math.sin(angleRad);
+      polyline = [[endLat - dLat, endLng - dLng], [endLat, endLng]];
+    }
+    const events = (lastTripData.trip_events ?? []).map((e) => ({
+      lat: e.lat ?? polyline[0][0],
+      lng: e.lng ?? polyline[0][1],
+      type: e.type ?? "harsh_braking",
+      severity: e.severity ?? "WARNING",
+      speed_kmh: e.speed_kmh ?? 0,
+      acc_g: e.acc_g ?? 0,
+    }));
+    return { polyline, events };
+  }, [showHistTripOverlay, lastTripData, liveSelectedPosition, selectedVehicle]);
+
+  useEffect(() => {
+    setShowHistTripOverlay(false);
+  }, [selectedVehicle]);
 
   const SERVICE_INTERVAL_KM = 15000;
 
@@ -4606,6 +4653,29 @@ export default function CockpitView({
                       {selectedVehicle && tripData?.events && (
                         <EventMarkers events={tripData.events} />
                       )}
+                      {historicalRouteOverlay && (
+                        <>
+                          <Polyline
+                            positions={historicalRouteOverlay.polyline}
+                            pathOptions={{ color: "#8b5cf6", weight: 3, opacity: 0.75 }}
+                          />
+                          {historicalRouteOverlay.events.map((evt, i) => (
+                            <Marker
+                              key={`hist-evt-${i}`}
+                              position={[evt.lat, evt.lng]}
+                              icon={createEventIcon(evt.type)}
+                            >
+                              <Popup>
+                                <strong>{evt.type.replace(/_/g, " ").toUpperCase()}</strong>
+                                <br />
+                                Speed: {evt.speed_kmh} km/h
+                                <br />
+                                Severity: {evt.severity}
+                              </Popup>
+                            </Marker>
+                          ))}
+                        </>
+                      )}
                     </MapContainer>
                     <Tooltip title="Expand map" arrow>
                       <IconButton
@@ -5569,6 +5639,29 @@ export default function CockpitView({
                   {selectedVehicle && tripData?.events && (
                     <EventMarkers events={tripData.events} />
                   )}
+                  {historicalRouteOverlay && (
+                    <>
+                      <Polyline
+                        positions={historicalRouteOverlay.polyline}
+                        pathOptions={{ color: "#8b5cf6", weight: 3, opacity: 0.75 }}
+                      />
+                      {historicalRouteOverlay.events.map((evt, i) => (
+                        <Marker
+                          key={`hist-evt-exp-${i}`}
+                          position={[evt.lat, evt.lng]}
+                          icon={createEventIcon(evt.type)}
+                        >
+                          <Popup>
+                            <strong>{evt.type.replace(/_/g, " ").toUpperCase()}</strong>
+                            <br />
+                            Speed: {evt.speed_kmh} km/h
+                            <br />
+                            Severity: {evt.severity}
+                          </Popup>
+                        </Marker>
+                      ))}
+                    </>
+                  )}
                 </MapContainer>
                 <Paper
                   elevation={0}
@@ -5888,7 +5981,7 @@ export default function CockpitView({
                         label: vehicleDetail.status,
                       };
                       const hColor = healthColor(h);
-                      const dScore = vehicleDetail.driver_score ?? 0;
+                      const dScore = lastTripData?.driver_summary?.score ?? vehicleDetail.driver_score ?? 0;
                       const dScoreColor =
                         dScore >= 80
                           ? "#22c55e"
@@ -5924,43 +6017,65 @@ export default function CockpitView({
                               alignItems="flex-start"
                             >
                               <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Box
-                                  sx={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                    px: 0.8,
-                                    py: 0.2,
-                                    borderRadius: 5,
-                                    bgcolor: alpha(st.color, 0.12),
-                                    border: `1px solid ${alpha(
-                                      st.color,
-                                      0.25
-                                    )}`,
-                                    mb: 0.6,
-                                  }}
-                                >
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.6 }}>
                                   <Box
                                     sx={{
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius: "50%",
-                                      bgcolor: st.color,
-                                      flexShrink: 0,
-                                    }}
-                                  />
-                                  <Typography
-                                    sx={{
-                                      fontSize: "9px !important",
-                                      fontWeight: 700,
-                                      color: st.color,
-                                      textTransform: "uppercase",
-                                      letterSpacing: ".06em",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 0.5,
+                                      px: 0.8,
+                                      py: 0.2,
+                                      borderRadius: 5,
+                                      bgcolor: alpha(st.color, 0.12),
+                                      border: `1px solid ${alpha(st.color, 0.25)}`,
                                     }}
                                   >
-                                    {st.label}
-                                  </Typography>
-                                </Box>
+                                    <Box
+                                      sx={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: "50%",
+                                        bgcolor: st.color,
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <Typography
+                                      sx={{
+                                        fontSize: "9px !important",
+                                        fontWeight: 700,
+                                        color: st.color,
+                                        textTransform: "uppercase",
+                                        letterSpacing: ".06em",
+                                      }}
+                                    >
+                                      {st.label}
+                                    </Typography>
+                                  </Box>
+                                  <Box
+                                    sx={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 0.4,
+                                      px: 0.7,
+                                      py: 0.2,
+                                      borderRadius: 5,
+                                      bgcolor: alpha("#f59e0b", 0.1),
+                                      border: `1px solid ${alpha("#f59e0b", 0.3)}`,
+                                    }}
+                                  >
+                                    <Typography
+                                      sx={{
+                                        fontSize: "8px !important",
+                                        fontWeight: 700,
+                                        color: "#d97706",
+                                        textTransform: "uppercase",
+                                        letterSpacing: ".05em",
+                                      }}
+                                    >
+                                      Historical
+                                    </Typography>
+                                  </Box>
+                                </Stack>
                                 <Typography
                                   sx={{
                                     fontSize: "15px !important",
@@ -5988,6 +6103,23 @@ export default function CockpitView({
                                 alignItems="center"
                                 sx={{ ml: 1, flexShrink: 0 }}
                               >
+                                {lastTripData?.last_trip && (
+                                  <Button
+                                    size="small"
+                                    variant={showHistTripOverlay ? "contained" : "outlined"}
+                                    color="secondary"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={() => setShowHistTripOverlay((v) => !v)}
+                                    sx={{
+                                      fontSize: "7px",
+                                      py: "1px",
+                                      px: "5px",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {showHistTripOverlay ? "Hide Trip" : "Load Trip"}
+                                  </Button>
+                                )}
                                 <Button
                                   size="small"
                                   variant="outlined"
@@ -6327,7 +6459,7 @@ export default function CockpitView({
                                   mb: 0.75,
                                 }}
                               >
-                                Last Known Location
+                                {vehicleDetail.status === "in_service" ? "Service Location" : vehicleDetail.status === "parked" ? "Parked Location" : "Last Known Location"}
                               </Typography>
                               <Stack spacing={0.5}>
                                 {vehicleDetail.road_type && (
@@ -6416,7 +6548,7 @@ export default function CockpitView({
                                     }}
                                   >
                                     {new Date(
-                                      lastTripData.last_trip.end_time
+                                      lastTripData.last_trip.end_time || (lastTripData.last_trip as any).end_ts
                                     ).toLocaleDateString("en-IN", {
                                       day: "numeric",
                                       month: "short",
@@ -9299,7 +9431,9 @@ export default function CockpitView({
                               <TableRow
                                 key={`top-${row.vehicle_id}`}
                                 hover
+                                onClick={() => navigate(`/automotive?vehicle=${encodeURIComponent(row.vehicle_id)}`)}
                                 sx={{
+                                  cursor: "pointer",
                                   bgcolor: rowBg,
                                   "&:hover": {
                                     bgcolor: isDark
@@ -9314,6 +9448,7 @@ export default function CockpitView({
                                     px: 1.5,
                                     fontSize: 11,
                                     fontWeight: 800,
+                                    color: isDark ? "#22d3ee" : "#0891b2",
                                   }}
                                 >
                                   {row.name || row.vehicle_id}
@@ -9439,39 +9574,21 @@ export default function CockpitView({
                                 <Box>
                                   <Typography
                                     onClick={() => {
-                                      if (
-                                        row.status?.toLowerCase() === "active"
-                                      ) {
-                                        navigate(
-                                          `/automotive?vehicle=${encodeURIComponent(
-                                            row.vehicle_id
-                                          )}`
-                                        );
-                                      }
+                                      navigate(
+                                        `/automotive?vehicle=${encodeURIComponent(
+                                          row.vehicle_id
+                                        )}`
+                                      );
                                     }}
                                     sx={{
                                       fontSize: "12px",
                                       fontWeight: 700,
-                                      color:
-                                        row.status?.toLowerCase() === "active"
-                                          ? isDark
-                                            ? "#22d3ee"
-                                            : "#0891b2"
-                                          : "text.disabled",
+                                      color: isDark ? "#22d3ee" : "#0891b2",
                                       lineHeight: 1.25,
-                                      cursor:
-                                        row.status?.toLowerCase() === "active"
-                                          ? "pointer"
-                                          : "default",
-                                      textDecoration:
-                                        row.status?.toLowerCase() === "active"
-                                          ? "underline"
-                                          : "none",
+                                      cursor: "pointer",
+                                      textDecoration: "underline",
                                       "&:hover": {
-                                        color:
-                                          row.status?.toLowerCase() === "active"
-                                            ? "#1976d2"
-                                            : "text.disabled",
+                                        color: "#1976d2",
                                       },
                                     }}
                                   >

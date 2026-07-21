@@ -131,6 +131,13 @@ async def vehicle_last_trip(vehicle_id: str):
     else:
         trip_events = []
     ds = cache.get("driver_summary", {})
+    if last_trip:
+        last_trip = dict(last_trip)
+        last_trip["start_time"] = last_trip.pop("start_ts", last_trip.get("start_time", ""))
+        last_trip["end_time"] = last_trip.pop("end_ts", last_trip.get("end_time", ""))
+        duration_mins = last_trip.pop("duration_mins", None)
+        if "duration_secs" not in last_trip and duration_mins is not None:
+            last_trip["duration_secs"] = round(duration_mins * 60)
     return {
         "last_trip": last_trip,
         "trip_events": trip_events[-50:],

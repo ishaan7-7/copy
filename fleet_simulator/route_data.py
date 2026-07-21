@@ -38,6 +38,14 @@ ROUTE_KEYS = [
     "lucknow_varanasi",
     "jaipur_udaipur",
     "delhi_dehradun",
+    "mumbai_pune",
+    "hyderabad_warangal",
+    "kolkata_durgapur",
+    "bangalore_mysore",
+    "chennai_vellore",
+    "ahmedabad_vadodara",
+    "pune_nashik",
+    "bhopal_indore",
 ]
 
 

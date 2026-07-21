@@ -64,6 +64,8 @@ const MODULE_COLORS: Record<string, string> = {
   tyre:         "#ef4444",
 };
 
+const ALL_MODULES = Object.keys(MODULE_COLORS);
+
 const fetchWriterMetrics = () =>
   axios.get(`${API_BASE}/api/writer/metrics`).then((r) => r.data);
 const fetchInferenceMetrics = () =>

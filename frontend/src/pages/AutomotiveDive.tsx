@@ -930,16 +930,16 @@ export default function AutomotiveDive({
     queryKey: ["fleetSimBehavior", selectedVehicle],
     queryFn: () =>
       axios.get(`${API}/api/fleet/vehicle/${selectedVehicle}/behavior`).then((r) => r.data),
-    enabled: !!selectedVehicle && viewMode === "summary",
-    refetchInterval: isActive && autoRefresh && viewMode === "summary" ? 5000 : false,
+    enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
+    refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 5000 : false,
   });
 
   const fleetPositionQuery = useQuery({
     queryKey: ["autoFleetPosition", selectedVehicle],
     queryFn: () =>
       axios.get(`${API}/api/automotive/fleet-position/${selectedVehicle}`).then((r) => r.data),
-    enabled: !!selectedVehicle && viewMode === "summary",
-    refetchInterval: viewMode === "summary" ? 5000 : false,
+    enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
+    refetchInterval: viewMode === "summary" && !isHistorical ? 5000 : false,
     staleTime: 3000,
   });
 
@@ -1132,6 +1132,9 @@ export default function AutomotiveDive({
   const topDrivers: any[] = summaryData?.top_anomaly_drivers ?? [];
   const maxDriverScore = topDrivers.length > 0 ? Math.max(...topDrivers.map((d: any) => d.score)) : 1;
   const alertsSummary: { open_count: number; closed_count: number; recent_open: any[] } = summaryData?.alerts_summary ?? { open_count: 0, closed_count: 0, recent_open: [] };
+  const alertsBadgeCount = isHistorical
+    ? ((histAlertsQuery.data as any[]) ?? []).filter((a: any) => a.status === "OPEN").length
+    : alertsSummary.open_count;
   const fleetSimData: any = fleetPositionQuery.data ?? summaryData?.fleet_sim ?? {};
   const tripData: any = summaryData?.trip_data ?? null;
   const isVehicleActive = fleetSimData?.status === "active";
@@ -2034,12 +2037,20 @@ export default function AutomotiveDive({
 
               <Box sx={{ flex: 1 }} />
 
-              <Badge badgeContent={alertsSummary.open_count} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "9px", height: 16, minWidth: 16 } }}>
+              <Badge badgeContent={alertsBadgeCount} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "9px", height: 16, minWidth: 16 } }}>
                 <Button size="small" onClick={() => setAlertsOpen(true)} disabled={!selectedVehicle} sx={{ height: 28, fontSize: "10px", fontWeight: 700, px: 1.5, borderRadius: "4px", textTransform: "uppercase", bgcolor: darkMode ? alpha("#ef4444", 0.12) : alpha("#ef4444", 0.08), color: darkMode ? "#f87171" : "#dc2626", border: `1px solid ${darkMode ? alpha("#ef4444", 0.3) : alpha("#ef4444", 0.22)}`, "&:hover": { bgcolor: darkMode ? alpha("#ef4444", 0.2) : alpha("#ef4444", 0.14) }, "&.Mui-disabled": { bgcolor: darkMode ? alpha("#475569", 0.1) : alpha("#94a3b8", 0.08), color: darkMode ? "#475569" : "#94a3b8", borderColor: darkMode ? alpha("#475569", 0.2) : alpha("#94a3b8", 0.2) } }}>
                   Alerts
                 </Button>
               </Badge>
             </Paper>
+
+            {isHistorical && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: darkMode ? alpha("#f59e0b", 0.08) : alpha("#fef3c7", 0.9), border: `1px solid ${alpha("#f59e0b", darkMode ? 0.25 : 0.35)}`, flexShrink: 0 }}>
+                <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#f59e0b", flexShrink: 0 }} />
+                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: "0.05em" }}>Historical Data</Typography>
+                <Typography sx={{ fontSize: "10px", color: darkMode ? "#64748b" : "#92400e" }}>· Live streaming inactive · Showing pre-computed records · Read-only</Typography>
+              </Box>
+            )}
 
             {isHistorical ? (
               <Box sx={{ display: "flex", gap: 1.5, flex: 1, minHeight: 0, overflow: "auto", pb: 2 }}>
@@ -2113,16 +2124,27 @@ export default function AutomotiveDive({
                           <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No fault codes recorded</Typography>
                         ) : (
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
-                            <thead><tr>{["Module", "Code", "Severity", "Description"].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
+                            <thead><tr>{["Module", "Code", "Severity", "Description", ""].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
                             <tbody>
                               {((histDtcsQuery.data as any[]) ?? []).map((dtc: any, i: number) => {
                                 const sev = dtc.severity === "CRITICAL" ? "#ef4444" : dtc.severity === "WARNING" ? "#f59e0b" : "#22c55e";
+                                const matchingAlert = ((histAlertsQuery.data as any[]) ?? []).find((a: any) => a.module === dtc.module && a.peak_anomaly_ts);
                                 return (
                                   <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
                                     <td style={{ padding: "5px 8px", color: (MODULE_COLORS as any)[dtc.module] || (darkMode ? "#94a3b8" : "#64748b"), fontWeight: 700, textTransform: "capitalize" }}>{dtc.module}</td>
-                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{dtc.code}</td>
+                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{dtc.dtc_code ?? dtc.code}</td>
                                     <td style={{ padding: "5px 8px" }}><span style={{ color: sev, fontWeight: 700, fontSize: "9px" }}>{dtc.severity}</span></td>
                                     <td style={{ padding: "5px 8px", color: darkMode ? "#94a3b8" : "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }} title={dtc.description}>{dtc.description}</td>
+                                    <td style={{ padding: "5px 8px" }}>
+                                      {matchingAlert && (
+                                        <button
+                                          onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle ?? "")}&module=${encodeURIComponent(dtc.module)}&peak_ts=${encodeURIComponent(matchingAlert.peak_anomaly_ts)}`)}
+                                          style={{ fontSize: "9px", fontWeight: 700, cursor: "pointer", padding: "2px 6px", borderRadius: 4, border: `1px solid ${alpha("#3b82f6", 0.4)}`, color: "#3b82f6", background: alpha("#3b82f6", 0.08) }}
+                                        >
+                                          Investigate →
+                                        </button>
+                                      )}
+                                    </td>
                                   </tr>
                                 );
                               })}
@@ -2152,7 +2174,7 @@ export default function AutomotiveDive({
                             <thead><tr>{["Date", "km", "Duration", "Avg km/h", "Brake", "Accel", "Corner", "Score"].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
                             <tbody>
                               {[...((histTripsQuery.data as any[]) ?? [])].reverse().map((trip: any, i: number) => {
-                                const dur = trip.duration_secs ?? 0;
+                                const dur = trip.duration_secs ?? (trip.duration_mins != null ? trip.duration_mins * 60 : 0);
                                 const hh = Math.floor(dur / 3600);
                                 const mm = Math.round((dur % 3600) / 60);
                                 const tripKm = trip.distance_km ?? 0;
@@ -2162,7 +2184,7 @@ export default function AutomotiveDive({
                                 const evTotal = (trip.harsh_braking_count ?? 0) + (trip.harsh_accel_count ?? 0) + (trip.harsh_cornering_count ?? 0);
                                 return (
                                   <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
-                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{String(trip.end_time || "").slice(0, 10)}</td>
+                                    <td style={{ padding: "5px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{String(trip.end_ts || trip.end_time || "").slice(0, 10)}</td>
                                     <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{tripKm.toFixed(1)}</td>
                                     <td style={{ padding: "5px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{hh}h {mm}m</td>
                                     <td style={{ padding: "5px 8px", fontFamily: "monospace" }}>{(trip.avg_speed_kmh ?? 0).toFixed(0)}</td>
