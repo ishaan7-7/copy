@@ -1,20 +1,19 @@
 """
-Precomputes historical data layers for non-active vehicles (sim026-sim040).
+Precomputes trip/event/DTC history for all 40 vehicles using route geometry.
 
-Reads expanded CSV sensor data and produces per-vehicle JSON layers at:
+Produces per-vehicle JSON layers at:
     data/computed/{sim_id}/trips.json
     data/computed/{sim_id}/events.json
     data/computed/{sim_id}/dtcs.json
     data/computed/{sim_id}/alerts.json
     data/computed/{sim_id}/driver_summary.json
-    data/computed/{sim_id}/last_state.json
+    data/computed/{sim_id}/last_state.json   (non-active vehicles only)
 
 Usage:
-    python precompute_history.py --data-root <path> --computed-root <path> [--yes]
+    python precompute_history.py --computed-root <path> [--data-root <ignored>] [--yes]
 """
 
 import argparse
-import glob as _glob
 import json
 import os
 import sys
@@ -25,22 +24,20 @@ import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "fleet_simulator"))
 from fleet_config import VEHICLES  # noqa: E402
-from route_data import load_route  # noqa: E402
+from route_data import load_route, DenseRoute  # noqa: E402
 
 MODULES = ["engine", "transmission", "battery", "body", "tyre"]
-GAP_THRESHOLD_SECS = 300
-MIN_TRIP_SECS = 120
-MIN_TRIP_KM = 0.5
 
 P_BRAKE = 2.2
 P_ACCEL = 1.4
 P_CORNER = 2.2
 SCORE_NORM = 33.0
 
-HARSH_BRAKE_G = -0.35
-HARSH_ACCEL_G = 0.25
-MAX_ACC_DT_SECS = 30.0
-CORNER_INJECT_PROB = 0.0008
+_BRAKE_PER_KM  = {"highway": 0.030, "primary": 0.055, "urban": 0.090}
+_ACCEL_PER_KM  = {"highway": 0.022, "primary": 0.040, "urban": 0.065}
+_CORNER_PER_KM = {"highway": 0.018, "primary": 0.035, "urban": 0.060}
+_MAX_EVENTS_PER_TYPE = 20
+_MIN_EVENTS_PER_TYPE = 2
 
 _DTC_POOL: dict[str, list[tuple]] = {
     "engine": [
@@ -86,148 +83,6 @@ _DTC_POOL: dict[str, list[tuple]] = {
         ("P0534", "non_critical", "HVAC",          "Air Conditioner Refrigerant Charge Loss",    "Low refrigerant detected. Cooling performance reduced."),
     ],
 }
-
-
-def _find_csv(root: str, sim_id: str, module: str) -> str | None:
-    pattern = os.path.join(root, sim_id, f"*{module}*scenarioA*{sim_id}*.csv")
-    matches = _glob.glob(pattern)
-    if matches:
-        return matches[0]
-    pattern2 = os.path.join(root, sim_id, f"*{module}*.csv")
-    matches2 = _glob.glob(pattern2)
-    return matches2[0] if matches2 else None
-
-
-def _load_speed_series(data_root: str, sim_id: str) -> pd.DataFrame | None:
-    path = _find_csv(data_root, sim_id, "transmission")
-    if path is None:
-        return None
-    try:
-        df = pd.read_csv(path, low_memory=False)
-    except Exception:
-        return None
-    if "timestamp" not in df.columns or "vehicle_speed_kmh" not in df.columns:
-        return None
-    df["_ts"] = pd.to_datetime(df["timestamp"], format="mixed", utc=True)
-    df = df.sort_values("_ts").reset_index(drop=True)
-    df["_speed"] = pd.to_numeric(df["vehicle_speed_kmh"], errors="coerce").fillna(0.0).clip(lower=0.0)
-    return df[["_ts", "_speed"]].copy()
-
-
-def _detect_trips(speed_df: pd.DataFrame) -> list[dict]:
-    ts = speed_df["_ts"].values
-    speeds = speed_df["_speed"].values
-
-    dt_secs = np.diff(ts.astype("int64")) / 1e9
-
-    break_indices = np.where(dt_secs > GAP_THRESHOLD_SECS)[0] + 1
-    seg_starts = np.concatenate([[0], break_indices])
-    seg_ends = np.concatenate([break_indices, [len(ts)]])
-
-    trips: list[dict] = []
-    for seg_s, seg_e in zip(seg_starts, seg_ends):
-        seg_ts = ts[seg_s:seg_e]
-        seg_speed = speeds[seg_s:seg_e]
-
-        if len(seg_ts) < 2:
-            continue
-
-        duration_secs = float((seg_ts[-1] - seg_ts[0]).astype("timedelta64[s]").astype(np.float64))
-        if duration_secs < MIN_TRIP_SECS:
-            continue
-
-        seg_dt = np.diff(seg_ts.astype("int64")) / 1e9
-        avg_pair = (seg_speed[:-1] + seg_speed[1:]) / 2.0
-        dt_capped = np.minimum(seg_dt, GAP_THRESHOLD_SECS)
-        dist_km = float(np.sum(avg_pair * dt_capped / 3600.0))
-
-        if dist_km < MIN_TRIP_KM:
-            continue
-
-        moving = seg_speed > 2.0
-        avg_speed = float(np.mean(seg_speed[moving])) if moving.any() else 0.0
-        max_speed = float(np.max(seg_speed))
-
-        trips.append({
-            "_seg_s": int(seg_s),
-            "_seg_e": int(seg_e),
-            "start_ts": pd.Timestamp(seg_ts[0]).isoformat(),
-            "end_ts": pd.Timestamp(seg_ts[-1]).isoformat(),
-            "duration_mins": round(duration_secs / 60.0, 1),
-            "distance_km": round(dist_km, 2),
-            "avg_speed_kmh": round(avg_speed, 1),
-            "max_speed_kmh": round(max_speed, 1),
-        })
-
-    return trips
-
-
-def _detect_events(
-    speed_df: pd.DataFrame,
-    trips: list[dict],
-    sim_id: str,
-    rng: np.random.Generator,
-) -> list[dict]:
-    ts_all = speed_df["_ts"].values
-    sp_all = speed_df["_speed"].values
-    events: list[dict] = []
-    cumulative_km = 0.0
-
-    for trip_idx, trip in enumerate(trips):
-        seg_s = trip["_seg_s"]
-        seg_e = trip["_seg_e"]
-        seg_ts = ts_all[seg_s:seg_e]
-        seg_speed = sp_all[seg_s:seg_e]
-
-        if len(seg_ts) < 3:
-            cumulative_km += trip["distance_km"]
-            continue
-
-        dt = np.diff(seg_ts.astype("int64")) / 1e9
-        dv = np.diff(seg_speed)
-        valid = (dt > 0.5) & (dt < MAX_ACC_DT_SECS)
-
-        seg_dist_km = 0.0
-        dt_capped = np.minimum(dt, GAP_THRESHOLD_SECS)
-
-        for i in range(len(dt)):
-            step_km = (seg_speed[i] + seg_speed[i + 1]) / 2.0 * dt_capped[i] / 3600.0
-            seg_dist_km += step_km
-
-            if not valid[i]:
-                continue
-
-            acc_g = (dv[i] / 3.6) / (dt[i] * 9.81)
-            if abs(acc_g) > 1.5:
-                continue
-
-            evt_type: str | None = None
-            final_acc_g = acc_g
-
-            if acc_g < HARSH_BRAKE_G and seg_speed[i] > 5.0:
-                evt_type = "braking"
-            elif acc_g > HARSH_ACCEL_G and dv[i] > 0:
-                evt_type = "accel"
-            elif rng.random() < CORNER_INJECT_PROB and seg_speed[i + 1] > 20.0:
-                evt_type = "cornering"
-                sign = int(rng.integers(2)) * 2 - 1
-                final_acc_g = sign * float(rng.uniform(0.27, 0.55))
-
-            if evt_type:
-                events.append({
-                    "event_id": f"{sim_id}-evt-{len(events) + 1:04d}",
-                    "trip_id": trip["trip_id"],
-                    "timestamp": pd.Timestamp(seg_ts[i + 1]).isoformat(),
-                    "type": evt_type,
-                    "severity": "warning" if abs(final_acc_g) < 0.55 else "critical",
-                    "speed_kmh": round(float(seg_speed[i + 1]), 1),
-                    "acc_g": round(float(final_acc_g), 3),
-                    "distance_km": round(cumulative_km + seg_dist_km, 2),
-                })
-
-        cumulative_km += trip["distance_km"]
-
-    return events
 
 
 def _driver_score(events: list[dict], total_km: float) -> float:
@@ -327,17 +182,6 @@ def _select_alerts(vehicle_id: str, dtcs: list[dict], rng: np.random.Generator) 
     return alerts
 
 
-def _find_route_end_km(route_points: list, veh_lat: float, veh_lng: float) -> float:
-    best_km = 0.0
-    best_dist = float("inf")
-    for pt in route_points:
-        d = (pt.lat - veh_lat) ** 2 + (pt.lng - veh_lng) ** 2
-        if d < best_dist:
-            best_dist = d
-            best_km = pt.cumulative_km
-    return best_km
-
-
 def _interpolate_on_route(route_points: list, target_km: float) -> tuple[float, float]:
     if target_km <= route_points[0].cumulative_km:
         return (route_points[0].lat, route_points[0].lng)
@@ -369,54 +213,164 @@ def _extract_segment(route_points: list, start_km: float, end_km: float, max_pts
     return all_pts
 
 
-def _process_vehicle(v: dict, data_root: str, computed_root: str) -> None:
+def _generate_trip_events(
+    vid: str,
+    trip_id: str,
+    route: DenseRoute,
+    seg_start_km: float,
+    seg_end_km: float,
+    trip_start_ts: pd.Timestamp,
+    duration_secs: float,
+    dist_km: float,
+    rng: np.random.Generator,
+) -> list[dict]:
+    seg_points = [p for p in route.points if seg_start_km <= p.cumulative_km <= seg_end_km]
+    if len(seg_points) < 4:
+        seg_points = route.points
+
+    km_by_type: dict[str, float] = {}
+    for i in range(1, len(seg_points)):
+        rt = seg_points[i].road_type
+        km_by_type[rt] = km_by_type.get(rt, 0.0) + (
+            seg_points[i].cumulative_km - seg_points[i - 1].cumulative_km
+        )
+
+    def _target(per_km_map: dict) -> int:
+        total = sum(per_km_map.get(rt, 0.025) * km for rt, km in km_by_type.items())
+        raw = int(rng.poisson(max(total, 0.1)))
+        return max(_MIN_EVENTS_PER_TYPE, min(raw, _MAX_EVENTS_PER_TYPE))
+
+    n_brake  = _target(_BRAKE_PER_KM)
+    n_accel  = _target(_ACCEL_PER_KM)
+    n_corner = _target(_CORNER_PER_KM)
+
+    events: list[dict] = []
+
+    for evt_type, n, lo, hi in [
+        ("braking",   n_brake,  -0.62, -0.35),
+        ("accel",     n_accel,   0.25,  0.55),
+        ("cornering", n_corner,  0.27,  0.55),
+    ]:
+        for _ in range(n):
+            pt = seg_points[int(rng.integers(0, len(seg_points)))]
+            progress = (pt.cumulative_km - seg_start_km) / max(dist_km, 0.01)
+            ts = trip_start_ts + pd.Timedelta(seconds=progress * duration_secs)
+            speed = pt.speed_target_kmh * float(rng.uniform(0.80, 1.10))
+            acc_g = float(rng.uniform(lo, hi))
+            if evt_type == "cornering":
+                sign = int(rng.integers(2)) * 2 - 1
+                acc_g = sign * abs(acc_g)
+            events.append({
+                "event_id": "",
+                "trip_id": trip_id,
+                "timestamp": ts.isoformat(),
+                "type": evt_type,
+                "severity": "warning" if abs(acc_g) < 0.55 else "critical",
+                "speed_kmh": round(float(speed), 1),
+                "acc_g": round(float(acc_g), 3),
+                "lat": round(pt.lat, 6),
+                "lng": round(pt.lng, 6),
+                "distance_km": round(pt.cumulative_km - seg_start_km, 2),
+            })
+
+    events.sort(key=lambda e: e["timestamp"])
+    return events
+
+
+def _generate_route_based_data(
+    vid: str,
+    route: DenseRoute,
+    rng: np.random.Generator,
+    data_end_ts: pd.Timestamp,
+) -> tuple[list[dict], list[dict]]:
+    N_TRIPS = 5
+
+    raw_segs: list[tuple[float, float]] = []
+    for _ in range(N_TRIPS - 1):
+        frac = float(rng.uniform(0.35, 0.70))
+        seg_km = route.total_km * frac
+        max_start = max(0.0, route.total_km - seg_km)
+        start_km = float(rng.uniform(0.0, max_start))
+        raw_segs.append((start_km, start_km + seg_km))
+    raw_segs.append((0.0, route.total_km))
+
+    stamped: list[tuple] = []
+    current_end_ts = data_end_ts
+
+    for seg_start_km, seg_end_km in reversed(raw_segs):
+        dist_km = seg_end_km - seg_start_km
+        pts_in_seg = [p for p in route.points if seg_start_km <= p.cumulative_km <= seg_end_km]
+        if pts_in_seg:
+            avg_target = sum(p.speed_target_kmh for p in pts_in_seg) / len(pts_in_seg)
+        else:
+            avg_target = 65.0
+        avg_speed = avg_target * float(rng.uniform(0.82, 0.93))
+        duration_secs = (dist_km / max(avg_speed, 1.0)) * 3600.0
+        max_speed = avg_target * float(rng.uniform(1.05, 1.20))
+
+        seg_end_ts = current_end_ts
+        seg_start_ts = seg_end_ts - pd.Timedelta(seconds=duration_secs)
+        stamped.append((seg_start_km, seg_end_km, seg_start_ts, seg_end_ts, dist_km, avg_speed, max_speed))
+
+        gap_secs = float(rng.uniform(3600.0, 21600.0))
+        current_end_ts = seg_start_ts - pd.Timedelta(seconds=gap_secs)
+
+    stamped.reverse()
+
+    trips_out: list[dict] = []
+    all_events: list[dict] = []
+
+    for i, (seg_start_km, seg_end_km, seg_start_ts, seg_end_ts, dist_km, avg_speed, max_speed) in enumerate(stamped):
+        trip_id = f"{vid}-trip-{i + 1:03d}"
+        duration_secs = (seg_end_ts - seg_start_ts).total_seconds()
+
+        waypoints = _extract_segment(route.points, seg_start_km, seg_end_km)
+
+        trip_events = _generate_trip_events(
+            vid, trip_id, route,
+            seg_start_km, seg_end_km,
+            seg_start_ts, duration_secs, dist_km, rng,
+        )
+        all_events.extend(trip_events)
+
+        trips_out.append({
+            "trip_id": trip_id,
+            "start_ts": seg_start_ts.isoformat(),
+            "end_ts": seg_end_ts.isoformat(),
+            "duration_mins": round(duration_secs / 60.0, 1),
+            "distance_km": round(dist_km, 2),
+            "avg_speed_kmh": round(avg_speed, 1),
+            "max_speed_kmh": round(max_speed, 1),
+            "event_count": len(trip_events),
+            "harsh_braking_count": sum(1 for e in trip_events if e["type"] == "braking"),
+            "harsh_accel_count": sum(1 for e in trip_events if e["type"] == "accel"),
+            "harsh_cornering_count": sum(1 for e in trip_events if e["type"] == "cornering"),
+            "route_waypoints": [[round(lat, 6), round(lng, 6)] for lat, lng in waypoints],
+        })
+
+    for idx, e in enumerate(all_events):
+        e["event_id"] = f"{vid}-evt-{idx + 1:04d}"
+
+    return trips_out, all_events
+
+
+def _process_vehicle(v: dict, computed_root: str) -> None:
     vid = v["id"]
     seed = abs(hash(vid)) % (2 ** 31)
     rng = np.random.default_rng(seed)
 
     print(f"  {vid}  status={v['status']}  health={v['health']}")
 
-    speed_df = _load_speed_series(data_root, vid)
+    route_key = v.get("route")
+    if not route_key:
+        print(f"    SKIP: no route defined")
+        return
 
-    if speed_df is not None and len(speed_df) >= 2:
-        data_start_ts = pd.Timestamp(speed_df["_ts"].iloc[0])
-        data_end_ts = pd.Timestamp(speed_df["_ts"].iloc[-1])
-    else:
-        print(f"    WARN: no transmission CSV — using synthetic 5-day window")
-        data_end_ts = pd.Timestamp("2024-07-14T00:00:00", tz="UTC")
-        data_start_ts = data_end_ts - pd.Timedelta(days=5)
-        speed_df = None
+    data_end_ts = pd.Timestamp("2024-07-14T00:00:00", tz="UTC")
+    data_start_ts = data_end_ts - pd.Timedelta(days=30)
 
-    raw_trips = _detect_trips(speed_df) if speed_df is not None else []
-
-    for i, t in enumerate(raw_trips):
-        t["trip_id"] = f"{vid}-trip-{i + 1:03d}"
-
-    events = _detect_events(speed_df, raw_trips, vid, rng) if (speed_df is not None and raw_trips) else []
-
-    event_counts: dict[str, dict] = {}
-    for e in events:
-        tid = e["trip_id"]
-        ec = event_counts.setdefault(tid, {"total": 0, "braking": 0, "accel": 0, "cornering": 0})
-        ec["total"] += 1
-        ec[e["type"]] += 1
-
-    trips_out = [
-        {
-            "trip_id": t["trip_id"],
-            "start_ts": t["start_ts"],
-            "end_ts": t["end_ts"],
-            "duration_mins": t["duration_mins"],
-            "distance_km": t["distance_km"],
-            "avg_speed_kmh": t["avg_speed_kmh"],
-            "max_speed_kmh": t["max_speed_kmh"],
-            "event_count": event_counts.get(t["trip_id"], {}).get("total", 0),
-            "harsh_braking_count": event_counts.get(t["trip_id"], {}).get("braking", 0),
-            "harsh_accel_count": event_counts.get(t["trip_id"], {}).get("accel", 0),
-            "harsh_cornering_count": event_counts.get(t["trip_id"], {}).get("cornering", 0),
-        }
-        for t in raw_trips
-    ]
+    route = load_route(route_key)
+    trips_out, events = _generate_route_based_data(vid, route, rng, data_end_ts)
 
     total_km = sum(t["distance_km"] for t in trips_out)
     total_hours = sum(t["duration_mins"] for t in trips_out) / 60.0
@@ -448,65 +402,41 @@ def _process_vehicle(v: dict, data_root: str, computed_root: str) -> None:
         "data_end_ts": data_end_ts.isoformat(),
     }
 
-    last_state = {
-        "vehicle_id": vid,
-        "name": vid,
-        "type": v.get("type", "Truck"),
-        "status": v["status"],
-        "lat": v.get("lat", 0.0),
-        "lng": v.get("lng", 0.0),
-        "city": v.get("city", ""),
-        "speed_kmh": 0.0,
-        "heading": 0.0,
-        "health": health,
-        "composite_score": v.get("composite", round(1.0 - health / 100.0, 3)),
-        "module_health": module_health,
-        "driver": v["driver"],
-        "driver_score": score,
-        "last_data_ts": data_end_ts.isoformat(),
-        "road_type": "",
-        "route_name": v.get("city", ""),
-        "engine_health": round(module_health.get("engine", health), 1),
-    }
-
-    route_key = v.get("route")
-    veh_lat = v.get("lat", 0.0)
-    veh_lng = v.get("lng", 0.0)
-
-    if route_key and trips_out:
-        try:
-            route = load_route(route_key)
-            route_end_km = _find_route_end_km(route.points, veh_lat, veh_lng)
-            total_km_trips = sum(t["distance_km"] for t in trips_out)
-            route_start_km = max(0.0, route_end_km - total_km_trips)
-
-            trip_offset_km = 0.0
-            for trip in trips_out:
-                seg_s = max(0.0, route_start_km + trip_offset_km)
-                seg_e = min(route.total_km, seg_s + trip["distance_km"])
-                waypoints = _extract_segment(route.points, seg_s, seg_e)
-                trip["route_waypoints"] = [[round(lat, 6), round(lng, 6)] for lat, lng in waypoints]
-                trip_offset_km += trip["distance_km"]
-
-            for evt in events:
-                evt_km = max(0.0, min(route.total_km, route_start_km + evt["distance_km"]))
-                lat, lng = _interpolate_on_route(route.points, evt_km)
-                evt["lat"] = round(lat, 6)
-                evt["lng"] = round(lng, 6)
-        except Exception as exc:
-            print(f"    WARN: route GPS assignment failed ({exc})")
-
     out_dir = os.path.join(computed_root, vid)
     os.makedirs(out_dir, exist_ok=True)
 
-    for filename, payload in [
+    layers: list[tuple] = [
         ("trips.json", trips_out),
         ("events.json", events),
         ("dtcs.json", dtcs),
         ("alerts.json", alerts),
         ("driver_summary.json", driver_summary),
-        ("last_state.json", last_state),
-    ]:
+    ]
+
+    if v["status"] != "active":
+        last_state = {
+            "vehicle_id": vid,
+            "name": vid,
+            "type": v.get("type", "Truck"),
+            "status": v["status"],
+            "lat": v.get("lat", 0.0),
+            "lng": v.get("lng", 0.0),
+            "city": v.get("city", ""),
+            "speed_kmh": 0.0,
+            "heading": 0.0,
+            "health": health,
+            "composite_score": v.get("composite", round(1.0 - health / 100.0, 3)),
+            "module_health": module_health,
+            "driver": v["driver"],
+            "driver_score": score,
+            "last_data_ts": data_end_ts.isoformat(),
+            "road_type": "",
+            "route_name": v.get("city", ""),
+            "engine_health": round(module_health.get("engine", health), 1),
+        }
+        layers.append(("last_state.json", last_state))
+
+    for filename, payload in layers:
         with open(os.path.join(out_dir, filename), "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, default=str)
 
@@ -514,20 +444,16 @@ def _process_vehicle(v: dict, data_root: str, computed_root: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Precompute history for non-active vehicles")
-    parser.add_argument("--data-root", required=True, help="Root dir containing expanded vehicle CSV dirs")
+    parser = argparse.ArgumentParser(description="Precompute history for all vehicles")
     parser.add_argument("--computed-root", required=True, help="Output root for computed JSON layers")
+    parser.add_argument("--data-root", default="", help="(unused) Legacy CSV data root")
     parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
     args = parser.parse_args()
 
-    data_root = os.path.abspath(args.data_root)
     computed_root = os.path.abspath(args.computed_root)
 
-    non_active = [v for v in VEHICLES if v["status"] != "active"]
-
-    print(f"\nData root    : {data_root}")
-    print(f"Computed root: {computed_root}")
-    print(f"Vehicles     : {len(non_active)} non-active\n")
+    print(f"\nComputed root: {computed_root}")
+    print(f"Vehicles     : {len(VEHICLES)} total\n")
 
     if not args.yes:
         ans = input("Proceed? [y/N] ").strip().lower()
@@ -536,8 +462,8 @@ def main() -> None:
             sys.exit(0)
         print()
 
-    for v in non_active:
-        _process_vehicle(v, data_root, computed_root)
+    for v in VEHICLES:
+        _process_vehicle(v, computed_root)
 
     print(f"\nDone. Output written to: {computed_root}")
 

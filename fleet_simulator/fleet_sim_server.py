@@ -25,24 +25,33 @@ _COMPUTED_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "data", "computed")
 )
 _computed: dict[str, dict] = {}
+_hist_cache: dict[str, dict] = {}
 
 
 def _load_computed() -> None:
     for v in VEHICLES:
-        if v["status"] == "active":
-            continue
         vid = v["id"]
         vdir = os.path.join(_COMPUTED_ROOT, vid)
         if not os.path.isdir(vdir):
             continue
-        cache: dict = {}
-        for layer in ("last_state", "driver_summary", "trips", "events"):
+
+        trips_data: dict = {}
+        for layer in ("trips", "events", "driver_summary"):
             path = os.path.join(vdir, f"{layer}.json")
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as fh:
-                    cache[layer] = json.load(fh)
-        if cache:
-            _computed[vid] = cache
+                    trips_data[layer] = json.load(fh)
+        if trips_data:
+            _hist_cache[vid] = trips_data
+
+        if v["status"] != "active":
+            cache: dict = dict(trips_data)
+            path = os.path.join(vdir, "last_state.json")
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as fh:
+                    cache["last_state"] = json.load(fh)
+            if cache:
+                _computed[vid] = cache
 
 
 async def _init_and_run():
@@ -119,9 +128,9 @@ async def vehicle_trip(vehicle_id: str):
 async def vehicle_last_trip(vehicle_id: str):
     if not _ready:
         raise HTTPException(status_code=503, detail="Initializing")
-    if vehicle_id not in _computed:
+    cache = _hist_cache.get(vehicle_id)
+    if not cache:
         raise HTTPException(status_code=404, detail="No historical data for vehicle")
-    cache = _computed[vehicle_id]
     trips = cache.get("trips", [])
     last_trip = trips[-1] if trips else None
     events = cache.get("events", [])
@@ -131,6 +140,19 @@ async def vehicle_last_trip(vehicle_id: str):
     else:
         trip_events = []
     ds = cache.get("driver_summary", {})
+    origin, destination = "", ""
+    v_config = next((v for v in VEHICLES if v["id"] == vehicle_id), None)
+    if v_config:
+        route_stem = v_config.get("route", "")
+        if route_stem:
+            route_path = os.path.join(
+                os.path.dirname(__file__), "routes", f"{route_stem}.json"
+            )
+            if os.path.exists(route_path):
+                with open(route_path, "r", encoding="utf-8") as fh:
+                    rd = json.load(fh)
+                    origin = rd.get("origin", "")
+                    destination = rd.get("destination", "")
     if last_trip:
         last_trip = dict(last_trip)
         last_trip["start_time"] = last_trip.pop("start_ts", last_trip.get("start_time", ""))
@@ -138,6 +160,8 @@ async def vehicle_last_trip(vehicle_id: str):
         duration_mins = last_trip.pop("duration_mins", None)
         if "duration_secs" not in last_trip and duration_mins is not None:
             last_trip["duration_secs"] = round(duration_mins * 60)
+        last_trip["origin"] = origin
+        last_trip["destination"] = destination
     return {
         "last_trip": last_trip,
         "trip_events": trip_events[-50:],
@@ -150,8 +174,9 @@ async def vehicle_last_trip(vehicle_id: str):
 async def vehicle_behavior(vehicle_id: str):
     if not _ready:
         raise HTTPException(status_code=503, detail="Initializing")
-    if vehicle_id in _computed:
-        ds = _computed[vehicle_id].get("driver_summary", {})
+    hist = _hist_cache.get(vehicle_id)
+    if hist and vehicle_id not in engine.active_vehicles:
+        ds = hist.get("driver_summary", {})
         if ds:
             total_km = ds.get("total_km", 0.0)
             return {

@@ -292,6 +292,8 @@ interface LastTripData {
     harsh_accel_count: number;
     harsh_cornering_count: number;
     event_count: number;
+    origin?: string;
+    destination?: string;
     route_waypoints?: [number, number][];
   } | null;
   trip_events: Array<{
@@ -2437,11 +2439,11 @@ function EventMarkers({ events }: { events: TripData["events"] }) {
 
 function MapController({
   selectedVehicle,
-  tripData,
+  livePosition,
   isActive,
 }: {
   selectedVehicle: string | null;
-  tripData: TripData | null;
+  livePosition: { lat: number; lng: number } | null;
   isActive: boolean;
 }) {
   const map = useMap();
@@ -2469,23 +2471,18 @@ function MapController({
     }
     if (
       selectedVehicle &&
-      tripData?.route?.length > 0 &&
+      livePosition &&
+      Number.isFinite(livePosition.lat) &&
+      Number.isFinite(livePosition.lng) &&
       lastFittedVehicle.current !== selectedVehicle
     ) {
       lastFittedVehicle.current = selectedVehicle;
-      const validRoute = tripData.route.filter(
-        (p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)
-      );
-      if (validRoute.length > 1) {
+      const latlng = L.latLng(livePosition.lat, livePosition.lng);
+      const alreadyVisible =
+        map.getBounds().contains(latlng) && map.getZoom() >= 9;
+      if (!alreadyVisible) {
         map.stop();
-        const bounds = L.latLngBounds(validRoute.map((p) => [p.lat, p.lng]));
-        map.fitBounds(bounds, {
-          paddingTopLeft: [40, 40],
-          paddingBottomRight: [40, 40],
-          maxZoom: 7,
-          animate: true,
-          duration: 0.6,
-        });
+        map.setView(latlng, Math.max(map.getZoom(), 12), { animate: false });
       }
       return;
     }
@@ -2494,7 +2491,7 @@ function MapController({
       map.stop();
       map.flyTo([22.9937, 78.9629], 4, { duration: 0.6 });
     }
-  }, [selectedVehicle, tripData, map]);
+  }, [selectedVehicle, livePosition, map]);
 
   return null;
 }
@@ -3508,7 +3505,10 @@ export default function CockpitView({
     const rawWaypoints = trip.route_waypoints;
     let polyline: [number, number][];
     if (rawWaypoints && rawWaypoints.length >= 2) {
-      polyline = rawWaypoints as [number, number][];
+      polyline = [
+        ...rawWaypoints.slice(0, -1),
+        [liveSelectedPosition.lat, liveSelectedPosition.lng],
+      ] as [number, number][];
     } else {
       const endLat = liveSelectedPosition.lat;
       const endLng = liveSelectedPosition.lng;
@@ -4581,7 +4581,7 @@ export default function CockpitView({
                       />
                       <MapController
                         selectedVehicle={selectedVehicle}
-                        tripData={tripData ?? null}
+                        livePosition={liveSelectedPosition}
                         isActive={isActive}
                       />
 
@@ -4628,7 +4628,7 @@ export default function CockpitView({
                         </Marker>
                       ))}
 
-                      {selectedVehicle && completedRoute.length > 1 && (
+                      {selectedIsActive && completedRoute.length > 1 && (
                         <Polyline
                           positions={completedRoute}
                           pathOptions={{
@@ -4638,7 +4638,7 @@ export default function CockpitView({
                           }}
                         />
                       )}
-                      {selectedVehicle && remainingRoute.length > 1 && (
+                      {selectedIsActive && remainingRoute.length > 1 && (
                         <Polyline
                           positions={remainingRoute}
                           pathOptions={{
@@ -4650,7 +4650,7 @@ export default function CockpitView({
                         />
                       )}
 
-                      {selectedVehicle && tripData?.events && (
+                      {selectedIsActive && tripData?.events && (
                         <EventMarkers events={tripData.events} />
                       )}
                       {historicalRouteOverlay && (
@@ -5573,7 +5573,7 @@ export default function CockpitView({
                   />
                   <MapController
                     selectedVehicle={selectedVehicle}
-                    tripData={tripData ?? null}
+                    livePosition={liveSelectedPosition}
                     isActive={isActive}
                   />
                   {mapVehicles.map((v) => (
@@ -5615,7 +5615,7 @@ export default function CockpitView({
                       </LeafletTooltip>
                     </Marker>
                   ))}
-                  {selectedVehicle && completedRoute.length > 1 && (
+                  {selectedIsActive && completedRoute.length > 1 && (
                     <Polyline
                       positions={completedRoute}
                       pathOptions={{
@@ -5625,7 +5625,7 @@ export default function CockpitView({
                       }}
                     />
                   )}
-                  {selectedVehicle && remainingRoute.length > 1 && (
+                  {selectedIsActive && remainingRoute.length > 1 && (
                     <Polyline
                       positions={remainingRoute}
                       pathOptions={{
@@ -5636,7 +5636,7 @@ export default function CockpitView({
                       }}
                     />
                   )}
-                  {selectedVehicle && tripData?.events && (
+                  {selectedIsActive && tripData?.events && (
                     <EventMarkers events={tripData.events} />
                   )}
                   {historicalRouteOverlay && (
@@ -6017,65 +6017,40 @@ export default function CockpitView({
                               alignItems="flex-start"
                             >
                               <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.6 }}>
+                                <Box
+                                  sx={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    px: 0.8,
+                                    py: 0.2,
+                                    borderRadius: 5,
+                                    bgcolor: alpha(st.color, 0.12),
+                                    border: `1px solid ${alpha(st.color, 0.25)}`,
+                                    mb: 0.6,
+                                  }}
+                                >
                                   <Box
                                     sx={{
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      px: 0.8,
-                                      py: 0.2,
-                                      borderRadius: 5,
-                                      bgcolor: alpha(st.color, 0.12),
-                                      border: `1px solid ${alpha(st.color, 0.25)}`,
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      bgcolor: st.color,
+                                      flexShrink: 0,
                                     }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        width: 6,
-                                        height: 6,
-                                        borderRadius: "50%",
-                                        bgcolor: st.color,
-                                        flexShrink: 0,
-                                      }}
-                                    />
-                                    <Typography
-                                      sx={{
-                                        fontSize: "9px !important",
-                                        fontWeight: 700,
-                                        color: st.color,
-                                        textTransform: "uppercase",
-                                        letterSpacing: ".06em",
-                                      }}
-                                    >
-                                      {st.label}
-                                    </Typography>
-                                  </Box>
-                                  <Box
+                                  />
+                                  <Typography
                                     sx={{
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: 0.4,
-                                      px: 0.7,
-                                      py: 0.2,
-                                      borderRadius: 5,
-                                      bgcolor: alpha("#f59e0b", 0.1),
-                                      border: `1px solid ${alpha("#f59e0b", 0.3)}`,
+                                      fontSize: "9px !important",
+                                      fontWeight: 700,
+                                      color: st.color,
+                                      textTransform: "uppercase",
+                                      letterSpacing: ".06em",
                                     }}
                                   >
-                                    <Typography
-                                      sx={{
-                                        fontSize: "8px !important",
-                                        fontWeight: 700,
-                                        color: "#d97706",
-                                        textTransform: "uppercase",
-                                        letterSpacing: ".05em",
-                                      }}
-                                    >
-                                      Historical
-                                    </Typography>
-                                  </Box>
-                                </Stack>
+                                    {st.label}
+                                  </Typography>
+                                </Box>
                                 <Typography
                                   sx={{
                                     fontSize: "15px !important",
@@ -6096,60 +6071,59 @@ export default function CockpitView({
                                   {vehicleDetail.vehicle_id} ·{" "}
                                   {vehicleDetail.type}
                                 </Typography>
-                              </Box>
-                              <Stack
-                                direction="row"
-                                spacing={0.5}
-                                alignItems="center"
-                                sx={{ ml: 1, flexShrink: 0 }}
-                              >
-                                {lastTripData?.last_trip && (
+                                <Stack
+                                  direction="row"
+                                  spacing={0.5}
+                                  sx={{ mt: 0.75 }}
+                                >
+                                  {lastTripData?.last_trip && (
+                                    <Button
+                                      size="small"
+                                      variant={showHistTripOverlay ? "contained" : "outlined"}
+                                      color="secondary"
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={() => setShowHistTripOverlay((v) => !v)}
+                                      sx={{
+                                        fontSize: "8px",
+                                        py: "2px",
+                                        px: "8px",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {showHistTripOverlay ? "Hide Trip" : "Load Last Trip"}
+                                    </Button>
+                                  )}
                                   <Button
                                     size="small"
-                                    variant={showHistTripOverlay ? "contained" : "outlined"}
-                                    color="secondary"
+                                    variant="outlined"
                                     onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={() => setShowHistTripOverlay((v) => !v)}
+                                    onClick={() => {
+                                      setSelectedVehicle(null);
+                                      navigate(
+                                        `/automotive?vehicle=${encodeURIComponent(
+                                          vehicleDetail.vehicle_id
+                                        )}`
+                                      );
+                                    }}
                                     sx={{
-                                      fontSize: "7px",
-                                      py: "1px",
-                                      px: "5px",
+                                      fontSize: "8px",
+                                      py: "2px",
+                                      px: "8px",
                                       whiteSpace: "nowrap",
                                     }}
                                   >
-                                    {showHistTripOverlay ? "Hide Trip" : "Load Trip"}
+                                    Deep Dive →
                                   </Button>
-                                )}
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onClick={() => {
-                                    setSelectedVehicle(null);
-                                    navigate(
-                                      `/automotive?vehicle=${encodeURIComponent(
-                                        vehicleDetail.vehicle_id
-                                      )}`
-                                    );
-                                  }}
-                                  sx={{
-                                    fontSize: "7px",
-                                    py: "1px",
-                                    px: "5px",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  Deep Dive →
-                                </Button>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => setSelectedVehicle(null)}
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  sx={{ p: 0.4, flexShrink: 0 }}
-                                >
-                                  <CloseIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              </Stack>
+                                </Stack>
+                              </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => setSelectedVehicle(null)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                sx={{ p: 0.4, flexShrink: 0, ml: 0.5 }}
+                              >
+                                <CloseIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
                             </Stack>
                             <Stack
                               direction="row"
@@ -6567,6 +6541,18 @@ export default function CockpitView({
                                     km
                                   </Typography>
                                 </Stack>
+                                {lastTripData.last_trip.origin && lastTripData.last_trip.destination && (
+                                  <Typography
+                                    sx={{
+                                      fontSize: "10px !important",
+                                      color: "text.secondary",
+                                    }}
+                                  >
+                                    {lastTripData.last_trip.origin}{" "}
+                                    <span style={{ opacity: 0.5 }}>→</span>{" "}
+                                    {lastTripData.last_trip.destination}
+                                  </Typography>
+                                )}
                                 <Stack
                                   direction="row"
                                   justifyContent="space-between"
@@ -6660,103 +6646,6 @@ export default function CockpitView({
                             </Box>
                           )}
 
-                          {/* ── FLEET TOTALS (driver summary) ───── */}
-                          {lastTripData?.driver_summary && (
-                            <Box
-                              sx={{
-                                px: 1.5,
-                                py: 1.25,
-                                borderTop: `1px solid ${dividerColor}`,
-                              }}
-                            >
-                              <Typography
-                                sx={{
-                                  fontSize: "9px !important",
-                                  fontWeight: 700,
-                                  color: "text.secondary",
-                                  textTransform: "uppercase",
-                                  letterSpacing: ".06em",
-                                  mb: 0.75,
-                                }}
-                              >
-                                Lifetime Stats
-                              </Typography>
-                              <Stack
-                                direction="row"
-                                justifyContent="space-between"
-                              >
-                                <Box sx={{ textAlign: "center" }}>
-                                  <Typography
-                                    sx={{
-                                      fontSize: "14px !important",
-                                      fontWeight: 800,
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {lastTripData.driver_summary.total_km.toFixed(
-                                      0
-                                    )}
-                                  </Typography>
-                                  <Typography
-                                    sx={{
-                                      fontSize: "8px !important",
-                                      color: "text.secondary",
-                                      mt: 0.25,
-                                    }}
-                                  >
-                                    km
-                                  </Typography>
-                                </Box>
-                                <Box sx={{ textAlign: "center" }}>
-                                  <Typography
-                                    sx={{
-                                      fontSize: "14px !important",
-                                      fontWeight: 800,
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {lastTripData.driver_summary.total_hours.toFixed(
-                                      1
-                                    )}
-                                  </Typography>
-                                  <Typography
-                                    sx={{
-                                      fontSize: "8px !important",
-                                      color: "text.secondary",
-                                      mt: 0.25,
-                                    }}
-                                  >
-                                    hrs
-                                  </Typography>
-                                </Box>
-                                <Box sx={{ textAlign: "center" }}>
-                                  <Typography
-                                    sx={{
-                                      fontSize: "14px !important",
-                                      fontWeight: 800,
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {lastTripData.driver_summary
-                                      .harsh_braking_count +
-                                      lastTripData.driver_summary
-                                        .harsh_accel_count +
-                                      lastTripData.driver_summary
-                                        .harsh_cornering_count}
-                                  </Typography>
-                                  <Typography
-                                    sx={{
-                                      fontSize: "8px !important",
-                                      color: "text.secondary",
-                                      mt: 0.25,
-                                    }}
-                                  >
-                                    events
-                                  </Typography>
-                                </Box>
-                              </Stack>
-                            </Box>
-                          )}
                         </>
                       );
                     }

@@ -972,7 +972,7 @@ export default function AutomotiveDive({
   const histTripsQuery = useQuery({
     queryKey: ["histTrips", selectedVehicle],
     queryFn: () =>
-      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/trips`).then((r) => r.data),
+      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/trips`).then((r) => r.data.trips ?? r.data),
     enabled: !!selectedVehicle && isHistorical,
     staleTime: Infinity,
   });
@@ -980,7 +980,7 @@ export default function AutomotiveDive({
   const histDtcsQuery = useQuery({
     queryKey: ["histDtcs", selectedVehicle],
     queryFn: () =>
-      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/dtcs`).then((r) => r.data),
+      axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/dtcs`).then((r) => r.data.dtcs ?? r.data),
     enabled: !!selectedVehicle && isHistorical,
     staleTime: Infinity,
   });
