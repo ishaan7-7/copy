@@ -45,15 +45,15 @@ VEHICLES = [
     {"id": "sim029", "name": "sim029", "type": "Truck", "status": "active", "route": "delhi_dehradun",     "driver": "X. Pandey",     "health": 93.8, "composite": 0.062, "module_health": {"engine": 91.3, "transmission": 93.3, "battery": 97.3, "body": 100.0, "tyre": 94.3}},
     {"id": "sim030", "name": "sim030", "type": "Truck", "status": "active", "route": "pune_nashik",        "driver": "J. Srivastava", "health": 80.7, "composite": 0.193, "module_health": {"engine": 72.7, "transmission": 77.2, "battery": 89.7, "body": 93.7, "tyre": 79.2}},
     {"id": "sim031", "name": "sim031", "type": "Truck", "status": "in_service", "lat": 22.3072, "lng": 73.1812, "city": "Vadodara, Gujarat",        "route": "ahmedabad_vadodara",  "driver": "L. Prasad",    "health": 57.1, "composite": 0.429, "module_health": {"engine": 44.1, "transmission": 49.6, "battery": 73.1, "body": 80.1, "tyre": 51.6}},
-    {"id": "sim032", "name": "sim032", "type": "Truck", "status": "parked",     "lat": 26.8467, "lng": 80.9462, "city": "Lucknow, UP",              "route": "delhi_lucknow",       "driver": "T. Choudhary", "health": 94.6, "composite": 0.054},
-    {"id": "sim033", "name": "sim033", "type": "Truck", "status": "parked",     "lat": 26.9124, "lng": 75.7873, "city": "Jaipur, Rajasthan",        "route": "delhi_jaipur",        "driver": "N. Malik",     "health": 77.5, "composite": 0.225},
+    {"id": "sim032", "name": "sim032", "type": "Truck", "status": "parked",     "lat": 26.8467, "lng": 80.9462, "city": "Lucknow, UP",              "route": "delhi_lucknow",       "driver": "T. Choudhary", "health": 94.6, "composite": 0.054, "module_health": {"engine": 92.3, "transmission": 93.8, "battery": 96.4, "body": 97.1, "tyre": 91.7}},
+    {"id": "sim033", "name": "sim033", "type": "Truck", "status": "parked",     "lat": 26.9124, "lng": 75.7873, "city": "Jaipur, Rajasthan",        "route": "delhi_jaipur",        "driver": "N. Malik",     "health": 77.5, "composite": 0.225, "module_health": {"engine": 73.2, "transmission": 75.8, "battery": 82.4, "body": 85.3, "tyre": 71.6}},
     {"id": "sim034", "name": "sim034", "type": "Truck", "status": "in_service", "lat": 19.9975, "lng": 73.7898, "city": "Nashik, Maharashtra",      "route": "pune_nashik",         "driver": "P. Bisht",     "health": 51.4, "composite": 0.486, "module_health": {"engine": 38.4, "transmission": 43.9, "battery": 67.4, "body": 74.4, "tyre": 45.9}},
-    {"id": "sim035", "name": "sim035", "type": "Truck", "status": "parked",     "lat": 26.8467, "lng": 80.9462, "city": "Lucknow, UP",              "route": "delhi_lucknow",       "driver": "B. Joshi",     "health": 87.9, "composite": 0.121},
-    {"id": "sim036", "name": "sim036", "type": "Truck", "status": "parked",     "lat": 30.7333, "lng": 76.7794, "city": "Chandigarh",               "route": "delhi_chandigarh",    "driver": "E. Ansari",    "health": 83.2, "composite": 0.168},
+    {"id": "sim035", "name": "sim035", "type": "Truck", "status": "parked",     "lat": 26.8467, "lng": 80.9462, "city": "Lucknow, UP",              "route": "delhi_lucknow",       "driver": "B. Joshi",     "health": 87.9, "composite": 0.121, "module_health": {"engine": 84.3, "transmission": 86.7, "battery": 91.2, "body": 93.5, "tyre": 83.1}},
+    {"id": "sim036", "name": "sim036", "type": "Truck", "status": "parked",     "lat": 30.7333, "lng": 76.7794, "city": "Chandigarh",               "route": "delhi_chandigarh",    "driver": "E. Ansari",    "health": 83.2, "composite": 0.168, "module_health": {"engine": 79.4, "transmission": 81.6, "battery": 87.3, "body": 89.7, "tyre": 77.8}},
     {"id": "sim037", "name": "sim037", "type": "Truck", "status": "in_service", "lat": 22.7196, "lng": 75.8577, "city": "Indore, Madhya Pradesh",   "route": "bhopal_indore",       "driver": "C. Thakur",    "health": 40.9, "composite": 0.591, "module_health": {"engine": 27.9, "transmission": 33.4, "battery": 56.9, "body": 63.9, "tyre": 35.4}},
-    {"id": "sim038", "name": "sim038", "type": "Truck", "status": "parked",     "lat": 27.1767, "lng": 78.0081, "city": "Agra, UP",                 "route": "delhi_agra",          "driver": "S. Negi",      "health": 75.8, "composite": 0.242},
-    {"id": "sim039", "name": "sim039", "type": "Truck", "status": "parked",     "lat": 25.3176, "lng": 82.9739, "city": "Varanasi, UP",             "route": "lucknow_varanasi",    "driver": "V. Taneja",    "health": 81.7, "composite": 0.183},
-    {"id": "sim040", "name": "sim040", "type": "Truck", "status": "parked",     "lat": 30.3165, "lng": 78.0322, "city": "Dehradun, Uttarakhand",    "route": "delhi_dehradun",      "driver": "M. Saxena",    "health": 72.3, "composite": 0.277},
+    {"id": "sim038", "name": "sim038", "type": "Truck", "status": "parked",     "lat": 27.1767, "lng": 78.0081, "city": "Agra, UP",                 "route": "delhi_agra",          "driver": "S. Negi",      "health": 75.8, "composite": 0.242, "module_health": {"engine": 71.3, "transmission": 73.9, "battery": 80.6, "body": 83.2, "tyre": 69.8}},
+    {"id": "sim039", "name": "sim039", "type": "Truck", "status": "parked",     "lat": 25.3176, "lng": 82.9739, "city": "Varanasi, UP",             "route": "lucknow_varanasi",    "driver": "V. Taneja",    "health": 81.7, "composite": 0.183, "module_health": {"engine": 77.9, "transmission": 80.4, "battery": 86.1, "body": 88.4, "tyre": 76.2}},
+    {"id": "sim040", "name": "sim040", "type": "Truck", "status": "parked",     "lat": 30.3165, "lng": 78.0322, "city": "Dehradun, Uttarakhand",    "route": "delhi_dehradun",      "driver": "M. Saxena",    "health": 72.3, "composite": 0.277, "module_health": {"engine": 68.1, "transmission": 70.7, "battery": 76.9, "body": 79.5, "tyre": 66.4}},
 ]
 
 
@@ -68,6 +68,29 @@ def get_severity(health):
     if health >= 60:
         return "warning"
     return "critical"
+
+
+def get_maintenance_forecast() -> dict:
+    within_1_week = 0
+    weeks_1_2 = 0
+    weeks_3_4 = 0
+    over_1_month = 0
+    for v in VEHICLES:
+        h = v["health"]
+        if h < 40:
+            within_1_week += 1
+        elif h < 50:
+            weeks_1_2 += 1
+        elif h < 80:
+            weeks_3_4 += 1
+        else:
+            over_1_month += 1
+    return {
+        "within_1_week": within_1_week,
+        "weeks_1_2": weeks_1_2,
+        "weeks_3_4": weeks_3_4,
+        "over_1_month": over_1_month,
+    }
 
 
 def get_fleet_summary():

@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from trip_engine import TripEngine
-from fleet_config import VEHICLES, get_fleet_summary
+from fleet_config import VEHICLES, get_fleet_summary, get_maintenance_forecast
 
 app = FastAPI(title="Fleet Simulator", version="1.0.0")
 
@@ -79,6 +79,11 @@ async def fleet_summary():
     scores = [st.behavior.score for st in engine.active_vehicles.values()]
     summary["avg_driver_score"] = round(sum(scores) / len(scores), 1) if scores else 100.0
     return summary
+
+
+@app.get("/api/fleet/maintenance-forecast")
+async def maintenance_forecast():
+    return get_maintenance_forecast()
 
 
 @app.get("/api/fleet/positions")

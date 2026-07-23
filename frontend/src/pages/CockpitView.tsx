@@ -99,7 +99,9 @@ import ExploreIcon from "@mui/icons-material/Explore";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
-import Draggable from "react-draggable";
+import DraggableLib from "react-draggable";
+// react-draggable type definitions require all props; cast to avoid noise since defaults handle them at runtime
+const Draggable = DraggableLib as unknown as React.ComponentType<{ children: React.ReactElement; handle?: string; cancel?: string }>;
 import { useStore } from "../store";
 import { useGoldStream } from "../contexts/GoldStreamContext";
 const FLEET_API = "http://127.0.0.1:8009/api/fleet";
@@ -154,6 +156,13 @@ interface VehiclePosition {
   driver_score: number;
   road_type: string;
   route_name: string;
+}
+
+interface MaintenanceForecast {
+  within_1_week: number;
+  weeks_1_2: number;
+  weeks_3_4: number;
+  over_1_month: number;
 }
 
 interface PipelineVehicle {
@@ -793,16 +802,16 @@ function KpiCard({
             >
               {label}
             </Typography>
-            <Stack direction="row" spacing={0.4} alignItems="center" mt={0.7}>
+            <Stack direction="row" spacing={0.4} alignItems="center" mt={0.7} sx={{ flexWrap: "nowrap", overflow: "hidden" }}>
               {iconLogo === true ? (
                 <>
                   {trend === "up" ? (
                     <TrendingUpOutlinedIcon
-                      sx={{ fontSize: "10px", color: trendColor }}
+                      sx={{ fontSize: "10px", color: trendColor, flexShrink: 0 }}
                     />
                   ) : (
                     <TrendingDownOutlinedIcon
-                      sx={{ fontSize: "10px", color: trendColor }}
+                      sx={{ fontSize: "10px", color: trendColor, flexShrink: 0 }}
                     />
                   )}
                 </>
@@ -810,6 +819,7 @@ function KpiCard({
                 ""
               )}
               <Typography
+                noWrap
                 sx={{
                   fontSize: "var(--app-font-xs)",
                   color: trendColor,
@@ -1838,8 +1848,10 @@ function alertRelativeTime(ts: string): string {
 
 function RecentAlerts({
   onTotalChange,
+  disableExternalNav = false,
 }: {
   onTotalChange: (n: number) => void;
+  disableExternalNav?: boolean;
 }) {
   const navigate = useNavigate();
   const [displayed, setDisplayed] = useState<DisplayAlert[]>([]);
@@ -1941,7 +1953,7 @@ function RecentAlerts({
               size="small"
               variant="outlined"
               sx={{ fontSize: "8px", py: "1px", px: "6px" }}
-              onClick={() => navigate("/fleet-health#alerts-feed")}
+              onClick={() => { if (!disableExternalNav) navigate("/fleet-health#alerts-feed"); }}
             >
               View All
             </Button>
@@ -2061,11 +2073,11 @@ function RecentAlerts({
       )}
       {!loading && total > displayed.length && displayed.length > 0 && (
         <Box
-          onClick={() => navigate("/fleet-health#alerts-feed")}
+          onClick={() => { if (!disableExternalNav) navigate("/fleet-health#alerts-feed"); }}
           sx={{
             mt: 0.3,
             textAlign: "center",
-            cursor: "pointer",
+            cursor: disableExternalNav ? "default" : "pointer",
             flexShrink: 0,
           }}
         >
@@ -2776,16 +2788,18 @@ type FleetTableColId = (typeof FLEET_TABLE_COLUMNS)[number]["id"];
 
 export default function CockpitView({
   isActive = true,
+  disableExternalNav = false,
 }: {
   isActive?: boolean;
+  disableExternalNav?: boolean;
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
-  const [vehiclePopoverAnchor, setVehiclePopoverAnchor] = useState(null);
+  const [vehiclePopoverAnchor, setVehiclePopoverAnchor] = useState<HTMLElement | null>(null);
 
-  const [popoverPosition, setPopoverPosition] = useState(null);
+  const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
 
   const [drawerTab, setDrawerTab] = useState(0);
   const [openFleetScatter, setOpenFleetScatter] = useState(false);
@@ -2804,7 +2818,7 @@ export default function CockpitView({
     | "healthy"
     | "warning"
     | "critical"
-  >("critical");
+  >("all");
   const [healthScoreFilter, setHealthScoreFilter] = useState("all");
 
   const [statusFilterMap, setStatusFilterMap] = useState("all");
@@ -2897,7 +2911,7 @@ export default function CockpitView({
     };
   }, [handleDragMove, handleDragEnd]);
 
-  const handleOpenVehicle = (event, vehicle) => {
+  const handleOpenVehicle = (event: React.MouseEvent<HTMLElement>, vehicle: string) => {
     setVehiclePopoverAnchor(event.currentTarget);
     setSelectedVehicle(vehicle);
     setDragPos({ x: 0, y: 0 });
@@ -2915,6 +2929,14 @@ export default function CockpitView({
     retry: 1,
     refetchInterval: isActive && autoRefresh ? 10000 : false,
   });
+  const { data: maintenanceForecastData } = useQuery<MaintenanceForecast>({
+    queryKey: ["fleet-maintenance-forecast"],
+    queryFn: () =>
+      axios.get(`${FLEET_API}/maintenance-forecast`).then((r) => r.data),
+    retry: 1,
+    refetchInterval: isActive && autoRefresh ? 10000 : false,
+  });
+
   const { data: positions, refetch: refetchPositions } = useQuery<
     VehiclePosition[]
   >({
@@ -3559,7 +3581,7 @@ export default function CockpitView({
   const healthColor = (h: number) =>
     h >= 80 ? "#22c55e" : h >= 60 ? "#eab308" : "#ef4444";
 
-  const DraggablePaper = React.forwardRef(function DraggablePaper(props, ref) {
+  const DraggablePaper = React.forwardRef<HTMLDivElement, React.ComponentProps<typeof Paper>>(function DraggablePaper(props, ref) {
     return (
       <Draggable
         handle=".drag-header"
@@ -3810,7 +3832,7 @@ export default function CockpitView({
       : 0;
     const predictedFailures = criticalCount + Math.ceil(warningCount * 0.35);
     const maintenanceForecast = serviceCount + predictedFailures;
-    const resolvedToday = 0;
+    const resolvedToday = alertsMetrics?.closed_alerts?.length ?? 0;
     const backendSummaryDriver = Number(summary.avg_driver_score);
     const hasSummaryDriver =
       summary.avg_driver_score !== null &&
@@ -3844,6 +3866,7 @@ export default function CockpitView({
     };
   }, [
     activeCount,
+    alertsMetrics,
     alertTotal,
     allPositions,
     criticalCount,
@@ -4061,38 +4084,34 @@ export default function CockpitView({
 
   const maintenanceRows = [
     {
-      label: "0-5 Days",
-      value: criticalCount,
+      label: "< 1 Week",
+      value: maintenanceForecastData?.within_1_week ?? criticalCount,
       color: "#ef4444",
       reason:
-        "Maintenance is due now for poor-health vehicles to reduce breakdown exposure.",
+        "Health below 40% — immediate service required to prevent breakdown.",
     },
     {
-      label: "5-10 Days",
-      value: serviceCount + Math.ceil(warningCount * 0.35),
+      label: "1-2 Weeks",
+      value: maintenanceForecastData?.weeks_1_2 ?? 0,
       color: "#f59e0b",
       reason:
-        "Workshop vehicles plus warning vehicles should be serviced before risk escalates.",
+        "Health 40–60%: schedule within two weeks before risk escalates to breakdown.",
     },
     {
-      label: "10-15 Days",
-      value: Math.max(
-        0,
-        executiveMetrics.maintenanceForecast - criticalCount - serviceCount
-      ),
+      label: "3-4 Weeks",
+      value: maintenanceForecastData?.weeks_3_4 ?? Math.ceil(warningCount * 0.6),
       color: "#22c55e",
       reason:
-        "Planned items can be scheduled with route and utilization windows to avoid downtime.",
+        "Health 60–80%: plan service around route windows to minimise downtime.",
     },
     {
-      label: ">15 Days",
-      value: Math.max(
-        0,
-        executiveMetrics.total - executiveMetrics.maintenanceForecast
-      ),
+      label: "> 1 Month",
+      value:
+        maintenanceForecastData?.over_1_month ??
+        Math.max(0, executiveMetrics.total - executiveMetrics.maintenanceForecast),
       color: "#06b6d4",
       reason:
-        "Healthy available vehicles can be grouped into later planned maintenance cycles.",
+        "Health ≥ 80%: healthy vehicles — group into routine monthly maintenance cycle.",
     },
   ];
 
@@ -4105,18 +4124,11 @@ export default function CockpitView({
       info: `Current alert pressure is driven by ${criticalCount} critical and ${warningCount} warning vehicles. Prioritize poor-health vehicles first.`,
     },
     {
-      label: "Predicted Failures",
-      value: `${executiveMetrics.predictedFailures}`,
-      hint: "AI risk forecast",
-      rows: predictedFailureRows,
-      info: `Predicted failures are calculated from critical vehicles plus a weighted share of warning vehicles. Poor health should be maintained first because the failure window is shortest.`,
-    },
-    {
       label: "Maintenance Forecast",
-      value: `${executiveMetrics.maintenanceForecast}`,
-      hint: "service demand",
+      value: `${(maintenanceForecastData?.within_1_week ?? 0) + (maintenanceForecastData?.weeks_1_2 ?? 0)}`,
+      hint: "need service within 2 weeks",
       rows: maintenanceRows,
-      info: `Maintenance forecast combines vehicles already in workshop with predicted failures. Service before these windows to avoid route disruption and emergency repair cost.`,
+      info: `Forecast derived from per-vehicle health scores. ${maintenanceForecastData?.within_1_week ?? criticalCount} vehicles need immediate service (health < 40%), ${maintenanceForecastData?.weeks_1_2 ?? serviceCount} within 2 weeks (health 40–60%). Schedule proactively to avoid emergency repair cost.`,
     },
   ];
 
@@ -4490,7 +4502,7 @@ export default function CockpitView({
             color="#ef4444"
             trend="down"
             iconLogo={true}
-            onClick={() => navigate("/fleet-health#alerts-feed")}
+            onClick={disableExternalNav ? undefined : () => navigate("/fleet-health#alerts-feed")}
           />
         </Box>
 
@@ -4516,7 +4528,7 @@ export default function CockpitView({
               }}
             >
               {/* MAP */}
-              <Grid item xs={12} sm={4} sx={{ minHeight: 0, height: "100%" }}>
+              <Grid item xs={12} sm={5} sx={{ minHeight: 0, height: "100%" }}>
                 <Paper
                   sx={{
                     height: "100%",
@@ -4832,9 +4844,9 @@ export default function CockpitView({
               <Grid
                 item
                 xs={12}
-                sm={8}
-                md={8}
-                lg={8}
+                sm={7}
+                md={7}
+                lg={7}
                 sx={{ minHeight: 0, height: "100%" }}
               >
                 <Box
@@ -4844,7 +4856,7 @@ export default function CockpitView({
                     width: "100%",
                     height: "100%",
                     minHeight: 0,
-                    gridTemplateColumns: "repeat(20, minmax(0, 1fr))",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                     gridTemplateRows: "repeat(2, minmax(0, 1fr))",
                     gridAutoRows: "minmax(0, 1fr)",
                   }}
@@ -4857,7 +4869,6 @@ export default function CockpitView({
                       display: "grid",
                       gridTemplateRows: "auto 1fr auto",
                       gap: 0.25,
-                      gridColumn: { xs: "span 20", sm: "span 5" },
                       overflow: "hidden",
                       border: `1px solid ${alpha(topHealthColor, 0.28)}`,
                       background: isDark
@@ -4899,7 +4910,6 @@ export default function CockpitView({
                       gridTemplateRows: "auto auto 1fr",
                       alignItems: "start",
                       gap: 0.55,
-                      gridColumn: { xs: "span 20", sm: "span 5" },
                       overflow: "hidden",
                       border: `1px solid ${alpha(topAvailabilityColor, 0.28)}`,
                       background: isDark
@@ -4970,7 +4980,6 @@ export default function CockpitView({
                       gridTemplateRows: "auto auto auto 1fr",
                       alignItems: "start",
                       gap: 0.4,
-                      gridColumn: { xs: "span 20", sm: "span 5" },
                       overflow: "hidden",
                       border: `1px solid ${alpha(topUtilizationColor, 0.28)}`,
                       background: isDark
@@ -5012,45 +5021,6 @@ export default function CockpitView({
                       />
                     </Box>
                   </Card>
-                  <Card
-                    sx={{
-                      p: 1,
-                      minHeight: 0,
-                      height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto 1fr auto",
-                      gap: 0.25,
-                      gridColumn: { xs: "span 20", sm: "span 5" },
-                      overflow: "hidden",
-                      border: `1px solid ${alpha(topRiskColor, 0.28)}`,
-                      background: isDark
-                        ? `linear-gradient(145deg, ${alpha(
-                            topRiskColor,
-                            0.12
-                          )}, rgba(15,23,42,0.92))`
-                        : `linear-gradient(145deg, ${alpha(
-                            topRiskColor,
-                            0.08
-                          )}, #ffffff)`,
-                    }}
-                  >
-                    <Typography sx={topCardTitleSx}>AI Risk Index</Typography>
-                    <Box sx={{ minHeight: 0 }}>
-                      <HealthGauge
-                        value={riskScore}
-                        color={topRiskColor}
-                        formatter="{value}%"
-                      />
-                    </Box>
-                    <Box sx={{ textAlign: "center", mt: -0.5 }}>
-                      <Typography sx={{ ...topCardSubSx, color: topRiskColor }}>
-                        {riskLabel(riskScore)}
-                      </Typography>
-                      <Typography sx={topCardMetaSx}>
-                        {executiveMetrics.atRisk} vehicles at risk
-                      </Typography>
-                    </Box>
-                  </Card>
                   {chartCards.map((card) => {
                     const maxValue = Math.max(
                       1,
@@ -5069,8 +5039,7 @@ export default function CockpitView({
                             display: "flex",
                             flexDirection: "column",
                             gap: 0.5,
-                            gridColumn: { xs: "span 20", sm: "span 5" },
-                            overflow: "hidden",
+                                  overflow: "hidden",
                             border: `1px solid ${alpha(
                               card.rows[0].color,
                               0.22
@@ -5335,21 +5304,17 @@ export default function CockpitView({
                                         sx={{
                                           height: "100%",
                                           display: "flex",
-                                          alignItems: "end",
-                                          justifyContent: "center",
-                                          position: "relative",
+                                          flexDirection: "column",
+                                          alignItems: "center",
+                                          justifyContent: "flex-end",
                                         }}
                                       >
                                         <Typography
                                           sx={{
-                                            position: "absolute",
-                                            bottom: `${Math.max(
-                                              14,
-                                              (row.value / maxValue) * 100
-                                            )}%`,
-                                            mb: 0.25,
                                             fontSize: 8,
                                             fontWeight: 900,
+                                            lineHeight: 1,
+                                            mb: 0.3,
                                             color: isDark
                                               ? "#e2e8f0"
                                               : "#0f172a",
@@ -5361,10 +5326,10 @@ export default function CockpitView({
                                           sx={{
                                             width: "55%",
                                             height: `${Math.max(
-                                              12,
-                                              (row.value / maxValue) * 82
+                                              8,
+                                              (row.value / maxValue) * 80
                                             )}%`,
-                                            minHeight: 12,
+                                            minHeight: 8,
                                             bgcolor: row.color,
                                             borderRadius: "3px 3px 0 0",
                                             boxShadow: `0 0 14px ${alpha(
@@ -5395,8 +5360,7 @@ export default function CockpitView({
                         {isAlerts && (
                           <Box
                             sx={{
-                              gridColumn: { xs: "span 20", sm: "span 5" },
-                              minHeight: 0,
+                                      minHeight: 0,
                             }}
                           >
                             <Card
@@ -5910,26 +5874,28 @@ export default function CockpitView({
                   </Box>
 
                   <Stack direction="row" spacing={0.5} alignItems="center">
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        fontSize: "8px",
-                        py: "1px",
-                        px: "6px",
-                        whiteSpace: "nowrap",
-                      }}
-                      onClick={() => {
-                        setSelectedVehicle(null);
-                        navigate(
-                          `/automotive?vehicle=${encodeURIComponent(
-                            selectedVehicle ?? ""
-                          )}`
-                        );
-                      }}
-                    >
-                      Deep Dive →
-                    </Button>
+                    {!disableExternalNav && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          fontSize: "8px",
+                          py: "1px",
+                          px: "6px",
+                          whiteSpace: "nowrap",
+                        }}
+                        onClick={() => {
+                          setSelectedVehicle(null);
+                          navigate(
+                            `/automotive?vehicle=${encodeURIComponent(
+                              selectedVehicle ?? ""
+                            )}`
+                          );
+                        }}
+                      >
+                        Deep Dive →
+                      </Button>
+                    )}
                     <IconButton
                       size="small"
                       onClick={() => setSelectedVehicle(null)}
@@ -6093,27 +6059,29 @@ export default function CockpitView({
                                       {showHistTripOverlay ? "Hide Trip" : "Load Last Trip"}
                                     </Button>
                                   )}
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={() => {
-                                      setSelectedVehicle(null);
-                                      navigate(
-                                        `/automotive?vehicle=${encodeURIComponent(
-                                          vehicleDetail.vehicle_id
-                                        )}`
-                                      );
-                                    }}
-                                    sx={{
-                                      fontSize: "8px",
-                                      py: "2px",
-                                      px: "8px",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    Deep Dive →
-                                  </Button>
+                                  {!disableExternalNav && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={() => {
+                                        setSelectedVehicle(null);
+                                        navigate(
+                                          `/automotive?vehicle=${encodeURIComponent(
+                                            vehicleDetail.vehicle_id
+                                          )}`
+                                        );
+                                      }}
+                                      sx={{
+                                        fontSize: "8px",
+                                        py: "2px",
+                                        px: "8px",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      Deep Dive →
+                                    </Button>
+                                  )}
                                 </Stack>
                               </Box>
                               <IconButton
@@ -6521,13 +6489,10 @@ export default function CockpitView({
                                       color: "text.secondary",
                                     }}
                                   >
-                                    {new Date(
-                                      lastTripData.last_trip.end_time || (lastTripData.last_trip as any).end_ts
-                                    ).toLocaleDateString("en-IN", {
-                                      day: "numeric",
-                                      month: "short",
-                                      year: "numeric",
-                                    })}
+                                    {(() => {
+                                      const _fmt = (iso: string) => iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) : "–";
+                                      return `${_fmt(lastTripData.last_trip.start_time)} → ${_fmt(lastTripData.last_trip.end_time || (lastTripData.last_trip as any).end_ts)}`;
+                                    })()}
                                   </Typography>
                                   <Typography
                                     sx={{
@@ -7619,14 +7584,14 @@ export default function CockpitView({
                                         </Typography>
 
                                         {(() => {
-                                          const counts = {};
+                                          const counts: Record<string, number> = {};
 
                                           tripData.route
                                             .slice(
                                               0,
                                               tripData.completed_index + 1
                                             )
-                                            .forEach((p) => {
+                                            .forEach((p: any) => {
                                               counts[p.road_type] =
                                                 (counts[p.road_type] || 0) + 1;
                                             });
@@ -7637,7 +7602,7 @@ export default function CockpitView({
                                               0
                                             ) || 1;
 
-                                          const colors = {
+                                          const colors: Record<string, string> = {
                                             highway: "#2563eb",
                                             primary: "#9333ea",
                                             urban: "#f59e0b",
@@ -7917,7 +7882,7 @@ export default function CockpitView({
                             color: isDark ? "#e2e8f0" : "#1e293b",
                             fontFamily: CHART_FONT,
                           },
-                          formatter: (p) => {
+                          formatter: (p: any) => {
                             const originalIdx = fleetHealthScatter.findIndex(
                               (v) => v.vehicle_id === p.seriesName
                             );
@@ -7947,7 +7912,7 @@ export default function CockpitView({
                           axisLabel: {
                             ...commonXAxis.axisLabel,
 
-                            formatter: (v) =>
+                            formatter: (v: any) =>
                               String(v).slice(5, 16).replace("T", " "),
                           },
                         },
@@ -8751,12 +8716,12 @@ export default function CockpitView({
             <Grid
               item
               xs={12}
-              sm={4}
+              sm={5}
               sx={{
                 minHeight: 0,
                 height: "100%",
                 display: "grid",
-                gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+                gridTemplateRows: "1fr",
                 gap: 0.75,
               }}
             >
@@ -8815,7 +8780,7 @@ export default function CockpitView({
                       lineHeight: 1.35,
                       color: "text.secondary",
                       display: "-webkit-box",
-                      WebkitLineClamp: 7,
+                      WebkitLineClamp: 14,
                       WebkitBoxOrient: "vertical",
                       overflow: "hidden",
                     }}
@@ -8865,79 +8830,9 @@ export default function CockpitView({
                   </Typography>
                 </Box>
               </Card>
-              <Card
-                sx={{
-                  p: 1,
-                  minHeight: 0,
-                  overflow: "hidden",
-                  border: `1px solid ${alpha("#8b5cf6", 0.28)}`,
-                  background: isDark
-                    ? `linear-gradient(145deg, ${alpha(
-                        "#8b5cf6",
-                        0.14
-                      )}, rgba(15,23,42,0.9))`
-                    : `linear-gradient(145deg, ${alpha(
-                        "#8b5cf6",
-                        0.08
-                      )}, #ffffff)`,
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <Box
-                    sx={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: "50%",
-                      display: "grid",
-                      placeItems: "center",
-                      color: "#8b5cf6",
-                      bgcolor: alpha("#8b5cf6", 0.14),
-                      border: `1px solid ${alpha("#8b5cf6", 0.25)}`,
-                    }}
-                  >
-                    <TipsAndUpdatesOutlinedIcon sx={{ fontSize: 14 }} />
-                  </Box>
-                  <Typography
-                    sx={{
-                      fontSize: 10,
-                      fontWeight: 900,
-                      color: "#8b5cf6",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    AI Recommendations
-                  </Typography>
-                </Stack>
-                <Stack
-                  component="ul"
-                  sx={{
-                    mt: 0.55,
-                    mb: 0,
-                    pl: 2,
-                    gap: 0.32,
-                    overflow: "hidden",
-                  }}
-                >
-                  {aiRecommendationItems.map((recommendation) => (
-                    <Typography
-                      component="li"
-                      key={recommendation}
-                      sx={{
-                        fontSize: 9.7,
-                        lineHeight: 1.25,
-                        color: "text.secondary",
-                        pl: 0.1,
-                        "&::marker": { color: "#8b5cf6" },
-                      }}
-                    >
-                      {recommendation}
-                    </Typography>
-                  ))}
-                </Stack>
-              </Card>
             </Grid>
 
-            <Grid item xs={12} sm={8} sx={{ minHeight: 0, height: "100%" }}>
+            <Grid item xs={12} sm={7} sx={{ minHeight: 0, height: "100%" }}>
               <Paper
                 elevation={0}
                 sx={{
@@ -9320,9 +9215,9 @@ export default function CockpitView({
                               <TableRow
                                 key={`top-${row.vehicle_id}`}
                                 hover
-                                onClick={() => navigate(`/automotive?vehicle=${encodeURIComponent(row.vehicle_id)}`)}
+                                onClick={disableExternalNav ? undefined : () => navigate(`/automotive?vehicle=${encodeURIComponent(row.vehicle_id)}`)}
                                 sx={{
-                                  cursor: "pointer",
+                                  cursor: disableExternalNav ? "default" : "pointer",
                                   bgcolor: rowBg,
                                   "&:hover": {
                                     bgcolor: isDark
@@ -9463,6 +9358,7 @@ export default function CockpitView({
                                 <Box>
                                   <Typography
                                     onClick={() => {
+                                      if (disableExternalNav) return;
                                       navigate(
                                         `/automotive?vehicle=${encodeURIComponent(
                                           row.vehicle_id
@@ -9472,13 +9368,15 @@ export default function CockpitView({
                                     sx={{
                                       fontSize: "12px",
                                       fontWeight: 700,
-                                      color: isDark ? "#22d3ee" : "#0891b2",
+                                      color: disableExternalNav
+                                        ? "text.primary"
+                                        : isDark ? "#22d3ee" : "#0891b2",
                                       lineHeight: 1.25,
-                                      cursor: "pointer",
-                                      textDecoration: "underline",
-                                      "&:hover": {
-                                        color: "#1976d2",
-                                      },
+                                      cursor: disableExternalNav ? "default" : "pointer",
+                                      textDecoration: disableExternalNav ? "none" : "underline",
+                                      "&:hover": disableExternalNav
+                                        ? {}
+                                        : { color: "#1976d2" },
                                     }}
                                   >
                                     {(row.name ?? row.vehicle_id)

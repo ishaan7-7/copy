@@ -127,6 +127,12 @@ function fmt(n: number): string {
   return String(Math.round(n));
 }
 
+function fmtMs(ms: number): string {
+  if (ms < 1_000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1_000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1_000)}s`;
+}
+
 function agGridSx(isDark: boolean) {
   return {
     "--ag-background-color": "transparent",
@@ -348,7 +354,7 @@ function InspectorToolbar({ isDark, children }: { isDark: boolean; children: Rea
     <Box sx={{
       px: 2, py: 1,
       bgcolor: isDark ? "#060f1a" : "#f1f5f9",
-      borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08)}`,
+      borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.14)}`,
       display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0, flexWrap: "wrap",
     }}>
       {children}
@@ -405,13 +411,13 @@ function ModuleJsonViewer({ isDark }: { isDark: boolean }) {
   return (
     <Box sx={{
       flexShrink: 0,
-      borderTop: `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.07)}`,
+      borderTop: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.13)}`,
     }}>
       {/* Section header */}
       <Box sx={{
         px: 2, py: 1,
         bgcolor: isDark ? "#060f1a" : "#f1f5f9",
-        borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.07)}`,
+        borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.13)}`,
         display: "flex", alignItems: "center", gap: 1.5,
       }}>
         <Typography sx={{
@@ -474,7 +480,7 @@ function ModuleJsonViewer({ isDark }: { isDark: boolean }) {
                 display: "flex",
                 flexDirection: "column",
                 borderRight: idx < data.length - 1
-                  ? `1px solid ${isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.07)}`
+                  ? `1px solid ${isDark ? alpha("#7dd3fc", 0.15) : alpha("#1f2937", 0.12)}`
                   : "none",
               }}>
                 {/* Card header */}
@@ -608,7 +614,7 @@ function VehiclesInspector({ isDark, observerData }: { isDark: boolean; observer
       valueFormatter: (p) => p.value != null ? `${Math.round(p.value)}s` : "—" },
   ], []);
 
-  const bd = isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08);
+  const bd = isDark ? alpha("#7dd3fc", 0.18) : alpha("#1f2937", 0.15);
 
   const chartData = useMemo(
     () => vehicles.map((v: any) => ({
@@ -901,12 +907,12 @@ function DlqInspector({
         {/* Count card */}
         <Box sx={{
           p: 2.5, borderRadius: 2, flex: "0 0 auto",
-          bgcolor: isDark ? alpha(c, 0.07) : alpha(c, 0.04),
-          border: `1px solid ${alpha(c, 0.2)}`,
+          bgcolor: isDark ? alpha(c, 0.14) : alpha(c, 0.08),
+          border: `1px solid ${alpha(c, 0.38)}`,
           borderLeft: `4px solid ${c}`,
           minWidth: 180,
         }}>
-          <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.5px", color: alpha(c, 0.7), mb: 1 }}>
+          <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.5px", color: c, mb: 1 }}>
             DEAD LETTER QUEUE
           </Typography>
           <Typography sx={{ fontSize: "52px", fontWeight: 900, color: c, lineHeight: 1 }}>
@@ -920,8 +926,8 @@ function DlqInspector({
         {/* Status banner */}
         <Box sx={{
           p: 2, borderRadius: 2, flex: 1, minWidth: 200,
-          bgcolor: isDark ? alpha(c, 0.05) : alpha(c, 0.03),
-          border: `1px solid ${alpha(c, 0.15)}`,
+          bgcolor: isDark ? alpha(c, 0.1) : alpha(c, 0.06),
+          border: `1px solid ${alpha(c, 0.3)}`,
           display: "flex", flexDirection: "column", justifyContent: "center",
         }}>
           <Typography sx={{ fontSize: "13px", fontWeight: 700, color: isDark ? "#e2e8f0" : "#0f172a", mb: 0.5 }}>
@@ -935,7 +941,7 @@ function DlqInspector({
         </Box>
       </Box>
 
-      <Divider sx={{ mx: 2, borderColor: isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08) }} />
+      <Divider sx={{ mx: 2, borderColor: isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.14) }} />
 
       <Box sx={{ p: 2 }}>
         <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.5px", color: isDark ? "#64748b" : "#94a3b8", mb: 1.5 }}>
@@ -953,12 +959,12 @@ function DlqInspector({
             return (
               <Box key={mod} sx={{
                 px: 2, py: 1.5, borderRadius: 1.5,
-                bgcolor: isDark ? alpha(mc, 0.08) : alpha(mc, 0.05),
-                border: `1px solid ${alpha(mc, 0.25)}`,
+                bgcolor: isDark ? alpha(mc, 0.15) : alpha(mc, 0.09),
+                border: `1px solid ${alpha(mc, 0.4)}`,
                 borderTop: `3px solid ${mc}`,
                 minWidth: 90, textAlign: "center",
               }}>
-                <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.8px", color: alpha(mc, 0.7) }}>
+                <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.8px", color: mc }}>
                   {mod.toUpperCase()}
                 </Typography>
                 <Typography sx={{ fontSize: "18px", fontWeight: 800, color: mc, lineHeight: 1.3 }}>
@@ -1088,7 +1094,7 @@ function FleetInspector({
     { label: "FLEET HEALTH", value: fh !== null ? `${fh.toFixed(1)}%` : "—", color: hc },
     { label: "ACTIVE VEHICLES", value: `${vehicleList.length}`, color: "#38bdf8" },
     { label: "TOTAL GOLD ROWS", value: totalRows.toLocaleString(), color: "#fbbf24" },
-    { label: "MAX LAG", value: goldData != null ? (lag > 0 ? `${fmt(lag)}ms` : "0ms") : "—", color: lag > 1_000 ? "#ef4444" : "#22c55e" },
+    { label: "MAX LAG", value: goldData != null ? (lag > 0 ? fmtMs(lag) : "0ms") : "—", color: lag > 1_000 ? "#ef4444" : "#22c55e" },
   ];
 
   return (
@@ -1111,7 +1117,7 @@ function FleetInspector({
         ))}
       </Box>
 
-      <Divider sx={{ mx: 2, borderColor: isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08) }} />
+      <Divider sx={{ mx: 2, borderColor: isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.14) }} />
 
       <Box sx={{ p: 2 }}>
         <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.5px", color: isDark ? "#64748b" : "#94a3b8", mb: 1.5 }}>
@@ -1167,7 +1173,7 @@ function NodeCard({
   return (
     <Paper elevation={isDark ? 0 : 2} onClick={() => onClick(id)} sx={{
       p: 1.5, borderRadius: 0, cursor: "pointer", position: "relative", overflow: "hidden",
-      border: `1px solid ${isDark ? alpha(accent, 0.18) : alpha(accent, 0.14)}`,
+      border: `1px solid ${isDark ? alpha(accent, 0.32) : alpha(accent, 0.24)}`,
       borderTop: `3px solid ${accent}`,
       transition: "all 0.2s ease",
       "&:hover": {
@@ -1188,7 +1194,7 @@ function NodeCard({
         <Box sx={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
           <svg width="44" height="44" viewBox="0 0 44 44" style={{ position: "absolute", top: 0, left: 0 }}>
             <circle cx="22" cy="22" r={r} fill="none"
-              stroke={alpha(accent, isDark ? 0.12 : 0.08)} strokeWidth="3" />
+              stroke={alpha(accent, isDark ? 0.22 : 0.15)} strokeWidth="3" />
             <circle cx="22" cy="22" r={r} fill="none"
               stroke={accent} strokeWidth="3" strokeLinecap="round"
               strokeDasharray={`${filled} ${circ}`}
@@ -1247,7 +1253,7 @@ function NodeCard({
         ))}
       </Box>
 
-      <Typography sx={{ fontSize: "7.5px", fontWeight: 700, letterSpacing: "0.5px", color: alpha(accent, 0.45), mt: 1, textAlign: "right" }}>
+      <Typography sx={{ fontSize: "7.5px", fontWeight: 700, letterSpacing: "0.5px", color: alpha(accent, 0.85), mt: 1, textAlign: "right" }}>
         INSPECT ▶
       </Typography>
     </Paper>
@@ -1377,10 +1383,10 @@ function InspectorDrawer({
           maxHeight: "82vh",
           display: "flex",
           flexDirection: "column",
-          border: `1px solid ${isDark ? alpha(accent, 0.2) : alpha(accent, 0.15)}`,
+          border: `1px solid ${isDark ? alpha(accent, 0.35) : alpha(accent, 0.25)}`,
           boxShadow: isDark
-            ? `0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px ${alpha(accent, 0.12)}`
-            : `0 24px 64px rgba(0,0,0,0.18), 0 0 0 1px ${alpha(accent, 0.1)}`,
+            ? `0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px ${alpha(accent, 0.2)}`
+            : `0 24px 64px rgba(0,0,0,0.18), 0 0 0 1px ${alpha(accent, 0.15)}`,
         },
       }}
       slotProps={{
@@ -1396,7 +1402,7 @@ function InspectorDrawer({
         background: isDark
           ? `linear-gradient(90deg, ${alpha(accent, 0.16)} 0%, ${alpha(accent, 0.05)} 40%, transparent 70%)`
           : `linear-gradient(90deg, ${alpha(accent, 0.1)} 0%, ${alpha(accent, 0.03)} 40%, transparent 70%)`,
-        borderBottom: `1px solid ${isDark ? alpha(accent, 0.15) : alpha(accent, 0.12)}`,
+        borderBottom: `1px solid ${isDark ? alpha(accent, 0.28) : alpha(accent, 0.22)}`,
         display: "flex", alignItems: "center", gap: 2,
       }}>
         <Box sx={{ width: 4, height: 44, borderRadius: 2, bgcolor: accent, flexShrink: 0 }} />
@@ -1481,7 +1487,7 @@ function SectionHeader({ isDark, title, accent }: {
     <Box sx={{
       px: 2, py: 1,
       display: "flex", alignItems: "center", gap: 1.5,
-      borderBottom: `1px solid ${isDark ? alpha(accent, 0.1) : alpha(accent, 0.1)}`,
+      borderBottom: `1px solid ${isDark ? alpha(accent, 0.22) : alpha(accent, 0.18)}`,
     }}>
       <Box sx={{ width: 3, height: 14, borderRadius: "2px", bgcolor: accent, flexShrink: 0 }} />
       <Typography sx={{ fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", color: isDark ? "#e2e8f0" : "#0f172a" }}>
@@ -1502,16 +1508,16 @@ function KpiTile({ label, value, sub, color, isDark }: {
   return (
     <Box sx={{
       flex: "1 1 0", minWidth: 110, p: 1.75,
-      bgcolor: isDark ? alpha(color, 0.06) : alpha(color, 0.04),
-      border: `1px solid ${alpha(color, isDark ? 0.18 : 0.14)}`,
+      bgcolor: isDark ? alpha(color, 0.12) : alpha(color, 0.07),
+      border: `1px solid ${alpha(color, isDark ? 0.32 : 0.24)}`,
       borderTop: `3px solid ${color}`,
       borderRadius: 1,
       transition: "background 0.15s",
-      "&:hover": { bgcolor: isDark ? alpha(color, 0.1) : alpha(color, 0.07) },
+      "&:hover": { bgcolor: isDark ? alpha(color, 0.18) : alpha(color, 0.12) },
     }}>
       <Typography sx={{
         fontSize: "7.5px", fontWeight: 700, letterSpacing: "1.2px",
-        color: alpha(color, isDark ? 0.6 : 0.55), mb: 0.75, lineHeight: 1,
+        color: alpha(color, isDark ? 0.9 : 0.85), mb: 0.75, lineHeight: 1,
       }}>
         {label}
       </Typography>
@@ -1572,11 +1578,11 @@ function FleetIntelligenceSection({ isDark, writerData, inferenceData, goldData,
     { label: "ACTIVE VEHICLES",    value: vehicleCount > 0 ? String(vehicleCount) : "—",                        sub: "simulation feeds",                                       color: "#22c55e" },
     { label: "FLEET HEALTH",       value: fleetHealth !== null ? `${fleetHealth.toFixed(0)}%` : "—",             sub: fleetHealth !== null ? (fleetHealth >= 75 ? "nominal" : fleetHealth >= 50 ? "degraded" : "critical") : "no data", color: fhColor },
     { label: "GOLD ROWS",          value: totalGoldRows > 0 ? fmt(totalGoldRows) : "—",                         sub: "fused records total",                                    color: "#fbbf24" },
-    { label: "MAX LAG",            value: goldData != null ? (globalLag > 0 ? `${fmt(globalLag)}ms` : "0ms") : "—",   sub: goldData != null ? (globalLag > 2000 ? "high latency" : globalLag > 0 ? "acceptable" : "caught up") : "no data", color: lagColor },
+    { label: "MAX LAG",            value: goldData != null ? (globalLag > 0 ? `${fmtMs(globalLag)}` : "0ms") : "—",   sub: goldData != null ? (globalLag > 2000 ? "high latency" : globalLag > 0 ? "acceptable" : "caught up") : "no data", color: lagColor },
     { label: "ACTIVE WRITERS",     value: totalWriters > 0 ? `${activeWriters}/${totalWriters}` : "—",           sub: "bronze writers running",                                 color: "#f59e0b" },
     { label: "BRONZE THROUGHPUT",  value: totalWriters > 0 ? (totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "0/m") : "—", sub: avgLatencyMs > 0 ? `avg ${avgLatencyMs.toFixed(0)}ms lat` : "pipeline idle", color: "#f59e0b" },
     { label: "ML MODULES",         value: activeModules > 0 ? `${activeModules}/5` : "—",                       sub: totalInferences > 0 ? `${fmt(totalInferences)} inf/5m` : "no inferences", color: "#38bdf8" },
-    { label: "PIPELINE E2E",       value: globalE2E > 0 ? `${fmt(globalE2E)}ms` : "—",                          sub: "sensor → gold latency",                                  color: "#38bdf8" },
+    { label: "PIPELINE E2E",       value: globalE2E > 0 ? `${fmtMs(globalE2E)}` : "—",                          sub: "sensor → gold latency",                                  color: "#38bdf8" },
   ];
 
   const vehicleColDefs = useMemo<ColDef[]>(() => [
@@ -1613,13 +1619,13 @@ function FleetIntelligenceSection({ isDark, writerData, inferenceData, goldData,
 
   const subHeaderSx = {
     px: 2, py: 0.75, flexShrink: 0,
-    borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.06) : alpha("#1f2937", 0.06)}`,
+    borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.14) : alpha("#1f2937", 0.12)}`,
   };
 
   return (
     <Paper elevation={0} sx={{
       borderRadius: 0, overflow: "hidden",
-      border: `1px solid ${isDark ? alpha("#22c55e", 0.12) : alpha("#22c55e", 0.1)}`,
+      border: `1px solid ${isDark ? alpha("#22c55e", 0.25) : alpha("#22c55e", 0.2)}`,
     }}>
       <SectionHeader isDark={isDark} title="FLEET INTELLIGENCE" accent="#22c55e" />
 
@@ -1628,14 +1634,14 @@ function FleetIntelligenceSection({ isDark, writerData, inferenceData, goldData,
         {kpis.map((k) => <KpiTile key={k.label} {...k} isDark={isDark} />)}
       </Box>
 
-      <Divider sx={{ borderColor: isDark ? alpha("#7dd3fc", 0.06) : alpha("#1f2937", 0.06) }} />
+      <Divider sx={{ borderColor: isDark ? alpha("#7dd3fc", 0.14) : alpha("#1f2937", 0.12) }} />
 
       {/* Bottom: vehicle grid + module bars */}
       <Box sx={{ display: "flex", minHeight: 270 }}>
         {/* Vehicle Status */}
         <Box sx={{
           flex: 3, minWidth: 0, display: "flex", flexDirection: "column",
-          borderRight: `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.07)}`,
+          borderRight: `1px solid ${isDark ? alpha("#7dd3fc", 0.16) : alpha("#1f2937", 0.13)}`,
         }}>
           <Box sx={subHeaderSx}>
             <Typography sx={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.5px", color: isDark ? "#64748b" : "#94a3b8" }}>
@@ -1688,13 +1694,13 @@ function FleetIntelligenceSection({ isDark, writerData, inferenceData, goldData,
                     )}
                     {e2e > 0 && (
                       <Typography sx={{ fontSize: "9px", color: isDark ? "#64748b" : "#94a3b8", ml: 0.5 }}>
-                        {fmt(e2e)}ms
+                        {fmtMs(e2e)}
                       </Typography>
                     )}
                   </Box>
                   <Box sx={{
                     height: 5, borderRadius: 3,
-                    bgcolor: isDark ? alpha(color, 0.1) : alpha(color, 0.08),
+                    bgcolor: isDark ? alpha(color, 0.2) : alpha(color, 0.15),
                   }}>
                     <Box sx={{
                       height: "100%", borderRadius: 3,
@@ -1726,20 +1732,20 @@ function PipelineColumn({
     <Box sx={{
       flex: 1, minWidth: 0, display: "flex", flexDirection: "column",
       borderRight: borderRight
-        ? `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.07)}`
+        ? `1px solid ${isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.15)}`
         : "none",
     }}>
       <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
       <Box sx={{
         px: 2, py: 0.85, flexShrink: 0,
-        bgcolor: isDark ? alpha(accent, 0.07) : alpha(accent, 0.05),
-        borderBottom: `1px solid ${alpha(accent, isDark ? 0.14 : 0.12)}`,
+        bgcolor: isDark ? alpha(accent, 0.13) : alpha(accent, 0.09),
+        borderBottom: `1px solid ${alpha(accent, isDark ? 0.28 : 0.22)}`,
         display: "flex", alignItems: "center", gap: 1,
       }}>
         <Box sx={{
           px: 0.75, py: 0.25, borderRadius: "4px",
-          bgcolor: alpha(accent, isDark ? 0.18 : 0.12),
-          border: `1px solid ${alpha(accent, 0.3)}`,
+          bgcolor: alpha(accent, isDark ? 0.25 : 0.18),
+          border: `1px solid ${alpha(accent, 0.45)}`,
         }}>
           <Typography sx={{ fontSize: "8px", fontWeight: 700, letterSpacing: "1.2px", color: accent }}>
             {badge}
@@ -1793,8 +1799,8 @@ function WriterCard({ id, m, isDark }: { id: string; m: any; isDark: boolean }) 
   return (
     <Box sx={{
       p: 1.25, borderRadius: 1,
-      bgcolor: isDark ? alpha(c, 0.06) : alpha(c, 0.04),
-      border: `1px solid ${alpha(c, running ? 0.18 : 0.3)}`,
+      bgcolor: isDark ? alpha(c, 0.13) : alpha(c, 0.08),
+      border: `1px solid ${alpha(c, running ? 0.35 : 0.45)}`,
       borderLeft: `3px solid ${c}`,
     }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.85 }}>
@@ -1804,7 +1810,7 @@ function WriterCard({ id, m, isDark }: { id: string; m: any; isDark: boolean }) 
         <Box sx={{
           display: "flex", alignItems: "center", gap: 0.5,
           px: 0.6, py: 0.2, borderRadius: "3px",
-          bgcolor: alpha(c, 0.14),
+          bgcolor: alpha(c, 0.22),
         }}>
           <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: c,
             animation: running ? "ds-pulse 2s ease-in-out infinite" : "none" }} />
@@ -1816,7 +1822,7 @@ function WriterCard({ id, m, isDark }: { id: string; m: any; isDark: boolean }) 
       <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
         <MetricPair label="THROUGHPUT" value={m.throughput > 0 ? `${fmt(m.throughput)}/m` : "0/m"} isDark={isDark} />
         <MetricPair label="LATENCY" value={m.latency_ms > 0 ? `${m.latency_ms.toFixed(1)}ms` : "—"} isDark={isDark} />
-        <MetricPair label="LAG" value={m.true_lag > 0 ? `${fmt(m.true_lag)}ms` : "0ms"}
+        <MetricPair label="LAG" value={m.true_lag > 0 ? fmtMs(m.true_lag) : "0ms"}
           color={m.true_lag > 1000 ? "#ef4444" : undefined} isDark={isDark} />
       </Box>
     </Box>
@@ -1833,9 +1839,9 @@ function InferenceCard({ mod, stats, isDark }: { mod: string; stats: any; isDark
   return (
     <Box sx={{
       p: 1.25, borderRadius: 1,
-      bgcolor: isDark ? alpha(color, 0.06) : alpha(color, 0.04),
-      border: `1px solid ${alpha(color, active ? 0.2 : 0.1)}`,
-      borderLeft: `3px solid ${active ? color : alpha(color, 0.3)}`,
+      bgcolor: isDark ? alpha(color, 0.13) : alpha(color, 0.08),
+      border: `1px solid ${alpha(color, active ? 0.35 : 0.2)}`,
+      borderLeft: `3px solid ${active ? color : alpha(color, 0.5)}`,
     }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.85 }}>
         <Typography sx={{ fontSize: "10px", fontWeight: 700, color, flex: 1, letterSpacing: "0.4px" }}>
@@ -1848,8 +1854,8 @@ function InferenceCard({ mod, stats, isDark }: { mod: string; stats: any; isDark
         )}
       </Box>
       <Box sx={{ display: "flex", gap: 2 }}>
-        <MetricPair label="E2E" value={e2e > 0 ? `${fmt(e2e)}ms` : "—"} isDark={isDark} />
-        <MetricPair label="INFERENCE" value={inf > 0 ? `${fmt(inf)}ms` : "—"} isDark={isDark} />
+        <MetricPair label="E2E" value={e2e > 0 ? fmtMs(e2e) : "—"} isDark={isDark} />
+        <MetricPair label="INFERENCE" value={inf > 0 ? fmtMs(inf) : "—"} isDark={isDark} />
         {!active && <MetricPair label="STATUS" value="IDLE" color="#64748b" isDark={isDark} />}
       </Box>
     </Box>
@@ -1865,8 +1871,8 @@ function StreamCard({ v, isDark, offset = 0 }: { v: any; isDark: boolean; offset
   return (
     <Box sx={{
       p: 1.25, borderRadius: 1,
-      bgcolor: isDark ? alpha(c, 0.05) : alpha(c, 0.04),
-      border: `1px solid ${alpha(c, 0.18)}`,
+      bgcolor: isDark ? alpha(c, 0.12) : alpha(c, 0.08),
+      border: `1px solid ${alpha(c, 0.35)}`,
       borderLeft: `3px solid ${c}`,
     }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.85 }}>
@@ -1893,7 +1899,7 @@ function StreamCard({ v, isDark, offset = 0 }: { v: any; isDark: boolean; offset
   );
 }
 
-function LiveStreamColumn({ isDark, observerData }: { isDark: boolean; observerData: any }) {
+function LiveStreamColumn({ isDark, observerData, borderRight }: { isDark: boolean; observerData: any; borderRight?: boolean }) {
   const [tick, setTick] = useState(0);
 
   useEffect(() => { setTick(0); }, [observerData]);
@@ -1907,7 +1913,7 @@ function LiveStreamColumn({ isDark, observerData }: { isDark: boolean; observerD
 
   return (
     <PipelineColumn accent="#22c55e" badge="LIVE STREAM" isDark={isDark}
-      empty={vehicles.length === 0}>
+      borderRight={borderRight} empty={vehicles.length === 0}>
       {vehicles.map((v) => (
         <StreamCard key={v.vehicle_id} v={v} isDark={isDark} offset={tick} />
       ))}
@@ -1934,11 +1940,13 @@ function PipelineObservabilitySection({ isDark, writerData, inferenceData, obser
   return (
     <Paper elevation={0} sx={{
       borderRadius: 0, overflow: "hidden",
-      border: `1px solid ${isDark ? alpha("#f59e0b", 0.12) : alpha("#f59e0b", 0.1)}`,
+      border: `1px solid ${isDark ? alpha("#f59e0b", 0.25) : alpha("#f59e0b", 0.2)}`,
     }}>
       <SectionHeader isDark={isDark} title="PIPELINE OBSERVABILITY" accent="#f59e0b" />
 
       <Box sx={{ display: "flex", minHeight: 360 }}>
+        <LiveStreamColumn isDark={isDark} observerData={observerData} borderRight />
+
         <PipelineColumn accent="#f59e0b" badge="BRONZE LAYER" isDark={isDark}
           borderRight empty={writerEntries.length === 0}>
           {writerEntries.map(([id, m]) => (
@@ -1947,13 +1955,11 @@ function PipelineObservabilitySection({ isDark, writerData, inferenceData, obser
         </PipelineColumn>
 
         <PipelineColumn accent="#38bdf8" badge="SILVER ML" isDark={isDark}
-          borderRight empty={moduleEntries.length === 0}>
+          empty={moduleEntries.length === 0}>
           {moduleEntries.map(([mod, stats]) => (
             <InferenceCard key={mod} mod={mod} stats={stats} isDark={isDark} />
           ))}
         </PipelineColumn>
-
-        <LiveStreamColumn isDark={isDark} observerData={observerData} />
       </Box>
     </Paper>
   );
@@ -1994,7 +2000,7 @@ function WeightPanel({
       width: isAb ? 232 : 256,
       flexShrink: 0,
       bgcolor: isDark ? alpha("#0d2137", 0.5) : alpha("#f1f5f9", 0.6),
-      border: `1px solid ${isDark ? alpha(accentColor, 0.15) : alpha(accentColor, 0.12)}`,
+      border: `1px solid ${isDark ? alpha(accentColor, 0.28) : alpha(accentColor, 0.22)}`,
       borderTop: `3px solid ${accentColor}`,
       display: "flex",
       flexDirection: "column",
@@ -2002,7 +2008,7 @@ function WeightPanel({
       <Box sx={{
         px: 1.5, py: 0.75,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        borderBottom: `1px solid ${isDark ? alpha(accentColor, 0.1) : alpha(accentColor, 0.08)}`,
+        borderBottom: `1px solid ${isDark ? alpha(accentColor, 0.2) : alpha(accentColor, 0.15)}`,
       }}>
         <Typography sx={{ fontSize: "10px", fontWeight: 700, letterSpacing: "1px", color: isDark ? alpha(accentColor, 0.9) : alpha(accentColor, 0.75) }}>
           {label}
@@ -2110,7 +2116,7 @@ function WeightPanel({
 
       <Box sx={{
         px: 1.5, pt: 0.75, pb: 1,
-        borderTop: `1px solid ${isDark ? alpha(accentColor, 0.08) : alpha(accentColor, 0.06)}`,
+        borderTop: `1px solid ${isDark ? alpha(accentColor, 0.18) : alpha(accentColor, 0.13)}`,
         display: "flex", gap: 0.5,
       }}>
         <TextField
@@ -2180,7 +2186,7 @@ function DegradationDriversSection({ isDark, vehicleList, isActive }: {
       elevation={0}
       sx={{
         borderRadius: 2,
-        border: `1px solid ${isDark ? alpha(accent, 0.18) : alpha(accent, 0.25)}`,
+        border: `1px solid ${isDark ? alpha(accent, 0.3) : alpha(accent, 0.35)}`,
         bgcolor: isDark ? alpha(accent, 0.04) : alpha(accent, 0.03),
         overflow: "hidden",
       }}
@@ -2188,7 +2194,7 @@ function DegradationDriversSection({ isDark, vehicleList, isActive }: {
       <Box sx={{
         px: 2, py: 1.25,
         display: "flex", alignItems: "center", gap: 1.5,
-        borderBottom: `1px solid ${isDark ? alpha(accent, 0.14) : alpha(accent, 0.18)}`,
+        borderBottom: `1px solid ${isDark ? alpha(accent, 0.25) : alpha(accent, 0.28)}`,
       }}>
         <Box sx={{ width: 3, height: 14, borderRadius: 1, bgcolor: accent, flexShrink: 0 }} />
         <Typography sx={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: isDark ? "#94a3b8" : "#64748b" }}>
@@ -2406,13 +2412,13 @@ function WeightLabSection({ isDark, vehicleList, isActive }: {
   return (
     <Paper elevation={0} sx={{
       borderRadius: 0, overflow: "hidden",
-      border: `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08)}`,
+      border: `1px solid ${isDark ? alpha("#7dd3fc", 0.18) : alpha("#1f2937", 0.15)}`,
     }}>
       <SectionHeader isDark={isDark} title="WEIGHT LAB" accent="#a855f7" />
 
       <Box sx={{
         px: 2, py: 0.75,
-        borderBottom: `1px solid ${isDark ? alpha("#a855f7", 0.1) : alpha("#a855f7", 0.08)}`,
+        borderBottom: `1px solid ${isDark ? alpha("#a855f7", 0.2) : alpha("#a855f7", 0.15)}`,
         display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap",
       }}>
         <ToggleButtonGroup
@@ -2804,11 +2810,11 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
         {/* SECTION 1: PIPELINE FLOW */}
         <Paper elevation={0} sx={{
           borderRadius: 0, overflow: "hidden",
-          border: `1px solid ${isDark ? alpha("#7dd3fc", 0.08) : alpha("#1f2937", 0.08)}`,
+          border: `1px solid ${isDark ? alpha("#7dd3fc", 0.2) : alpha("#1f2937", 0.15)}`,
         }}>
           <Box sx={{
             px: 2, py: 1,
-            borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.07) : alpha("#1f2937", 0.06)}`,
+            borderBottom: `1px solid ${isDark ? alpha("#7dd3fc", 0.15) : alpha("#1f2937", 0.12)}`,
             display: "flex", alignItems: "center", gap: 1,
           }}>
             <AccountTreeRoundedIcon sx={{ fontSize: 14, color: isDark ? "#7dd3fc" : "#005071" }} />
@@ -2861,7 +2867,7 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
                   { label: "THROUGHPUT", value: totalWriters > 0 ? (totalThroughput > 0 ? `${fmt(totalThroughput)}/m` : "0/m") : "—" },
                   { label: "AVG LAT", value: avgLatencyMs > 0 ? `${avgLatencyMs.toFixed(0)}ms` : "—" },
                   { label: "PEAK LAG",
-                    value: totalWriters > 0 ? (maxWriterLag > 0 ? `${fmt(maxWriterLag)}ms` : "0ms") : "—",
+                    value: totalWriters > 0 ? (maxWriterLag > 0 ? fmtMs(maxWriterLag) : "0ms") : "—",
                     color: maxWriterLag > 1000 ? "#ef4444" : maxWriterLag > 300 ? "#eab308" : undefined },
                 ]}
                 isDark={isDark} onClick={openDrawer} />
@@ -2886,7 +2892,7 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
                 metrics={[
                   { label: "INF/5M", value: totalInferences > 0 ? fmt(totalInferences) : "—" },
                   { label: "INF LAT", value: avgInfLatency > 0 ? `${avgInfLatency.toFixed(0)}ms` : "—" },
-                  { label: "E2E LAT", value: globalE2E > 0 ? `${fmt(globalE2E)}ms` : "—" },
+                  { label: "E2E LAT", value: globalE2E > 0 ? `${fmtMs(globalE2E)}` : "—" },
                 ]}
                 isDark={isDark} onClick={openDrawer} />
 
@@ -2906,7 +2912,7 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
                     value: fleetHealth !== null ? `${fleetHealth.toFixed(0)}%` : "—",
                     color: fleetHealth !== null ? (fleetHealth >= 75 ? "#22c55e" : fleetHealth >= 50 ? "#eab308" : "#ef4444") : undefined },
                   { label: "PIPELINE LAG",
-                    value: goldData != null ? (globalLag > 0 ? `${fmt(globalLag)}ms` : "0ms") : "—",
+                    value: goldData != null ? (globalLag > 0 ? `${fmtMs(globalLag)}` : "0ms") : "—",
                     color: globalLag > 2000 ? "#ef4444" : globalLag > 500 ? "#eab308" : undefined },
                   { label: "VEHICLES", value: `${vehicleList.length}` },
                 ]}

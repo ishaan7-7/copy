@@ -165,24 +165,8 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
   const sensorKeys = MODULE_SENSOR_KEYS[selectedModule] || [];
 
   useEffect(() => {
-    if (sensorKeys.length === 0) return;
-    const alerts = [
-      ...(alertsMetricsQuery.data?.open_alerts || []),
-      ...(alertsMetricsQuery.data?.closed_alerts || []),
-    ].filter((a: Record<string, string>) => a.module === selectedModule);
-    if (alerts.length > 0) {
-      try {
-        const feats = JSON.parse(String(alerts[0].top_10_features || "{}"));
-        const topSensor = Object.entries(feats).sort(
-          ([, a], [, b]) => Number(b) - Number(a)
-        )[0]?.[0];
-        if (topSensor && sensorKeys.includes(topSensor)) {
-          setSelectedSensor(topSensor);
-          return;
-        }
-      } catch {}
-    }
-    setSelectedSensor(sensorKeys[0]);
+    setSelectedSensor("");
+    setLoadEvidence(false);
   }, [selectedModule]);
 
   const alertsMetricsQuery = useQuery({
@@ -452,7 +436,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
   return (
     <Box
       sx={{
-        height: "calc(100vh - 80px)",
+        height: "100%",
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
@@ -562,7 +546,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
               label="Vehicle"
               MenuProps={{
                 PaperProps: {
-                  sx: { "& .MuiMenuItem-root": { fontSize: "10px", fontFamily: "monospace" } },
+                  sx: { maxHeight: 300, overflowY: "auto", "& .MuiMenuItem-root": { fontSize: "10px", fontFamily: "monospace" } },
                 },
               }}
             >
@@ -585,7 +569,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
             onChange={(_e, val) => {
               if (val) {
                 setSelectedModule(val);
-                setSelectedSensor(MODULE_SENSOR_KEYS[val]?.[0] || "");
+                setSelectedSensor("");
               }
             }}
             sx={{
@@ -1643,8 +1627,10 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
                           size="small"
                           label={f.replace(/_/g, " ")}
                           onClick={() => {
-                            setSelectedSensor(f);
-                            setLoadEvidence(true);
+                            if (sensorKeys.includes(f)) {
+                              setSelectedSensor(f);
+                              setLoadEvidence(true);
+                            }
                           }}
                           sx={{
                             borderRadius: "4px",
@@ -1662,7 +1648,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
                     <Typography
                       sx={{ color: "text.disabled", fontSize: "9px", mt: 0.5, display: "block", fontFamily: "monospace" }}
                     >
-                      click feature → load sensor evidence
+                      click feature to auto-load sensor evidence
                     </Typography>
                   </Box>
                 )}

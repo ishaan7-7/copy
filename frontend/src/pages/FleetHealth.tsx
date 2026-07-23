@@ -543,7 +543,8 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const { autoRefresh, toggleAutoRefresh } = useStore();
-  const { enabled_modules: ALL_MODULES } = useSystemConfig();
+  const { enabled_modules: _rawModules } = useSystemConfig();
+  const ALL_MODULES = _rawModules as Module[];
 
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [activeModule, setActiveModule] = useState<Module>("engine");
@@ -562,12 +563,23 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     if (location.hash !== "#alerts-feed") return;
-    window.requestAnimationFrame(() => {
-      document.getElementById("alerts-feed")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
+    const t = setTimeout(() => {
+      const el = document.getElementById("alerts-feed");
+      if (!el) return;
+      const headerH =
+        parseInt(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--app-header-h"
+          )
+        ) || 42;
+      const elRect = el.getBoundingClientRect();
+      const scrollParent = el.closest("main") ?? document.documentElement;
+      const parentRect = scrollParent.getBoundingClientRect();
+      const offset = elRect.top - parentRect.top - headerH - 8;
+      if (Math.abs(offset) < 2) return;
+      scrollParent.scrollBy({ top: offset, behavior: "smooth" });
+    }, 500);
+    return () => clearTimeout(t);
   }, [location.hash]);
 
   const fleetQuery = useQuery<FleetSummary>({
@@ -1177,7 +1189,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
       <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2.5 }}>
 
         {/* Section 1: Vital Signs */}
-        <Paper id="alerts-feed" elevation={0} sx={{ ...iSx(isDark), p: 2 }}>
+        <Paper elevation={0} sx={{ ...iSx(isDark), p: 2 }}>
           <SectionHeader
             title="Fleet Vital Signs"
             accent={accentGreen}
@@ -1328,37 +1340,39 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
           <Paper elevation={0} sx={{ ...iSx(isDark), p: 2 }}>
             <SectionHeader title="Fleet Health Distribution" accent="#38bdf8" />
-            <Box sx={{ height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={healthBarData} margin={{ top: 4, right: 8, bottom: 20, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} vertical={false} />
-                  <XAxis
-                    dataKey="id"
-                    tick={{ fontSize: 8, fill: chartTextColor }}
-                    angle={-45}
-                    textAnchor="end"
-                    interval={0}
-                    height={40}
-                  />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: chartTextColor }} width={30} />
-                  <RcTooltip
-                    cursor={{ fill: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" }}
-                    contentStyle={{
-                      background: isDark ? "#131722" : "#fff",
-                      border: `1px solid ${isDark ? "#2d3748" : "#e2e8f0"}`,
-                      borderRadius: 6,
-                      fontSize: 11,
-                    }}
-                    itemStyle={{ color: isDark ? "#cbd5e1" : "#374151" }}
-                    labelStyle={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 600 }}
-                  />
-                  <Bar dataKey="score" radius={[2, 2, 0, 0]} name="Health Score">
-                    {healthBarData.map((entry, i) => (
-                      <Cell key={i} fill={healthColor(entry.score)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <Box sx={{ overflowX: "auto" }}>
+              <Box sx={{ height: 220, minWidth: healthBarData.length * 16 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={healthBarData} margin={{ top: 4, right: 8, bottom: 20, left: 0 }} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} vertical={false} />
+                    <XAxis
+                      dataKey="id"
+                      tick={{ fontSize: 7, fill: chartTextColor }}
+                      angle={-45}
+                      textAnchor="end"
+                      interval={0}
+                      height={40}
+                    />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: chartTextColor }} width={30} />
+                    <RcTooltip
+                      cursor={{ fill: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" }}
+                      contentStyle={{
+                        background: isDark ? "#131722" : "#fff",
+                        border: `1px solid ${isDark ? "#2d3748" : "#e2e8f0"}`,
+                        borderRadius: 6,
+                        fontSize: 11,
+                      }}
+                      itemStyle={{ color: isDark ? "#cbd5e1" : "#374151" }}
+                      labelStyle={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 600 }}
+                    />
+                    <Bar dataKey="score" maxBarSize={14} radius={[2, 2, 0, 0]} name="Health Score">
+                      {healthBarData.map((entry, i) => (
+                        <Cell key={i} fill={healthColor(entry.score)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
             </Box>
           </Paper>
 
@@ -1481,7 +1495,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
                 </Typography>
                 <Box
                   className={isDark ? "ag-theme-balham-dark" : "ag-theme-balham"}
-                  sx={{ height: (modRankingQuery.data?.rankings?.length ?? 0) * 28 + 32, width: "100%", ...agGridSx(isDark) }}
+                  sx={{ height: Math.min((modRankingQuery.data?.rankings?.length ?? 0) * 28 + 32, 400), width: "100%", ...agGridSx(isDark) }}
                 >
                   <AgGridReact
                     rowData={modRankingQuery.data?.rankings ?? []}
@@ -1498,7 +1512,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
                 <Typography sx={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: isDark ? "#94a3b8" : "#64748b", mb: 1 }}>
                   Top Anomaly Features
                 </Typography>
-                <Box sx={{ height: (modRankingQuery.data?.rankings?.length ?? 0) * 28 + 32 }}>
+                <Box sx={{ height: 300 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       layout="vertical"
@@ -1696,7 +1710,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
         </Paper>
 
         {/* Section 6: Live Alerts Feed */}
-        <Paper elevation={0} sx={{ ...iSx(isDark), p: 2 }}>
+        <Paper id="alerts-feed" elevation={0} sx={{ ...iSx(isDark), p: 2 }}>
           <SectionHeader
             title="Alerts Feed"
             accent={accentRed}

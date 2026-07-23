@@ -275,7 +275,8 @@ function MapController({
   useEffect(() => {
     if (
       selectedVehicle &&
-      tripData?.route?.length > 0 &&
+      tripData != null &&
+      tripData.route.length > 0 &&
       lastFittedVehicle.current !== selectedVehicle
     ) {
       lastFittedVehicle.current = selectedVehicle;
@@ -1004,9 +1005,9 @@ export default function FleetCenter() {
   const [openFleetScatter, setOpenFleetScatter] = useState(false);
   const [openVehicleHealth, setOpenVehicleHealth] = useState(false);
 
-  const [vehiclePopoverAnchor, setVehiclePopoverAnchor] = useState(null);
+  const [vehiclePopoverAnchor, setVehiclePopoverAnchor] = useState<Element | null>(null);
 
-  const [popoverPosition, setPopoverPosition] = useState(null);
+  const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
 
   // const handleCloseVehicle = () => {
   //   setSelectedVehicle(null);
@@ -1017,7 +1018,7 @@ export default function FleetCenter() {
   const dragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
 
-  const handleDragStart = (e) => {
+  const handleDragStart = (e: React.MouseEvent<Element>) => {
     dragging.current = true;
 
     start.current = {
@@ -1028,7 +1029,7 @@ export default function FleetCenter() {
     document.body.style.cursor = "grabbing";
   };
 
-  const handleDragMove = (e) => {
+  const handleDragMove = (e: MouseEvent) => {
     if (!dragging.current) return;
 
     setDragPos({
@@ -1052,7 +1053,7 @@ export default function FleetCenter() {
     };
   }, [dragPos]);
 
-  const handleOpenVehicle = (event, vehicle) => {
+  const handleOpenVehicle = (event: React.MouseEvent, vehicle: string) => {
     setVehiclePopoverAnchor(event.currentTarget);
     setSelectedVehicle(vehicle);
   };
@@ -1288,9 +1289,9 @@ export default function FleetCenter() {
   const healthColor = (h: number) =>
     h >= 80 ? "#22c55e" : h >= 60 ? "#eab308" : "#ef4444";
 
-  const bounds = [
-    [-90, -180], // southwest
-    [90, 180], // northeast
+  const bounds: [[number, number], [number, number]] = [
+    [-90, -180],
+    [90, 180],
   ];
 
   const commonAxisLabel = {
@@ -1358,23 +1359,30 @@ export default function FleetCenter() {
     },
   };
 
-  const DraggablePaper = React.forwardRef(function DraggablePaper(props, ref) {
-    return (
-      <Draggable
-        handle=".drag-header"
-        cancel='[class*="MuiTabs-root"],[class*="MuiButtonBase-root"],input,textarea,.MuiTabs-scroller'
-      >
-        <Paper
-          ref={ref}
-          {...props}
-          sx={{
-            ...(props.sx || {}),
-            cursor: "default",
-          }}
-        />
-      </Draggable>
-    );
-  });
+  const DraggableWrap = Draggable as unknown as React.ComponentType<{
+    handle?: string;
+    cancel?: string;
+    children: React.ReactElement;
+  }>;
+  const DraggablePaper = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof Paper>>(
+    function DraggablePaper(props, ref) {
+      return (
+        <DraggableWrap
+          handle=".drag-header"
+          cancel='[class*="MuiTabs-root"],[class*="MuiButtonBase-root"],input,textarea,.MuiTabs-scroller'
+        >
+          <Paper
+            ref={ref}
+            {...props}
+            sx={{
+              ...(props.sx || {}),
+              cursor: "default",
+            }}
+          />
+        </DraggableWrap>
+      );
+    }
+  );
   return (
     <Box
       sx={{
@@ -1633,7 +1641,7 @@ export default function FleetCenter() {
                   r.health ?? 0,
                 ]),
 
-                symbolSize: (val) => Math.max(8, (val[1] / 100) * 14),
+                symbolSize: (val: [string, number]) => Math.max(8, (val[1] / 100) * 14),
 
                 itemStyle: {
                   color: VEHICLE_COLORS[idx % VEHICLE_COLORS.length],
@@ -1664,7 +1672,7 @@ export default function FleetCenter() {
                     fontSize: 10,
                   },
 
-                  formatter: (p) => `
+                  formatter: (p: { seriesName: string; data: [string, number] }) => `
             <b>${p.seriesName}</b>
             <br/>
             ${p.data[0]}
@@ -1683,7 +1691,7 @@ export default function FleetCenter() {
                   axisLabel: {
                     ...commonXAxis.axisLabel,
 
-                    formatter: (v) => String(v).slice(5, 16).replace("T", " "),
+                    formatter: (v: string) => String(v).slice(5, 16).replace("T", " "),
                   },
                 },
 
@@ -3492,7 +3500,7 @@ export default function FleetCenter() {
                                   </Typography>
 
                                   {(() => {
-                                    const counts = {};
+                                    const counts: Record<string, number> = {};
 
                                     tripData.route
                                       .slice(0, tripData.completed_index + 1)
@@ -3507,7 +3515,7 @@ export default function FleetCenter() {
                                         0
                                       ) || 1;
 
-                                    const colors = {
+                                    const colors: Record<string, string> = {
                                       highway: "#2563eb",
                                       primary: "#9333ea",
                                       urban: "#f59e0b",

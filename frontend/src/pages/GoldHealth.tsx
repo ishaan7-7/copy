@@ -134,6 +134,7 @@ function WeightPanel({
   const [selectedPreset, setSelectedPreset] = useState("");
   const [saveAsName, setSaveAsName] = useState("");
   const { autoRefresh } = useStore();
+  const { enabled_modules: ALL_MODULES } = useSystemConfig();
   return (
     <Box
       sx={{

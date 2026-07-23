@@ -71,19 +71,19 @@ const nearestNamedValue = (question: string, values: string[]) => {
   if (direct) return direct;
 
   let best: { value: string; distance: number } | null = null;
-  values.forEach((value) => {
+  for (const value of values) {
     const targetWords = normalizedWords(value).split(" ");
-    words.forEach((word) => {
-      targetWords.forEach((target) => {
+    for (const word of words) {
+      for (const target of targetWords) {
         const distance = levenshtein(word, target);
         const limit = Math.max(1, Math.floor(target.length * 0.24));
         if (distance <= limit && (!best || distance < best.distance)) {
           best = { value, distance };
         }
-      });
-    });
-  });
-  return best?.value ?? null;
+      }
+    }
+  }
+  return best !== null ? best.value : null;
 };
 
 const solutionFor = (record: DtcKnowledgeRecord) => {
@@ -160,6 +160,11 @@ const formatRecordList = (
     ? `\nRecommended diagnostic approach: ${solutionFor(solutionExample)}`
     : "";
   return `${heading} (${sorted.length}):\n${lines.join("\n")}${solution}`;
+};
+
+export const getDtcDetails = (code: string): DtcRecord & { module: string } | null => {
+  const match = records.find((r) => r.dtc_code === code.toUpperCase());
+  return match ?? null;
 };
 
 export const answerDtcQuestion = (question: string): string | null => {
