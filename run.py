@@ -81,6 +81,7 @@ API_PORTS = (set(range(8001, 8010)) - {8005})
 running_processes = []
 open_log_files    = []
 HEAD_MODE         = False  # overridden from --head flag before main() is called
+DEV_FRONTEND      = False  # overridden from --dev-frontend flag before main() is called
 
 
 # --- Helpers ---
@@ -147,12 +148,17 @@ def launch_master_frontend():
     frontend_dir = os.path.join(ROOT_DIR, "master_dashboard", "frontend")
     dist_index   = os.path.join(frontend_dir, "dist", "index.html")
 
-    if os.path.exists(dist_index):
-        print("--- Frontend: serving production build from backend (port 8005) ---")
-        print("   Skipping Vite dev server (delete frontend/dist to use Vite again).")
-        print("   Opening browser at http://127.0.0.1:8005")
-        webbrowser.open("http://127.0.0.1:8005")
-        return
+    if os.path.exists(dist_index) and not DEV_FRONTEND:
+        print("--- Frontend: static build detected — checking freshness ---")
+        build_script = os.path.join(ROOT_DIR, "tools", "build_frontend.py")
+        result = subprocess.run([VENV_PYTHON, build_script, "--if-stale"], cwd=ROOT_DIR)
+        if result.returncode == 0:
+            print("--- Frontend: serving production build from backend (port 8005) ---")
+            print("   Pass --dev-frontend to use the Vite dev server instead.")
+            print("   Opening browser at http://127.0.0.1:8005")
+            webbrowser.open("http://127.0.0.1:8005")
+            return
+        print("   WARNING: frontend rebuild failed — falling back to Vite dev server.")
 
     print("--- Starting Master Dashboard Frontend (React/Vite) ---")
     npm_cmd      = os.path.join(NODE_DIR, "npm.cmd")
@@ -616,9 +622,11 @@ if __name__ == "__main__":
     parser.add_argument("--dashboard", action="store_true", help="Start master dashboard only (warns if APIs are not running)")
     parser.add_argument("--head",      action="store_true", help="Launch all services in visible terminal windows instead of log files")
     parser.add_argument("--skip-preflight", action="store_true", dest="skip_preflight", help="Skip config/data preflight validation")
+    parser.add_argument("--dev-frontend", action="store_true", dest="dev_frontend", help="Always use the Vite dev server, ignoring any built frontend/dist")
     args = parser.parse_args()
 
-    HEAD_MODE = args.head
+    HEAD_MODE    = args.head
+    DEV_FRONTEND = args.dev_frontend
 
     try:
         main(args)
