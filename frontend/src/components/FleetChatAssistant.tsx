@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useGoldStream } from "../contexts/GoldStreamContext";
+import { useStore } from "../store";
 import { answerDtcQuestion } from "../utils/dtcKnowledge";
 import {
   answerKnowledgeRepoQuestion,
@@ -137,17 +138,18 @@ export default function FleetChatAssistant({
   const navigate = useNavigate();
   const theme = useTheme();
   const { vehicles, connected } = useGoldStream();
+  const autoRefresh = useStore((s) => s.autoRefresh);
   const { data: fleetSummary, isError: fleetSummaryError } = useQuery<FleetFooterSummary>({
     queryKey: ["fleet-summary"],
     queryFn: () => axios.get(`${FLEET_API}/summary`).then((response) => response.data),
     retry: 1,
-    refetchInterval: 10000,
+    refetchInterval: autoRefresh ? 10000 : false,
   });
   const { data: fleetPositions, isError: fleetPositionsError } = useQuery<FleetFooterPosition[]>({
     queryKey: ["fleet-positions"],
     queryFn: () => axios.get(`${FLEET_API}/positions`).then((response) => response.data),
     retry: 1,
-    refetchInterval: 10000,
+    refetchInterval: autoRefresh ? 10000 : false,
   });
   const [open, setOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -412,31 +414,26 @@ export default function FleetChatAssistant({
   }, []);
 
   useEffect(() => {
+    let lastScrolledEl: HTMLElement | null = null;
+
     const hasScrolledContent = () => {
       const documentScrollTop =
         window.scrollY || document.documentElement.scrollTop || document.body.scrollTop;
       if (documentScrollTop > 120 || embeddedScrollTopRef.current > 120) return true;
-      const embeddedPageScrolled = Array.from(
-        document.querySelectorAll<HTMLIFrameElement>("iframe")
-      ).some((frame) => {
-        try {
-          const frameDocument = frame.contentDocument;
-          return (
-            Number(frameDocument?.scrollingElement?.scrollTop) > 120 ||
-            Number(frameDocument?.documentElement.scrollTop) > 120 ||
-            Number(frameDocument?.body.scrollTop) > 120
-          );
-        } catch {
-          return false;
-        }
-      });
-      if (embeddedPageScrolled) return true;
-      return Array.from(document.querySelectorAll<HTMLElement>("main, main *")).some(
-        (element) => element.scrollTop > 120
-      );
+      return !!(lastScrolledEl && lastScrolledEl.isConnected && lastScrolledEl.scrollTop > 120);
     };
 
     const refreshVisibility = () => setShowScrollTop(hasScrolledContent());
+    const handleScroll = (event: Event) => {
+      if (event.target instanceof HTMLElement) {
+        if (event.target.scrollTop > 120) {
+          lastScrolledEl = event.target;
+        } else if (event.target === lastScrolledEl) {
+          lastScrolledEl = event.target.scrollTop > 0 ? event.target : lastScrolledEl;
+        }
+      }
+      refreshVisibility();
+    };
     const handleEmbeddedScroll = (event: MessageEvent) => {
       if (
         typeof event.data === "object" &&
@@ -448,14 +445,14 @@ export default function FleetChatAssistant({
       }
     };
 
-    document.addEventListener("scroll", refreshVisibility, true);
+    document.addEventListener("scroll", handleScroll, true);
     window.addEventListener("scroll", refreshVisibility, { passive: true });
     window.addEventListener("message", handleEmbeddedScroll);
     window.requestAnimationFrame(refreshVisibility);
-    const visibilityPoll = window.setInterval(refreshVisibility, 250);
+    const visibilityPoll = window.setInterval(refreshVisibility, 2000);
 
     return () => {
-      document.removeEventListener("scroll", refreshVisibility, true);
+      document.removeEventListener("scroll", handleScroll, true);
       window.removeEventListener("scroll", refreshVisibility);
       window.removeEventListener("message", handleEmbeddedScroll);
       window.clearInterval(visibilityPoll);

@@ -62,7 +62,7 @@ async def shutdown_session():
 # _CB_OPEN_SEC and every request returns the last cached response
 # immediately (< 1 ms) instead of blocking for the full timeout.
 _CB_THRESHOLD  = 3
-_CB_OPEN_SEC   = 30.0
+_CB_OPEN_SEC   = 10.0
 _cb: dict = {}   # service_key -> {failures, open_until, last_ok}
 
 def _cb_state(key: str) -> dict:
@@ -221,6 +221,12 @@ except Exception as _import_err:
 async def _start_background_tasks():
     if _automotive_loop_fn is not None:
         asyncio.create_task(_automotive_loop_fn())
+
+_FRONTEND_DIST = _os.path.abspath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "frontend", "dist"))
+if _os.path.isdir(_FRONTEND_DIST):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
+    logger.info(f"Serving built frontend from {_FRONTEND_DIST} at http://127.0.0.1:8005/")
 
 if __name__ == "__main__":
     import uvicorn

@@ -68,6 +68,7 @@ import axios from "axios";
 import { useStore } from "../store";
 import { liveInterval, useRefetchOnActivate } from "../hooks/useApi";
 import { useSystemConfig } from "../hooks/useSystemConfig";
+import { useGoldStream } from "../contexts/GoldStreamContext";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
@@ -544,6 +545,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const isDark = theme.palette.mode === "dark";
   const { autoRefresh, toggleAutoRefresh } = useStore();
   const { enabled_modules: _rawModules } = useSystemConfig();
+  const { vehicles: sseVehicles, connected: sseConnected } = useGoldStream();
   const ALL_MODULES = _rawModules as Module[];
 
   const [vehicleSearch, setVehicleSearch] = useState("");
@@ -585,7 +587,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const fleetQuery = useQuery<FleetSummary>({
     queryKey: ["fh-fleet-summary"],
     queryFn: () => axios.get(`${API}/api/automotive/fleet-summary`).then((r) => r.data),
-    refetchInterval: liveInterval(8_000, isActive, autoRefresh),
+    refetchInterval: sseConnected ? false : liveInterval(8_000, isActive, autoRefresh),
     staleTime: 5_000,
   });
 
@@ -646,11 +648,11 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (fleetQuery.data || alertsQuery.data) {
+    if (fleetQuery.data || alertsQuery.data || sseVehicles.length) {
       setLastUpdatedAt(Date.now());
       setAgeSec(0);
     }
-  }, [fleetQuery.data, alertsQuery.data]);
+  }, [fleetQuery.data, alertsQuery.data, sseVehicles]);
 
   useEffect(() => {
     if (!lastUpdatedAt) return;
@@ -663,8 +665,23 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
 
   const fleetData = fleetQuery.data;
   const alertsData = alertsQuery.data;
-  const vehicles = fleetData?.vehicles ?? [];
-  const stats = fleetData?.fleet_stats;
+  const vehicles = useMemo<Vehicle[]>(() => {
+    if (sseConnected && sseVehicles.length) return sseVehicles as unknown as Vehicle[];
+    return fleetData?.vehicles ?? [];
+  }, [sseConnected, sseVehicles, fleetData?.vehicles]);
+  const stats = useMemo<FleetStats | undefined>(() => {
+    if (sseConnected && sseVehicles.length) {
+      const hs = sseVehicles.map((v) => v.health_score);
+      const avg = hs.reduce((a, b) => a + b, 0) / hs.length;
+      return {
+        total_vehicles: hs.length,
+        avg_health: Math.round(avg * 10) / 10,
+        critical_count: hs.filter((h) => h < 60).length,
+        warning_count: hs.filter((h) => h >= 60 && h < 80).length,
+      };
+    }
+    return fleetData?.fleet_stats;
+  }, [sseConnected, sseVehicles, fleetData?.fleet_stats]);
 
   const filteredVehicles = useMemo(() => {
     if (!vehicleSearch.trim()) return vehicles;

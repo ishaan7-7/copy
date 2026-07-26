@@ -62,7 +62,7 @@ def _get_live(key: str):
 _response_cache: dict = {}
 _cache_lock = Lock()
 _RESPONSE_TTL = 5.0
-_MAX_CACHE_ENTRIES = 200
+_MAX_CACHE_ENTRIES = 600
 
 def _cached_response(key: str, ttl: float = _RESPONSE_TTL):
     with _cache_lock:
@@ -84,6 +84,7 @@ _DELTA_ROOT      = os.path.join(_PROJECT_ROOT, "data", "delta", "bronze")
 _SILVER_ROOT     = os.path.join(_PROJECT_ROOT, "data", "delta", "silver")
 _GOLD_ROOT       = os.path.join(_PROJECT_ROOT, "data", "delta", "gold", "vehicle_health")
 _COMPUTED_ROOT   = os.path.join(_PROJECT_ROOT, "data", "computed")
+_BATCH_BRONZE_ROOT = os.path.join(_PROJECT_ROOT, "data", "batch", "bronze")
 _BATCH_SILVER_ROOT = os.path.join(_PROJECT_ROOT, "data", "batch", "silver")
 _BATCH_GOLD_ROOT   = os.path.join(_PROJECT_ROOT, "data", "batch", "gold", "vehicle_health")
 _BATCH_ALERTS_ROOT = os.path.join(_PROJECT_ROOT, "data", "batch", "gold", "alerts")
@@ -352,58 +353,80 @@ def _iter_bronze_by_vehicle(module: str, max_files_per_vehicle: int = 10, column
 
 # ── Mileage join helper ───────────────────────────────────────────────────────
 
+_BODY_CACHE: dict = {}
+_BODY_CACHE_TTL = 30.0
+_BODY_CACHE_LOCK = Lock()
+
+
+def _get_body_frame(vehicle_id: str):
+    import pandas as pd
+    now = time.monotonic()
+    with _BODY_CACHE_LOCK:
+        entry = _BODY_CACHE.get(vehicle_id)
+        if entry and (now - entry[0]) < _BODY_CACHE_TTL:
+            return entry[1]
+
+    body_merged = None
+    _bronze_root = _BATCH_BRONZE_ROOT if vehicle_id in _HISTORICAL_IDS else _DELTA_ROOT
+    body_partition = os.path.join(_bronze_root, "body", f"source_id={vehicle_id}")
+    if os.path.exists(body_partition):
+        bfiles = dr.list_files(body_partition, max_files=5)
+        body_raw = dr.query_df(
+            "SELECT timestamp, ingest_ts, odometer_reading FROM read_parquet(?)", bfiles,
+        ) if bfiles else pd.DataFrame()
+        if not body_raw.empty and "odometer_reading" in body_raw.columns:
+            btc = next((c for c in ("timestamp", "ingest_ts") if c in body_raw.columns), None)
+            if btc:
+                raw_ts = pd.to_datetime(body_raw[btc], errors="coerce", utc=True)
+                body_raw["_body_ts"] = raw_ts.dt.tz_convert(None)
+                bdf = body_raw[["_body_ts", "odometer_reading"]].dropna(subset=["_body_ts"])
+                if not bdf.empty:
+                    body_merged = (
+                        bdf.sort_values("_body_ts")
+                        .drop_duplicates("_body_ts")
+                        .reset_index(drop=True)
+                    )
+                    # Enforce monotonically increasing odometer regardless of source data quality:
+                    # sort the odometer values independently so the smallest maps to the earliest
+                    # timestamp and the largest to the latest. This is a no-op on already-correct
+                    # data and a safe repair on noisy/random synthetic data.
+                    body_merged["odometer_reading"] = sorted(body_merged["odometer_reading"].values)
+
+    with _BODY_CACHE_LOCK:
+        _BODY_CACHE[vehicle_id] = (now, body_merged)
+        if len(_BODY_CACHE) > 80:
+            oldest = min(_BODY_CACHE, key=lambda k: _BODY_CACHE[k][0])
+            del _BODY_CACHE[oldest]
+    return body_merged
+
+
 def _attach_mileage(combined, vehicle_id: str):
     import pandas as pd
-    body_partition = os.path.join(_DELTA_ROOT, "body", f"source_id={vehicle_id}")
-    if not os.path.exists(body_partition):
+    body_merged = _get_body_frame(vehicle_id)
+    if body_merged is None:
         combined["mileage"] = range(len(combined))
         return combined
-    bfiles = dr.list_files(body_partition, max_files=5)
-    body_raw = dr.query_df(
-        "SELECT timestamp, ingest_ts, odometer_reading FROM read_parquet(?)", bfiles,
-    ) if bfiles else pd.DataFrame()
-    bdfs = []
-    if not body_raw.empty and "odometer_reading" in body_raw.columns:
-        btc = next((c for c in ("timestamp", "ingest_ts") if c in body_raw.columns), None)
-        if btc:
-            raw_ts = pd.to_datetime(body_raw[btc], errors="coerce", utc=True)
-            body_raw["_body_ts"] = raw_ts.dt.tz_convert(None)
-            bdfs.append(body_raw[["_body_ts", "odometer_reading"]].dropna(subset=["_body_ts"]))
-    if bdfs:
-        body_merged = (
-            pd.concat(bdfs, ignore_index=True)
-            .sort_values("_body_ts")
-            .drop_duplicates("_body_ts")
-            .reset_index(drop=True)
-        )
-        # Enforce monotonically increasing odometer regardless of source data quality:
-        # sort the odometer values independently so the smallest maps to the earliest
-        # timestamp and the largest to the latest. This is a no-op on already-correct
-        # data and a safe repair on noisy/random synthetic data.
-        body_merged["odometer_reading"] = sorted(body_merged["odometer_reading"].values)
-        odo_base = float(body_merged["odometer_reading"].iloc[0])
 
-        combined["_comb_ts"] = pd.to_datetime(combined["timestamp"], errors="coerce")
-        combined_sorted = combined.sort_values("_comb_ts").copy()
-        merged = pd.merge_asof(
-            combined_sorted,
-            body_merged.rename(columns={"_body_ts": "_comb_ts"}),
-            on="_comb_ts",
-            direction="nearest",
-            tolerance=pd.Timedelta("10min"),
-        )
-        merged = merged.drop(columns=["_comb_ts"])
-        combined = merged
-        if combined.get("odometer_reading") is not None and combined["odometer_reading"].notna().any():
-            raw = combined["odometer_reading"].ffill().bfill().fillna(odo_base)
-            combined["mileage"] = raw.round(1)
-        else:
-            odo_max = float(body_merged["odometer_reading"].max())
-            n = len(combined)
-            total = max(odo_max - odo_base, 0.0)
-            combined["mileage"] = [round(odo_base + total * i / max(n - 1, 1), 1) for i in range(n)]
+    odo_base = float(body_merged["odometer_reading"].iloc[0])
+    combined["_comb_ts"] = pd.to_datetime(combined["timestamp"], errors="coerce")
+    combined_sorted = combined.sort_values("_comb_ts").copy()
+    merged = pd.merge_asof(
+        combined_sorted,
+        body_merged.rename(columns={"_body_ts": "_comb_ts"}),
+        on="_comb_ts",
+        direction="nearest",
+        tolerance=pd.Timedelta("10min"),
+    )
+    merged = merged.drop(columns=["_comb_ts"])
+    combined = merged
+    if combined.get("odometer_reading") is not None and combined["odometer_reading"].notna().any():
+        raw = combined["odometer_reading"].ffill().bfill().fillna(odo_base)
+        combined["mileage"] = raw.round(1)
     else:
-        combined["mileage"] = range(len(combined))
+        odo_max = float(body_merged["odometer_reading"].max())
+        n = len(combined)
+        total = max(odo_max - odo_base, 0.0)
+        combined["mileage"] = [round(odo_base + total * i / max(n - 1, 1), 1) for i in range(n)]
     return combined
 
 
@@ -587,7 +610,8 @@ def get_automotive_sensor_history(vehicle_id: str, module: str):
     rows: list = []
     data_source = "none"
 
-    partition_path = os.path.join(_DELTA_ROOT, module, f"source_id={vehicle_id}")
+    _bronze_root = _BATCH_BRONZE_ROOT if vehicle_id in _HISTORICAL_IDS else _DELTA_ROOT
+    partition_path = os.path.join(_bronze_root, module, f"source_id={vehicle_id}")
     if os.path.exists(partition_path):
         pfiles = dr.list_files(partition_path, max_files=20)
         combined = dr.query_df("SELECT * FROM read_parquet(?)", pfiles) if pfiles else pd.DataFrame()
@@ -645,8 +669,12 @@ def get_automotive_module_health(vehicle_id: str, module: str):
         _bp = os.path.join(_BATCH_SILVER_ROOT, module, f"source_id={vehicle_id}", "silver.parquet")
         combined = pd.read_parquet(_bp) if os.path.exists(_bp) else pd.DataFrame()
     else:
-        _sp = os.path.join(_SILVER_ROOT, module)
-        combined = _query_vehicle_df(_sp, vehicle_id, _SILVER_MAX_FILES) if os.path.exists(_sp) else pd.DataFrame()
+        live_rows = _get_live(f"module-health-live-{module}-{vehicle_id}")
+        if live_rows:
+            combined = pd.DataFrame(live_rows)
+        else:
+            _sp = os.path.join(_SILVER_ROOT, module)
+            combined = _query_vehicle_df(_sp, vehicle_id, _SILVER_MAX_FILES) if os.path.exists(_sp) else pd.DataFrame()
 
     if not combined.empty:
         ts_col = next((c for c in ("inference_ts", "ingest_ts", "timestamp") if c in combined.columns), None)
@@ -754,10 +782,16 @@ def get_vehicle_module_decomposition(vehicle_id: str):
 
     mod_series: dict = {}
     for mod in _VEHICLE_MODULES:
-        silver_path = os.path.join(_SILVER_ROOT, mod)
-        if not os.path.exists(silver_path):
-            continue
-        combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
+        combined = pd.DataFrame()
+        if vehicle_id not in _HISTORICAL_IDS:
+            live_rows = _get_live(f"module-health-live-{mod}-{vehicle_id}")
+            if live_rows:
+                combined = pd.DataFrame(live_rows)
+        if combined.empty:
+            silver_path = os.path.join(_SILVER_ROOT, mod)
+            if not os.path.exists(silver_path):
+                continue
+            combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
         if combined.empty or "health_score" not in combined.columns:
             continue
         try:
@@ -1308,7 +1342,7 @@ def _compute_module_fleet_health(module: str) -> dict:
     if os.path.exists(silver_path):
         pfiles = dr.list_files(silver_path, max_files=_SILVER_MAX_FILES)
         combined = dr.query_df(
-            "SELECT source_id, inference_ts, ingest_ts, timestamp, health_score FROM read_parquet(?)", pfiles,
+            "SELECT source_id, inference_ts, ingest_ts, timestamp, health_score, severity, top_features FROM read_parquet(?)", pfiles,
         ) if pfiles else pd.DataFrame()
         if not combined.empty and "source_id" in combined.columns and "health_score" in combined.columns:
             ts_col = next((c for c in ("inference_ts", "ingest_ts", "timestamp") if c in combined.columns), None)
@@ -1318,12 +1352,17 @@ def _compute_module_fleet_health(module: str) -> dict:
                 combined["ts"] = combined["_ts"].dt.strftime("%Y-%m-%d %H:%M:%S.%f").str[:-3]
             else:
                 combined["ts"] = combined.index.astype(str)
+            detail_cols = [c for c in ("inference_ts", "ingest_ts", "timestamp", "source_id", "health_score", "severity", "top_features") if c in combined.columns]
             for vid, grp in combined.groupby("source_id"):
                 pts = grp[["ts", "health_score"]].dropna()
                 vehicle_pts[str(vid)] = [
-                    {"ts": r["ts"], "v": round(float(r["health_score"]), 1)}
-                    for _, r in pts.iterrows()
+                    {"ts": t, "v": round(float(v), 1)}
+                    for t, v in zip(pts["ts"], pts["health_score"])
                 ]
+                _set_live(
+                    f"module-health-live-{module}-{vid}",
+                    grp[detail_cols].tail(2000).to_dict(orient="records"),
+                )
     if not vehicle_pts and _PRESENTATION_MODE_ACTIVE and _DEMO_SILVER_CACHE:
         for vid in _DEMO_VEHICLES:
             if vid in _DEMO_SILVER_CACHE and module in _DEMO_SILVER_CACHE[vid]:
@@ -1353,6 +1392,10 @@ def _compute_module_fleet_health(module: str) -> dict:
 def _precompute_module_fleet_health(module: str) -> None:
     """Called by the live loop — computes and stores in LIVE_CACHE."""
     try:
+        current_mtime = _dir_latest_mtime(os.path.join(_SILVER_ROOT, module))
+        if current_mtime > 0 and current_mtime <= _loop_dir_mtimes.get(f"silver-{module}", 0.0):
+            return
+        _loop_dir_mtimes[f"silver-{module}"] = current_mtime
         result = _compute_module_fleet_health(module)
         _set_live(f"module-fleet-health-{module}", result)
     except Exception:
@@ -1655,8 +1698,30 @@ def get_dtc_master_data():
 # Mirrors exactly how WRITER_METRICS_CACHE / GOLD_METRICS_CACHE work.
 # ---------------------------------------------------------------------------
 
+_loop_dir_mtimes: dict = {}
+
+
+def _dir_latest_mtime(directory: str) -> float:
+    latest = 0.0
+    if not os.path.exists(directory):
+        return latest
+    try:
+        for entry in os.scandir(directory):
+            if entry.is_file() and entry.name.endswith(".parquet"):
+                mt = entry.stat().st_mtime
+                if mt > latest:
+                    latest = mt
+    except OSError:
+        pass
+    return latest
+
+
 def _sync_refresh_automotive_cache() -> None:
     import pandas as pd
+    current_mtime = max(_dir_latest_mtime(_GOLD_ROOT), _dir_latest_mtime(_GOLD_ALERTS_DIR))
+    if current_mtime > 0 and current_mtime <= _loop_dir_mtimes.get("gold", 0.0):
+        return
+    _loop_dir_mtimes["gold"] = current_mtime
     try:
         # ── Gold: read once, shared across all vehicle computations ──────────
         gold_df = pd.DataFrame()

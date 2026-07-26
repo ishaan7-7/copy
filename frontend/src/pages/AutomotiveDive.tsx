@@ -95,6 +95,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import RotateRightRoundedIcon from "@mui/icons-material/RotateRightRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import { useSystemConfig } from "../hooks/useSystemConfig";
+import { useGoldStream } from "../contexts/GoldStreamContext";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
@@ -506,6 +507,10 @@ function parseTopFeatures(raw: string): { feature: string; score: number }[] {
   }
 }
 
+function fmtDriverScore(s: number): string {
+  return s >= 100 ? s.toFixed(0) : s >= 10 ? s.toFixed(1) : s.toFixed(3);
+}
+
 function formatFeatureKey(k: string): string {
   return k
     .replace(/_calculated/g, "")
@@ -675,6 +680,7 @@ export default function AutomotiveDive({
     (a, b) => MODULE_DISPLAY_ORDER.indexOf(a) - MODULE_DISPLAY_ORDER.indexOf(b)
   );
   const _historicalSet = useMemo(() => new Set<string>(historical_sims), [historical_sims]);
+  const { vehicles: sseFleetVehicles, connected: sseConnected, ringBuffer: sseRing } = useGoldStream();
 
   const _initVehicle = searchParams.get("vehicle") || "";
   const _initModule = searchParams.get("module") || "engine";
@@ -738,7 +744,7 @@ export default function AutomotiveDive({
     queryKey: ["autoFleetSummary"],
     queryFn: () =>
       axios.get(`${API}/api/automotive/fleet-summary`).then((r) => r.data),
-    refetchInterval: isActive && autoRefresh ? 15000 : false,
+    refetchInterval: sseConnected ? false : isActive && autoRefresh ? 15000 : false,
   });
 
   const allVehiclesQuery = useQuery<{ vehicle_id: string }[]>({
@@ -800,7 +806,12 @@ export default function AutomotiveDive({
         .get(`${API}/api/automotive/vehicle-health-history/${selectedVehicle}`)
         .then((r) => r.data),
     enabled: !!selectedVehicle,
-    refetchInterval: isActive && autoRefresh ? 10000 : false,
+    refetchInterval:
+      sseConnected && !isHistorical
+        ? false
+        : isActive && autoRefresh
+        ? 10000
+        : false,
   });
 
   const vehicleDecompQuery = useQuery({
@@ -995,7 +1006,7 @@ export default function AutomotiveDive({
     queryKey: ["histDtcs", selectedVehicle],
     queryFn: () =>
       axios.get(`${API}/api/automotive/vehicle/${selectedVehicle}/dtcs`).then((r) => r.data.dtcs ?? r.data),
-    enabled: !!selectedVehicle && isHistorical,
+    enabled: !!selectedVehicle,
     staleTime: Infinity,
   });
 
@@ -1042,7 +1053,10 @@ export default function AutomotiveDive({
     if (_paramModule && ALL_MODULES.includes(_paramModule) && _paramModule !== selectedModule) setSelectedModule(_paramModule);
   }, [_paramVehicle, _paramModule]);
 
-  const _autoVehicles: any[] = fleetQuery.data?.vehicles || [];
+  const _autoVehicles: any[] =
+    sseConnected && sseFleetVehicles.length
+      ? sseFleetVehicles
+      : fleetQuery.data?.vehicles || [];
   const _simVehicles: any[] = allVehiclesQuery.data ?? [];
   const vehicles: any[] = (() => {
     if (_autoVehicles.length > 0) return _autoVehicles;
@@ -1109,8 +1123,18 @@ export default function AutomotiveDive({
       : "#22c55e";
 
   // GOLD derived
+  const healthRaw = useMemo(() => {
+    const base: any[] = vehicleHealthQuery.data?.data || [];
+    if (!sseConnected || isHistorical || !selectedVehicle) return base;
+    const ring = sseRing.get(selectedVehicle) ?? [];
+    if (!ring.length) return base;
+    const lastTs = base.length ? String(base[base.length - 1].ts ?? "") : "";
+    const extra = ring.filter((p: any) => String(p.ts ?? "") > lastTs);
+    return extra.length ? [...base, ...extra] : base;
+  }, [vehicleHealthQuery.data, sseConnected, isHistorical, selectedVehicle, sseRing, sseFleetVehicles]);
+
   const healthHistory = useMemo(() => {
-    const raw: any[] = vehicleHealthQuery.data?.data || [];
+    const raw: any[] = healthRaw;
     const factor = Math.max(1, Math.floor(raw.length / 400));
     const sampled =
       factor === 1 ? raw : raw.filter((_: any, i: number) => i % factor === 0);
@@ -1119,10 +1143,10 @@ export default function AutomotiveDive({
       health: r.health,
       mileage: r.mileage ?? 0,
     }));
-  }, [vehicleHealthQuery.data]);
+  }, [healthRaw]);
 
   const summaryHealthData = useMemo(() => {
-    const raw: any[] = vehicleHealthQuery.data?.data || [];
+    const raw: any[] = healthRaw;
     const factor = Math.max(1, Math.floor(raw.length / 200));
     const sampled = factor === 1 ? raw : raw.filter((_: any, i: number) => i % factor === 0);
     return sampled.map((r: any) => ({
@@ -1135,7 +1159,7 @@ export default function AutomotiveDive({
       body_contrib: r.body_contrib,
       tyre_contrib: r.tyre_contrib,
     }));
-  }, [vehicleHealthQuery.data]);
+  }, [healthRaw]);
 
   const observerVehicleEntry = useMemo(() => {
     const vList: any[] = (observerQuery.data as any)?.vehicles || [];
@@ -1184,7 +1208,7 @@ export default function AutomotiveDive({
     return Object.entries(scores)
       .map(([feature, { module, score }]) => ({ feature, module, score }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
+      .slice(0, 5);
   }, [histAlertsQuery.data]);
 
   const histBehaviorData = useMemo(() => {
@@ -2195,26 +2219,26 @@ export default function AutomotiveDive({
                   </ResponsiveContainer>
                 </Paper>
 
-                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexShrink: 0 }}>
                     <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#ef4444" }} />
                     <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Top Anomaly Drivers</Typography>
                     <Chip size="small" label="All Modules" sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#ef4444", darkMode ? 0.15 : 0.08), color: "#ef4444" }} />
                   </Box>
                   {histTopDrivers.length === 0 ? (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, justifyContent: "space-evenly", minHeight: 0 }}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1), flexShrink: 0 }} />
                           <Box sx={{ width: 56, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 0.9), flexShrink: 0 }} />
                           <Box sx={{ flex: 1, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6) }} />
                           <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 0.8), flexShrink: 0 }} />
-                          <Box sx={{ width: 36, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
+                          <Box sx={{ width: 44, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
                         </Box>
                       ))}
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, justifyContent: "space-evenly", minHeight: 0 }}>
                       {histTopDrivers.map((d, i) => {
                         const modColor = (MODULE_COLORS as Record<string, string>)[d.module] || (darkMode ? "#7dd3fc" : "#0369a1");
                         const barPct = histMaxDriverScore > 0 ? (d.score / histMaxDriverScore) * 100 : 0;
@@ -2226,7 +2250,7 @@ export default function AutomotiveDive({
                             <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.15), flexShrink: 0, position: "relative", overflow: "hidden" }}>
                               <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg, ${alpha(modColor, 0.5)}, ${modColor})`, borderRadius: 3 }} />
                             </Box>
-                            <Typography sx={{ fontSize: "9px", fontFamily: "monospace", width: 36, textAlign: "right", color: darkMode ? "#64748b" : "#94a3b8", flexShrink: 0 }}>{d.score.toFixed(3)}</Typography>
+                            <Typography sx={{ fontSize: "9px", fontFamily: "monospace", width: 44, textAlign: "right", color: darkMode ? "#64748b" : "#94a3b8", flexShrink: 0, overflow: "hidden" }}>{fmtDriverScore(d.score)}</Typography>
                           </Box>
                         );
                       })}
@@ -2649,26 +2673,26 @@ export default function AutomotiveDive({
                 </Paper>
 
                 {/* Top Anomaly Drivers */}
-                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexShrink: 0 }}>
                     <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#ef4444" }} />
                     <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Top Anomaly Drivers</Typography>
                     <Chip size="small" label="All Modules" sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#ef4444", darkMode ? 0.15 : 0.08), color: "#ef4444" }} />
                   </Box>
                   {topDrivers.length === 0 ? (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, justifyContent: "space-evenly", minHeight: 0 }}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1), flexShrink: 0 }} />
                           <Box sx={{ width: 56, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 0.9), flexShrink: 0 }} />
                           <Box sx={{ flex: 1, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6) }} />
                           <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 0.8), flexShrink: 0 }} />
-                          <Box sx={{ width: 36, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
+                          <Box sx={{ width: 44, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
                         </Box>
                       ))}
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, justifyContent: "space-evenly", minHeight: 0 }}>
                       {topDrivers.map((d: any, i: number) => {
                         const modColor = (MODULE_COLORS as Record<string, string>)[d.module] || (darkMode ? "#7dd3fc" : "#0369a1");
                         const barPct = maxDriverScore > 0 ? (d.score / maxDriverScore) * 100 : 0;
@@ -2680,7 +2704,7 @@ export default function AutomotiveDive({
                             <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.15), flexShrink: 0, position: "relative", overflow: "hidden" }}>
                               <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg, ${alpha(modColor, 0.5)}, ${modColor})`, borderRadius: 3 }} />
                             </Box>
-                            <Typography sx={{ fontSize: "9px", fontFamily: "monospace", width: 36, textAlign: "right", color: darkMode ? "#64748b" : "#94a3b8", flexShrink: 0 }}>{d.score.toFixed(3)}</Typography>
+                            <Typography sx={{ fontSize: "9px", fontFamily: "monospace", width: 44, textAlign: "right", color: darkMode ? "#64748b" : "#94a3b8", flexShrink: 0, overflow: "hidden" }}>{fmtDriverScore(d.score)}</Typography>
                           </Box>
                         );
                       })}

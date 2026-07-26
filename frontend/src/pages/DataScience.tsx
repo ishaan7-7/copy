@@ -1637,7 +1637,7 @@ function FleetIntelligenceSection({ isDark, writerData, inferenceData, goldData,
       <Divider sx={{ borderColor: isDark ? alpha("#7dd3fc", 0.14) : alpha("#1f2937", 0.12) }} />
 
       {/* Bottom: vehicle grid + module bars */}
-      <Box sx={{ display: "flex", minHeight: 270 }}>
+      <Box sx={{ display: "flex", height: 300 }}>
         {/* Vehicle Status */}
         <Box sx={{
           flex: 3, minWidth: 0, display: "flex", flexDirection: "column",
@@ -1944,7 +1944,7 @@ function PipelineObservabilitySection({ isDark, writerData, inferenceData, obser
     }}>
       <SectionHeader isDark={isDark} title="PIPELINE OBSERVABILITY" accent="#f59e0b" />
 
-      <Box sx={{ display: "flex", minHeight: 360 }}>
+      <Box sx={{ display: "flex", height: 420 }}>
         <LiveStreamColumn isDark={isDark} observerData={observerData} borderRight />
 
         <PipelineColumn accent="#f59e0b" badge="BRONZE LAYER" isDark={isDark}
@@ -2648,7 +2648,7 @@ export default function DataScience({ isActive = true }: { isActive?: boolean })
   const vehicleList: string[] = useMemo(() => goldData?.active_sims ?? [], [goldData]);
 
   const dlqBacklog: number = observerData?.global_stats?.dlq_backlog ?? 0;
-  const activeVehicles: number = observerData?.global_stats?.active_vehicles ?? vehicleList.length;
+  const activeVehicles: number = vehicleList.length || (observerData?.global_stats?.active_vehicles ?? 0);
 
   const bronzeHealth: HealthState =
     totalWriters === 0 ? "idle"

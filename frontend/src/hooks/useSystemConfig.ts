@@ -26,6 +26,8 @@ export function useSystemConfig(): SystemConfig {
       axios.get<SystemConfig>(`${API}/api/config/manifest`).then((r) => r.data),
     staleTime: Infinity,
     gcTime: Infinity,
+    retry: 10,
+    retryDelay: (attempt) => Math.min(2000 * (attempt + 1), 10000),
   });
   return data ?? _FALLBACK;
 }

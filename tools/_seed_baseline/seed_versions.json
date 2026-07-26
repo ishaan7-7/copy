@@ -1,0 +1,14 @@
+{
+  "bronze/engine": 6,
+  "bronze/battery": 6,
+  "bronze/body": 6,
+  "bronze/transmission": 6,
+  "bronze/tyre": 6,
+  "silver/engine": 6,
+  "silver/battery": 6,
+  "silver/body": 6,
+  "silver/transmission": 6,
+  "silver/tyre": 6,
+  "gold/vehicle_health": 0,
+  "gold/alerts": 0
+}
