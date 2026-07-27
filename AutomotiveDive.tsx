@@ -1180,7 +1180,24 @@ export default function AutomotiveDive({
   const nextServiceKm: number | null = summaryData?.service_info?.next_service_in_km ?? null;
   const summaryServiceProgress = odometerKm != null ? Math.min(100, ((odometerKm % 15000) / 15000) * 100) : 0;
   const topDrivers: any[] = summaryData?.top_anomaly_drivers ?? [];
-  const maxDriverScore = topDrivers.length > 0 ? Math.max(...topDrivers.map((d: any) => d.score)) : 1;
+  // Backend now returns top-3-per-module (not top-5 overall) so every
+  // module gets a slot instead of 1-2 high-magnitude modules crowding out
+  // the rest. Scale each row's bar against its OWN module's max, not the
+  // global max — otherwise modules with naturally smaller feature
+  // magnitudes render as near-empty bars even for their worst driver.
+  const groupedTopDrivers = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    for (const d of topDrivers) {
+      const mod = d.module || "";
+      if (!groups.has(mod)) groups.set(mod, []);
+      groups.get(mod)!.push(d);
+    }
+    return Array.from(groups.entries()).map(([module, drivers]) => ({
+      module,
+      maxScore: Math.max(...drivers.map((d) => d.score), 1),
+      drivers,
+    }));
+  }, [topDrivers]);
   const alertsSummary: { open_count: number; closed_count: number; recent_open: any[] } = summaryData?.alerts_summary ?? { open_count: 0, closed_count: 0, recent_open: [] };
   const alertsBadgeCount = isHistorical
     ? ((histAlertsQuery.data as any[]) ?? []).filter((a: any) => a.status === "OPEN").length
@@ -2680,34 +2697,60 @@ export default function AutomotiveDive({
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexShrink: 0 }}>
                     <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#ef4444" }} />
                     <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Top Anomaly Drivers</Typography>
-                    <Chip size="small" label="All Modules" sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#ef4444", darkMode ? 0.15 : 0.08), color: "#ef4444" }} />
+                    <Chip size="small" label="Top 3 / Module" sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#ef4444", darkMode ? 0.15 : 0.08), color: "#ef4444" }} />
                   </Box>
                   {topDrivers.length === 0 ? (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, justifyContent: "space-evenly", minHeight: 0 }}>
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1), flexShrink: 0 }} />
-                          <Box sx={{ width: 56, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 0.9), flexShrink: 0 }} />
-                          <Box sx={{ flex: 1, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6) }} />
-                          <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 0.8), flexShrink: 0 }} />
-                          <Box sx={{ width: 44, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, flex: 1, justifyContent: "space-between", minHeight: 0 }}>
+                      {Array.from({ length: 5 }).map((_, g) => (
+                        <Box key={g} sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                          <Box sx={{ width: 70, height: 8, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1), mb: 0.25 }} />
+                          {Array.from({ length: 3 }).map((_, i) => (
+                            <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Box sx={{ flex: 1, height: 8, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6) }} />
+                              <Box sx={{ width: 70, height: 5, borderRadius: 3, bgcolor: darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 0.8), flexShrink: 0 }} />
+                              <Box sx={{ width: 36, height: 8, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
+                            </Box>
+                          ))}
                         </Box>
                       ))}
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, justifyContent: "space-evenly", minHeight: 0 }}>
-                      {topDrivers.map((d: any, i: number) => {
-                        const modColor = (MODULE_COLORS as Record<string, string>)[d.module] || (darkMode ? "#7dd3fc" : "#0369a1");
-                        const barPct = maxDriverScore > 0 ? (d.score / maxDriverScore) * 100 : 0;
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9, flex: 1, justifyContent: "space-between", minHeight: 0, overflow: "auto" }}>
+                      {groupedTopDrivers.map((group) => {
+                        const modColor = (MODULE_COLORS as Record<string, string>)[group.module] || (darkMode ? "#7dd3fc" : "#0369a1");
                         return (
-                          <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: modColor, flexShrink: 0 }} />
-                            <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#94a3b8" : "#64748b", width: 56, flexShrink: 0, textTransform: "uppercase", letterSpacing: 0.3 }}>{d.module}</Typography>
-                            <Typography sx={{ fontSize: "10px", flex: 1, color: darkMode ? "#cbd5e1" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatFeatureKey(d.feature)}</Typography>
-                            <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.15), flexShrink: 0, position: "relative", overflow: "hidden" }}>
-                              <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg, ${alpha(modColor, 0.5)}, ${modColor})`, borderRadius: 3 }} />
-                            </Box>
-                            <Typography sx={{ fontSize: "9px", fontFamily: "monospace", width: 44, textAlign: "right", color: darkMode ? "#64748b" : "#94a3b8", flexShrink: 0, overflow: "hidden" }}>{fmtDriverScore(d.score)}</Typography>
+                          <Box
+                            key={group.module}
+                            sx={{
+                              borderRadius: 1.5,
+                              bgcolor: alpha(modColor, darkMode ? 0.1 : 0.06),
+                              border: `1px solid ${alpha(modColor, 0.22)}`,
+                              borderLeft: `3px solid ${modColor}`,
+                              p: 0.6,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 0.4,
+                            }}
+                          >
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 800, color: modColor, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                              {group.module}
+                            </Typography>
+                            {group.drivers.map((d: any, i: number) => {
+                              const barPct = group.maxScore > 0 ? (d.score / group.maxScore) * 100 : 0;
+                              return (
+                                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.9 }}>
+                                  <Typography sx={{ fontSize: "10px", fontWeight: 600, flex: 1, color: darkMode ? "#e2e8f0" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {formatFeatureKey(d.feature)}
+                                  </Typography>
+                                  <Box sx={{ width: 70, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.18), flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                                    <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, bgcolor: modColor, borderRadius: 3 }} />
+                                  </Box>
+                                  <Typography sx={{ fontSize: "9.5px", fontWeight: 700, fontFamily: "monospace", width: 44, textAlign: "right", color: modColor, flexShrink: 0, overflow: "hidden" }}>
+                                    {fmtDriverScore(d.score)}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
                           </Box>
                         );
                       })}

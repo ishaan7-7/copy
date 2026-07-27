@@ -1211,11 +1211,19 @@ def get_vehicle_summary(vehicle_id: str):
         except Exception:
             pass
 
-    top_anomaly_drivers = sorted(
-        [{"feature": f, "score": round(s, 4), "module": feature_modules.get(f, "")} for f, s in feature_scores.items()],
-        key=lambda x: x["score"],
-        reverse=True,
-    )[:5]
+    # Top 3 per module (not top 5 overall) so every module is represented —
+    # a flat cross-module top-N let 1-2 high-magnitude modules crowd out the
+    # rest, leaving the panel sparse and most modules invisible.
+    _TOP_N_PER_MODULE = 3
+    _drivers_by_module: dict[str, list[dict]] = {}
+    for f, s in feature_scores.items():
+        mod = feature_modules.get(f, "")
+        _drivers_by_module.setdefault(mod, []).append({"feature": f, "score": round(s, 4), "module": mod})
+
+    top_anomaly_drivers = []
+    for mod in _VEHICLE_MODULES:
+        mod_drivers = sorted(_drivers_by_module.get(mod, []), key=lambda x: x["score"], reverse=True)
+        top_anomaly_drivers.extend(mod_drivers[:_TOP_N_PER_MODULE])
 
     # ── 5. Last DTC run for this vehicle ──────────────────────────────────────
     last_dtc = None
