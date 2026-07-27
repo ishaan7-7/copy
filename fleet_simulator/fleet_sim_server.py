@@ -174,7 +174,13 @@ async def vehicle_last_trip(vehicle_id: str):
         last_trip["destination"] = destination
     return {
         "last_trip": last_trip,
-        "trip_events": trip_events[-50:],
+        # trip_events is already filtered down to just this one trip's
+        # events (by trip_id, above) — a long/high-distance trip (e.g. the
+        # full end-to-end route) can genuinely have 50+ harsh-driving events,
+        # so a flat [-50:] here was silently dropping the oldest ones from
+        # the map's event markers. 200 is a generous ceiling well above any
+        # observed trip's event count, kept only as a sanity bound.
+        "trip_events": trip_events[-200:],
         "driver_summary": ds,
         "is_historical": True,
     }

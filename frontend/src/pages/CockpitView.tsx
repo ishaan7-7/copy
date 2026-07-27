@@ -3506,7 +3506,7 @@ export default function CockpitView({
     return null;
   }, [liveSelectedPosition, vehicleDetail]);
 
-  const { data: tripData } = useQuery<TripData>({
+  const { data: tripData, isPlaceholderData: isTripDataPlaceholder } = useQuery<TripData>({
     queryKey: ["fleet-trip", selectedVehicle],
     queryFn: () =>
       axios
@@ -3517,7 +3517,7 @@ export default function CockpitView({
     refetchInterval: isActive && autoRefresh ? 10000 : false,
   });
 
-  const { data: behaviorData } = useQuery<BehaviorData>({
+  const { data: behaviorData, isPlaceholderData: isBehaviorDataPlaceholder } = useQuery<BehaviorData>({
     queryKey: ["fleet-behavior", selectedVehicle],
     queryFn: () =>
       axios
@@ -3527,7 +3527,7 @@ export default function CockpitView({
     staleTime: 30000,
   });
 
-  const { data: lastTripData } = useQuery<LastTripData>({
+  const { data: lastTripData, isPlaceholderData: isLastTripPlaceholder } = useQuery<LastTripData>({
     queryKey: ["fleet-last-trip", selectedVehicle],
     queryFn: () =>
       axios
@@ -3538,7 +3538,12 @@ export default function CockpitView({
   });
 
   const historicalRouteOverlay = useMemo(() => {
-    if (!showHistTripOverlay || !lastTripData?.last_trip || !selectedVehicleAnchor) return null;
+    // isLastTripPlaceholder guards against React Query's global
+    // keepPreviousData default: right after switching the selected vehicle,
+    // lastTripData can still hold the PREVIOUS vehicle's cached trip while
+    // the new fetch is in flight — rendering it here would draw the wrong
+    // vehicle's route on the map.
+    if (!showHistTripOverlay || isLastTripPlaceholder || !lastTripData?.last_trip || !selectedVehicleAnchor) return null;
     const trip = lastTripData.last_trip;
     const anchorLat = selectedVehicleAnchor.lat;
     const anchorLng = selectedVehicleAnchor.lng;
@@ -3569,7 +3574,7 @@ export default function CockpitView({
       acc_g: e.acc_g ?? 0,
     }));
     return { polyline, events };
-  }, [showHistTripOverlay, lastTripData, selectedVehicleAnchor, selectedVehicle]);
+  }, [showHistTripOverlay, isLastTripPlaceholder, lastTripData, selectedVehicleAnchor, selectedVehicle]);
 
   useEffect(() => {
     setShowHistTripOverlay(false);
@@ -3577,19 +3582,24 @@ export default function CockpitView({
 
   const SERVICE_INTERVAL_KM = 15000;
 
+  // isTripDataPlaceholder guards the same keepPreviousData staleness as
+  // lastTripData/vehicleDetail: right after switching between two active
+  // vehicles, tripData can still hold the PREVIOUS vehicle's route while the
+  // new fetch is in flight, which would draw the wrong vehicle's
+  // completed/remaining route and events on the map.
   const completedRoute = useMemo(() => {
-    if (!tripData) return [];
+    if (!tripData || isTripDataPlaceholder) return [];
     return tripData.route
       .slice(0, tripData.completed_index + 1)
       .map((p) => [p.lat, p.lng] as [number, number]);
-  }, [tripData]);
+  }, [tripData, isTripDataPlaceholder]);
 
   const remainingRoute = useMemo(() => {
-    if (!tripData) return [];
+    if (!tripData || isTripDataPlaceholder) return [];
     return tripData.route
       .slice(tripData.completed_index)
       .map((p) => [p.lat, p.lng] as [number, number]);
-  }, [tripData]);
+  }, [tripData, isTripDataPlaceholder]);
 
   const tileUrl =
     "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
@@ -4680,7 +4690,7 @@ export default function CockpitView({
                         />
                       )}
 
-                      {selectedIsActive && tripData?.events && (
+                      {selectedIsActive && !isTripDataPlaceholder && tripData?.events && (
                         <EventMarkers events={tripData.events} />
                       )}
                       {historicalRouteOverlay && (
@@ -5618,7 +5628,7 @@ export default function CockpitView({
                       }}
                     />
                   )}
-                  {selectedIsActive && tripData?.events && (
+                  {selectedIsActive && !isTripDataPlaceholder && tripData?.events && (
                     <EventMarkers events={tripData.events} />
                   )}
                   {historicalRouteOverlay && (
@@ -5924,7 +5934,7 @@ export default function CockpitView({
                   </Stack>
                 </Box>
               )}
-              {vehicleDetail && (
+              {vehicleDetail && vehicleDetail.vehicle_id === selectedVehicle && (
                 <Box
                   sx={{
                     height: "100%",
@@ -6906,7 +6916,7 @@ export default function CockpitView({
                               }}
                             >
                               {/* ================= TRIP ================= */}
-                              {drawerTab === 0 && tripData && (
+                              {drawerTab === 0 && tripData && !isTripDataPlaceholder && (
                                 <>
                                   <Box
                                     sx={{
@@ -7379,7 +7389,7 @@ export default function CockpitView({
 
                               {/* ================= BEHAVIOR ================= */}
 
-                              {drawerTab === 1 && behaviorData && (
+                              {drawerTab === 1 && behaviorData && !isBehaviorDataPlaceholder && (
                                 <Box
                                   sx={{
                                     display: "flex",
@@ -7548,7 +7558,7 @@ export default function CockpitView({
 
                               {/* ================= ROAD ================= */}
 
-                              {drawerTab === 2 && behaviorData && (
+                              {drawerTab === 2 && behaviorData && !isBehaviorDataPlaceholder && (
                                 <Box
                                   sx={{
                                     display: "flex",
@@ -7581,7 +7591,7 @@ export default function CockpitView({
                                     <SpeedByRoad data={behaviorData} />
                                   </Paper>
 
-                                  {tripData && (
+                                  {tripData && !isTripDataPlaceholder && (
                                     <>
                                       {/* ROAD BREAKDOWN */}
                                       <Paper
