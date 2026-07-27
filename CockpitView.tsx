@@ -4238,6 +4238,146 @@ export default function CockpitView({
     criticalCount + warningCount === 1 ? "" : "s"
   }.`;
 
+  const lowestHealthVehicle = [...allPositions].sort(
+    (left, right) => getLiveHealth(left) - getLiveHealth(right)
+  )[0];
+  const highestHealthVehicle = [...allPositions].sort(
+    (left, right) => getLiveHealth(right) - getLiveHealth(left)
+  )[0];
+  const lowestDriverVehicle = [...allPositions]
+    .filter((vehicle) => Number.isFinite(Number(vehicle.driver_score)))
+    .sort(
+      (left, right) => Number(left.driver_score) - Number(right.driver_score)
+    )[0];
+  const fastestVehicle = [...allPositions].sort(
+    (left, right) => Number(right.speed || 0) - Number(left.speed || 0)
+  )[0];
+  const immediateCareVehicles = [...allPositions]
+    .filter((vehicle) => getLiveHealth(vehicle) < 50)
+    .sort((left, right) => getLiveHealth(left) - getLiveHealth(right));
+  const priorityVehicle = immediateCareVehicles[0];
+  const priorityAlert = priorityVehicle
+    ? openAlerts.find(
+        (alert) => String(alert.source_id) === priorityVehicle.vehicle_id
+      )
+    : undefined;
+  const priorityIssue = priorityVehicle
+    ? priorityAlert
+      ? `${String(priorityAlert.module || "module")} anomaly · ${Math.round(
+          Number(priorityAlert.max_composite_score || 0) * 100
+        )}% score`
+      : Number(priorityVehicle.engine_health) < 60
+      ? `Engine health ${Math.round(Number(priorityVehicle.engine_health))}%`
+      : `Overall health ${Math.round(getLiveHealth(priorityVehicle))}%`
+    : "No immediate-care issue detected";
+  const aiExecutiveInsights = [
+    {
+      label: "Fleet condition",
+      value: `${healthScoreValue}/100 health`,
+      detail: `${executiveMetrics.availability}% available · ${executiveMetrics.utilization}% utilized · ${executiveMetrics.riskIndex}% risk`,
+      action:
+        executiveMetrics.riskIndex > 35
+          ? "Action: reduce non-essential dispatch until high-risk vehicles are inspected."
+          : "Action: continue the current dispatch plan and monitor the risk queue.",
+      color: healthStatus.color,
+    },
+    {
+      label: "Underperforming vehicle",
+      value: lowestHealthVehicle
+        ? `${lowestHealthVehicle.vehicle_id} · ${Math.round(
+            getLiveHealth(lowestHealthVehicle)
+          )}% health`
+        : "N/A",
+      detail: lowestHealthVehicle
+        ? `${lowestHealthVehicle.status} · ${lowestHealthVehicle.type} · ${
+            lowestHealthVehicle.route_name || "route unavailable"
+          }`
+        : "Awaiting vehicle-health data",
+      action: lowestHealthVehicle
+        ? "Action: inspect before its next route and compare module-level health."
+        : "Action: no vehicle intervention can be assigned yet.",
+      color: "#ef4444",
+    },
+    {
+      label: "Immediate maintenance",
+      value: `${immediateCareVehicles.length} critical · ${executiveMetrics.maintenanceForecast} due`,
+      detail: priorityVehicle
+        ? `${priorityVehicle.vehicle_id}: ${priorityIssue}`
+        : priorityIssue,
+      action: priorityVehicle
+        ? `Action: move ${priorityVehicle.vehicle_id} to inspection; ${maintenanceVehicleBuckets.within_1_week.length} vehicle(s) need service within one week.`
+        : "Action: retain the normal preventive-maintenance cycle.",
+      color: immediateCareVehicles.length ? "#dc2626" : "#22c55e",
+    },
+    {
+      label: "Driver requiring coaching",
+      value: lowestDriverVehicle
+        ? `${Math.round(Number(lowestDriverVehicle.driver_score))}/100`
+        : "N/A",
+      detail: lowestDriverVehicle
+        ? `${lowestDriverVehicle.driver || "Unassigned"} · ${
+            lowestDriverVehicle.vehicle_id
+          }`
+        : "Awaiting driver-score data",
+      action: lowestDriverVehicle
+        ? "Action: review speeding, harsh braking and acceleration events with the driver."
+        : "Action: assign drivers so safety performance can be monitored.",
+      color: "#f97316",
+    },
+    {
+      label: "Highest live speed",
+      value: fastestVehicle
+        ? `${Math.round(Number(fastestVehicle.speed || 0))} km/h`
+        : "N/A",
+      detail: fastestVehicle
+        ? `${fastestVehicle.vehicle_id} · ${
+            fastestVehicle.driver || "driver unassigned"
+          }`
+        : "Awaiting live-speed data",
+      action:
+        Number(fastestVehicle?.speed || 0) > 90
+          ? "Action: verify the route speed limit and notify monitoring if the event is unsafe."
+          : "Action: no immediate overspeed escalation is indicated.",
+      color: Number(fastestVehicle?.speed || 0) > 90 ? "#ef4444" : "#0ea5e9",
+    },
+    {
+      label: "Best-performing vehicle",
+      value: highestHealthVehicle
+        ? `${highestHealthVehicle.vehicle_id} · ${Math.round(
+            getLiveHealth(highestHealthVehicle)
+          )}% health`
+        : "N/A",
+      detail: highestHealthVehicle
+        ? `${highestHealthVehicle.status} · ${highestHealthVehicle.type}`
+        : "Awaiting vehicle-health data",
+      action:
+        "Action: prioritize this vehicle for high-value routes when operationally suitable.",
+      color: "#22c55e",
+    },
+    {
+      label: "Failure and alert outlook",
+      value: `${executiveMetrics.predictedFailures} predicted · ${
+        alertTotal ?? 0
+      } live alerts`,
+      detail: `${criticalAlertCount} critical · ${warningAlertCount} warning · ${executiveMetrics.resolvedToday} resolved today`,
+      action:
+        (alertTotal ?? 0) > 0
+          ? "Action: triage critical alerts first, then combine warnings with planned workshop visits."
+          : "Action: continue live monitoring; no alert backlog is currently reported.",
+      color: (alertTotal ?? 0) > 0 ? "#fb7185" : "#22c55e",
+    },
+    {
+      label: "Capacity and workshop",
+      value: `${activeCount + parkedCount} ready · ${serviceCount} workshop`,
+      detail: `${activeCount} active · ${parkedCount} parked · ${executiveMetrics.utilization}% utilization`,
+      action:
+        parkedCount > 0 && executiveMetrics.utilization < 70
+          ? "Action: rebalance parked capacity before adding vehicles or overtime."
+          : "Action: maintain capacity and review workshop turnaround for delayed vehicles.",
+      color: topAvailabilityColor,
+    },
+  ];
+
   function AiSummary({ summary }: { summary: FleetSummary }) {
     const criticalCount = positions?.filter((v) => {
       const h =
@@ -9003,8 +9143,8 @@ export default function CockpitView({
                       )}, #ffffff)`,
                 }}
               >
-                <Box sx={{ minWidth: 0 }}>
-                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                <Box sx={{ minWidth: 0, height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0 }}>
                     <Box
                       sx={{
                         width: 22,
@@ -9037,13 +9177,100 @@ export default function CockpitView({
                       lineHeight: 1.35,
                       color: "text.secondary",
                       display: "-webkit-box",
-                      WebkitLineClamp: 14,
+                      WebkitLineClamp: 6,
                       WebkitBoxOrient: "vertical",
                       overflow: "hidden",
+                      flexShrink: 0,
                     }}
                   >
                     {aiExecutiveStory}
                   </Typography>
+                  <Box
+                    sx={{
+                      mt: 0.6,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.45,
+                      flex: 1,
+                      minHeight: 0,
+                      overflowY: "auto",
+                      overflowX: "hidden",
+                      pr: 0.35,
+                    }}
+                  >
+                    {aiExecutiveInsights.map((insight) => (
+                      <Box
+                        key={insight.label}
+                        sx={{
+                          minWidth: 0,
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 0.65,
+                          px: 0.15,
+                          py: 0.4,
+                          borderBottom: `1px solid ${
+                            isDark ? "rgba(148,163,184,0.14)" : "rgba(148,163,184,0.22)"
+                          }`,
+                          "&:last-of-type": { borderBottom: "none" },
+                        }}
+                      >
+                        <Box
+                          aria-hidden="true"
+                          sx={{
+                            width: 7,
+                            height: 7,
+                            mt: 0.35,
+                            borderRadius: "50%",
+                            bgcolor: insight.color,
+                            boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Stack direction="row" alignItems="baseline" flexWrap="wrap" spacing={0.5}>
+                            <Typography
+                              sx={{
+                                minWidth: 0,
+                                fontSize: 8.7,
+                                fontWeight: 900,
+                                color: isDark ? "#f8fafc" : "#0f172a",
+                              }}
+                            >
+                              {insight.label}:
+                            </Typography>
+                            <Typography
+                              sx={{
+                                fontSize: 10.8,
+                                lineHeight: 1.1,
+                                fontWeight: 900,
+                                color: insight.color,
+                                px: 0.45,
+                                py: 0.12,
+                                borderRadius: 0.65,
+                                bgcolor: alpha(insight.color, isDark ? 0.14 : 0.09),
+                              }}
+                            >
+                              {insight.value}
+                            </Typography>
+                          </Stack>
+                          <Typography sx={{ mt: 0.2, fontSize: 8.3, lineHeight: 1.2, color: "text.secondary" }}>
+                            {insight.detail}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              mt: 0.15,
+                              fontSize: 8.3,
+                              lineHeight: 1.2,
+                              fontWeight: 750,
+                              color: isDark ? "#dbeafe" : "#334155",
+                            }}
+                          >
+                            {insight.action}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
                 </Box>
                 <Box
                   sx={{

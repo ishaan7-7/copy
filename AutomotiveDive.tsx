@@ -2835,7 +2835,7 @@ export default function AutomotiveDive({
                           {[
                             { label: "Total Rows", value: hasData ? (totalRows > 0 ? Number(totalRows).toLocaleString() : "--") : "--" },
                             { label: isKafka ? "Rejected" : "Modules", value: hasData ? (isKafka ? String(kafkaEntry?.rejected_rows ?? 0) : String(activeMods.length)) : "--" },
-                            { label: isKafka ? "Validation Rate" : "Latest Data", value: hasData ? (isKafka ? `${(Number(kafkaEntry?.validation_rate) * 100).toFixed(1)}%` : (latestTs ? latestTs.slice(0, 16).replace("T", " ") : "--")) : "--" },
+                            { label: isKafka ? "Validation Rate" : "Latest Data", value: hasData ? (isKafka ? `${Number(kafkaEntry?.validation_rate ?? 0).toFixed(1)}%` : (latestTs ? latestTs.slice(0, 16).replace("T", " ") : "--")) : "--" },
                             { label: isKafka ? "Avg Latency" : "Source", value: hasData ? (isKafka ? `${Number(kafkaEntry?.avg_latency ?? 0).toFixed(0)} ms` : "Bronze Delta") : "--" },
                           ].map(({ label, value }) => (
                             <Box key={label} sx={{ p: 0.75, borderRadius: 1, bgcolor: darkMode ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8) }}>
