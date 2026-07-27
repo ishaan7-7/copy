@@ -2902,6 +2902,12 @@ export default function CockpitView({
   const [statusFilterMap, setStatusFilterMap] = useState("all");
   const [vehicleType, setVehicleType] = useState("all");
   const [showHistTripOverlay, setShowHistTripOverlay] = useState(false);
+  // Lets a user see just the route shape without the event-marker clutter.
+  // Active vehicles' routes are always on screen, so their toggle is always
+  // usable; parked/in-service vehicles only have a route once "Load Last
+  // Trip" has been clicked, so their toggle stays disabled until then.
+  const [showActiveTripEvents, setShowActiveTripEvents] = useState(true);
+  const [showHistTripEvents, setShowHistTripEvents] = useState(true);
   const [selectedPlant, setSelectedPlant] = useState("all");
 
   const [search, setSearch] = useState("");
@@ -3174,6 +3180,14 @@ export default function CockpitView({
     queryFn: () => axios.get(`${PIPELINE_API}/api/automotive/dtc/fleet-distribution`).then((r) => r.data),
     refetchInterval: isActive && autoRefresh ? 120000 : false,
     staleTime: 30000,
+  });
+  // Static DTC contract — used only to enrich fault codes in the AI
+  // Executive Summary with a plain-English description, so a row can say
+  // "P0217 (Engine Coolant Over Temperature)" instead of a bare code.
+  const { data: dtcMasterContract } = useQuery({
+    queryKey: ["dtc-master-contract"],
+    queryFn: () => axios.get(`${PIPELINE_API}/api/automotive/dtc-master`).then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -3665,6 +3679,8 @@ export default function CockpitView({
 
   useEffect(() => {
     setShowHistTripOverlay(false);
+    setShowHistTripEvents(true);
+    setShowActiveTripEvents(true);
   }, [selectedVehicle]);
 
   const SERVICE_INTERVAL_KM = 15000;
@@ -4254,13 +4270,39 @@ export default function CockpitView({
 
   const topDriverVehicle = topPerformingRows[0];
   const MODULE_KEYS_FLEET = ["engine", "transmission", "battery", "body", "tyre"];
+  // Cross-reference helpers reused across the AI Executive Summary rows so
+  // each row can pull in a specific vehicle's own module/DTC/alert context
+  // instead of restating the same fleet-wide averages every time.
+  const vehicleModuleEntry = (vehicleId: string | undefined) =>
+    vehicleId
+      ? ((automotiveFleetSummary as any)?.vehicles ?? []).find((v: any) => v.vehicle_id === vehicleId)
+      : null;
+  const extremeModuleFor = (vehicleId: string | undefined, direction: "weakest" | "strongest") => {
+    const entry = vehicleModuleEntry(vehicleId);
+    if (!entry) return null;
+    const ranked = MODULE_KEYS_FLEET.map((m) => ({ mod: m, v: Number(entry[`${m}_contrib`] ?? 100) })).sort(
+      (a, b) => (direction === "weakest" ? a.v - b.v : b.v - a.v)
+    );
+    return ranked[0];
+  };
+  const withArticle = (word: string) => `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
+  const dtcCodeInfo = (code: string | undefined) => {
+    if (!code) return null;
+    const modules: Record<string, any[]> = (dtcMasterContract as any)?.modules ?? {};
+    for (const mod of Object.keys(modules)) {
+      const rec = (modules[mod] ?? []).find((r: any) => r.dtc_code === code);
+      if (rec) return { ...rec, module: mod };
+    }
+    return null;
+  };
   const weakestModuleInfo = (() => {
     const vehicles: any[] = (automotiveFleetSummary as any)?.vehicles ?? [];
     if (!vehicles.length) return null;
     const avgByModule = MODULE_KEYS_FLEET.map((mod) => {
       const values = vehicles.map((v: any) => Number(v[`${mod}_contrib`] ?? 0));
       const avg = values.reduce((s: number, x: number) => s + x, 0) / (values.length || 1);
-      return { mod, avg };
+      const affected = values.filter((v: number) => v < 60).length;
+      return { mod, avg, affected };
     });
     return [...avgByModule].sort((a, b) => a.avg - b.avg)[0];
   })();
@@ -4334,14 +4376,40 @@ export default function CockpitView({
       ? `Engine health ${Math.round(Number(priorityVehicle.engine_health))}%`
       : `Overall health ${Math.round(getLiveHealth(priorityVehicle))}%`
     : "No immediate-care issue detected";
+
+  // Cross-referenced context reused by more than one row below, so a fact
+  // discovered once (e.g. the underperforming vehicle's own weakest module)
+  // can echo consistently wherever it's relevant, the same "read together"
+  // pattern the chat assistant's topics use.
+  const worstVehicleModule = extremeModuleFor(lowestHealthVehicle?.vehicle_id, "weakest");
+  const worstVehicleAlert = lowestHealthVehicle
+    ? openAlerts.find((a: any) => String(a.source_id) === lowestHealthVehicle.vehicle_id)
+    : undefined;
+  const bestVehicleModule = extremeModuleFor(highestHealthVehicle?.vehicle_id, "strongest");
+  const coachingVehicleHealth = lowestDriverVehicle ? getLiveHealth(lowestDriverVehicle) : null;
+  const fastestVehicleHealth = fastestVehicle ? getLiveHealth(fastestVehicle) : null;
+  const affectedVehicleIds = [...new Set(openAlerts.map((a: any) => String(a.source_id)))];
+  const topFaultDetail = dtcCodeInfo(topFaultCodeInfo?.code);
+  const priorityInWithinWeek = priorityVehicle
+    ? maintenanceVehicleBuckets.within_1_week.some((v) => v.vehicle_id === priorityVehicle.vehicle_id)
+    : false;
+
   const aiExecutiveInsights = [
     {
       label: "Fleet condition",
       value: `${healthScoreValue}/100 health`,
-      detail: `${executiveMetrics.availability}% available · ${executiveMetrics.utilization}% utilized · ${executiveMetrics.riskIndex}% risk · ${activeCount}/${executiveMetrics.total || 0} vehicles active now`,
+      detail: `${executiveMetrics.availability}% available (${activeCount} active, ${parkedCount} parked, ${serviceCount} in workshop) and ${executiveMetrics.utilization}% utilized, against ${executiveMetrics.riskIndex}% overall risk from ${criticalCount} critical and ${warningCount} warning vehicles.${
+        weakestModuleInfo
+          ? ` Structurally, ${weakestModuleInfo.mod} is the fleet's weak point at ${weakestModuleInfo.avg.toFixed(1)}% average contribution, with ${weakestModuleInfo.affected} vehicle${weakestModuleInfo.affected === 1 ? "" : "s"} below the 60% concern line on that module alone.`
+          : ""
+      }${
+        topFaultCodeInfo
+          ? ` That lines up with ${topFaultCodeInfo.code}${topFaultDetail?.description ? ` (${topFaultDetail.description})` : ""} being the most-triggered fault fleet-wide, seen ${topFaultCodeInfo.count}× across ${topFaultCodeInfo.vehicle_count} vehicles.`
+          : ""
+      }`,
       action:
         executiveMetrics.riskIndex > 35
-          ? "Action: reduce non-essential dispatch until high-risk vehicles are inspected."
+          ? `Action: reduce non-essential dispatch until the ${criticalCount} critical vehicle${criticalCount === 1 ? "" : "s"} ${criticalCount === 1 ? "is" : "are"} inspected${weakestModuleInfo ? `, prioritizing ${weakestModuleInfo.mod} diagnostics given the fleet-wide pattern` : ""}.`
           : "Action: continue the current dispatch plan and monitor the risk queue.",
       color: healthStatus.color,
     },
@@ -4353,12 +4421,26 @@ export default function CockpitView({
           )}% health`
         : "N/A",
       detail: lowestHealthVehicle
-        ? `${lowestHealthVehicle.status} · ${lowestHealthVehicle.type} · ${
-            lowestHealthVehicle.route_name || "route unavailable"
-          } · ${Math.max(0, Math.round(healthScoreValue - getLiveHealth(lowestHealthVehicle)))} pts below fleet average`
+        ? `${lowestHealthVehicle.status}, ${lowestHealthVehicle.type} on ${
+            lowestHealthVehicle.route_name || "an unassigned route"
+          } — ${Math.max(0, Math.round(healthScoreValue - getLiveHealth(lowestHealthVehicle)))} pts below the fleet average.${
+            worstVehicleModule
+              ? ` Its weakest module is ${worstVehicleModule.mod} at ${worstVehicleModule.v.toFixed(1)}%${
+                  weakestModuleInfo && worstVehicleModule.mod === weakestModuleInfo.mod
+                    ? " — the same module dragging down the whole fleet, so this isn't an isolated case"
+                    : ""
+                }.`
+              : ""
+          }${
+            worstVehicleAlert
+              ? ` It also carries a live open alert on ${String(worstVehicleAlert.module || "").toLowerCase()} at a ${Math.round(Number(worstVehicleAlert.max_composite_score || 0) * 100)}% anomaly score.`
+              : ""
+          }`
         : "Awaiting vehicle-health data",
       action: lowestHealthVehicle
-        ? "Action: inspect before its next route and compare module-level health."
+        ? `Action: inspect ${lowestHealthVehicle.vehicle_id} before its next route${
+            worstVehicleModule ? `, starting with the ${worstVehicleModule.mod} module` : ""
+          }${worstVehicleAlert ? " — the open alert shouldn't wait for a scheduled slot" : ""}.`
         : "Action: no vehicle intervention can be assigned yet.",
       color: "#ef4444",
     },
@@ -4366,10 +4448,12 @@ export default function CockpitView({
       label: "Immediate maintenance",
       value: `${immediateCareVehicles.length} critical · ${executiveMetrics.maintenanceForecast} due`,
       detail: priorityVehicle
-        ? `${priorityVehicle.vehicle_id}: ${priorityIssue}`
+        ? `${priorityVehicle.vehicle_id}: ${priorityIssue}${
+            priorityInWithinWeek ? " — already flagged in the <1-week maintenance window" : ""
+          }. ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold, out of ${executiveMetrics.maintenanceForecast} total flagged for maintenance across the whole forecast.`
         : priorityIssue,
       action: priorityVehicle
-        ? `Action: move ${priorityVehicle.vehicle_id} to inspection; ${maintenanceVehicleBuckets.within_1_week.length} vehicle(s) need service within one week.`
+        ? `Action: move ${priorityVehicle.vehicle_id} to inspection now; sequence the remaining ${maintenanceVehicleBuckets.within_1_week.length} vehicle${maintenanceVehicleBuckets.within_1_week.length === 1 ? "" : "s"} due within a week right behind it.`
         : "Action: retain the normal preventive-maintenance cycle.",
       color: immediateCareVehicles.length ? "#dc2626" : "#22c55e",
     },
@@ -4379,16 +4463,24 @@ export default function CockpitView({
         ? `${Math.round(Number(lowestDriverVehicle.driver_score))}/100`
         : "N/A",
       detail: lowestDriverVehicle
-        ? `${lowestDriverVehicle.driver || "Unassigned"} · ${
-            lowestDriverVehicle.vehicle_id
-          }${
+        ? `${lowestDriverVehicle.driver || "Unassigned"} on ${lowestDriverVehicle.vehicle_id}${
             executiveMetrics.avgDriver !== null
-              ? ` · ${Math.max(0, Math.round(executiveMetrics.avgDriver - Number(lowestDriverVehicle.driver_score)))} pts below fleet average`
+              ? `, ${Math.max(0, Math.round(executiveMetrics.avgDriver - Number(lowestDriverVehicle.driver_score)))} pts below the fleet average`
+              : ""
+          }${
+            topDriverVehicle?.driver_score
+              ? ` and ${Math.max(0, Math.round(Number(topDriverVehicle.driver_score) - Number(lowestDriverVehicle.driver_score)))} pts behind ${topDriverVehicle.driver}, the fleet's benchmark driver`
+              : ""
+          }.${
+            coachingVehicleHealth !== null && coachingVehicleHealth < 60
+              ? ` This vehicle's own health is also weak at ${Math.round(coachingVehicleHealth)}% — harsh driving and mechanical wear may be compounding each other here.`
               : ""
           }`
         : "Awaiting driver-score data",
       action: lowestDriverVehicle
-        ? "Action: review speeding, harsh braking and acceleration events with the driver."
+        ? `Action: review harsh-braking and acceleration events with ${lowestDriverVehicle.driver || "this driver"}${
+            topDriverVehicle?.driver ? `, using ${topDriverVehicle.driver}'s technique as the coaching reference` : ""
+          }.`
         : "Action: assign drivers so safety performance can be monitored.",
       color: "#f97316",
     },
@@ -4398,13 +4490,19 @@ export default function CockpitView({
         ? `${Math.round(Number(fastestVehicle.speed || 0))} km/h`
         : "N/A",
       detail: fastestVehicle
-        ? `${fastestVehicle.vehicle_id} · ${
-            fastestVehicle.driver || "driver unassigned"
-          } · ${activeCount} vehicles active fleet-wide`
+        ? `${fastestVehicle.vehicle_id}, driven by ${fastestVehicle.driver || "an unassigned driver"}, out of ${activeCount} vehicles active fleet-wide right now.${
+            fastestVehicleHealth !== null
+              ? ` Its health is ${Math.round(fastestVehicleHealth)}%${
+                  fastestVehicleHealth < 70
+                    ? " — running hard on a vehicle that's already below full health is worth a closer look"
+                    : ", so running at pace isn't compounding an existing risk"
+                }.`
+              : ""
+          }`
         : "Awaiting live-speed data",
       action:
         Number(fastestVehicle?.speed || 0) > 90
-          ? "Action: verify the route speed limit and notify monitoring if the event is unsafe."
+          ? `Action: verify the route speed limit for ${fastestVehicle?.vehicle_id} and notify monitoring if the event is unsafe.`
           : "Action: no immediate overspeed escalation is indicated.",
       color: Number(fastestVehicle?.speed || 0) > 90 ? "#ef4444" : "#0ea5e9",
     },
@@ -4416,7 +4514,9 @@ export default function CockpitView({
           )}% health`
         : "N/A",
       detail: highestHealthVehicle
-        ? `${highestHealthVehicle.status} · ${highestHealthVehicle.type} · ${Math.max(0, Math.round(getLiveHealth(highestHealthVehicle) - healthScoreValue))} pts above fleet average`
+        ? `${highestHealthVehicle.status}, ${highestHealthVehicle.type} — ${Math.max(0, Math.round(getLiveHealth(highestHealthVehicle) - healthScoreValue))} pts above the fleet average.${
+            bestVehicleModule ? ` Its strongest module is ${bestVehicleModule.mod} at ${bestVehicleModule.v.toFixed(1)}%.` : ""
+          }`
         : "Awaiting vehicle-health data",
       action:
         "Action: prioritize this vehicle for high-value routes when operationally suitable.",
@@ -4427,8 +4527,14 @@ export default function CockpitView({
       value: `${executiveMetrics.predictedFailures} predicted · ${
         alertTotal ?? 0
       } live alerts`,
-      detail: `${criticalAlertCount} critical · ${warningAlertCount} warning · ${executiveMetrics.resolvedToday} resolved today${
-        topFaultCodeInfo ? ` · top fault ${topFaultCodeInfo.code}` : ""
+      detail: `${criticalAlertCount} critical and ${warningAlertCount} warning open alert${criticalAlertCount + warningAlertCount === 1 ? "" : "s"}, ${executiveMetrics.resolvedToday} resolved today.${
+        topFaultCodeInfo
+          ? ` Fleet-wide, ${topFaultCodeInfo.code}${topFaultDetail?.description ? ` (${topFaultDetail.description})` : ""} is the most common trigger, seen ${topFaultCodeInfo.count}× across ${topFaultCodeInfo.vehicle_count} vehicles.`
+          : ""
+      }${
+        affectedVehicleIds.length
+          ? ` Vehicles currently affected: ${affectedVehicleIds.slice(0, 3).join(", ")}${affectedVehicleIds.length > 3 ? `, +${affectedVehicleIds.length - 3} more` : ""}.`
+          : ""
       }`,
       action:
         (alertTotal ?? 0) > 0
@@ -4439,9 +4545,19 @@ export default function CockpitView({
     {
       label: "Capacity and workshop",
       value: `${activeCount + parkedCount} ready · ${serviceCount} workshop`,
-      detail: `${activeCount} active · ${parkedCount} parked · ${executiveMetrics.utilization}% utilization · ${
+      detail: `${activeCount} active, ${parkedCount} parked, ${serviceCount} in workshop — ${executiveMetrics.utilization}% utilization, ${
         executiveMetrics.total ? Math.round((activeCount / executiveMetrics.total) * 100) : 0
-      }% of fleet deployed`,
+      }% of the fleet actually deployed right now.${
+        serviceCount
+          ? ` The ${serviceCount} vehicle${serviceCount === 1 ? "" : "s"} in the workshop average${serviceCount === 1 ? "s" : ""} ${Math.round(
+              allPositions.filter((v) => v.status === "in_service").reduce((s, v) => s + getLiveHealth(v), 0) / serviceCount
+            )}% health — ${
+              allPositions.filter((v) => v.status === "in_service").reduce((s, v) => s + getLiveHealth(v), 0) / serviceCount < healthScoreValue
+                ? "consistent with them being pulled for a real reason, not idle capacity"
+                : "some may be there for routine service rather than a genuine fault"
+            }.`
+          : ""
+      }`,
       action:
         parkedCount > 0 && executiveMetrics.utilization < 70
           ? "Action: rebalance parked capacity before adding vehicles or overtime."
@@ -4451,7 +4567,11 @@ export default function CockpitView({
     {
       label: "Maintenance pipeline",
       value: `${maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length} due within 2 weeks`,
-      detail: `<1wk: ${maintenanceVehicleBuckets.within_1_week.length} · 1-2wk: ${maintenanceVehicleBuckets.weeks_1_2.length} · 3-4wk: ${maintenanceVehicleBuckets.weeks_3_4.length} · 1mo+: ${maintenanceVehicleBuckets.over_1_month.length}`,
+      detail: `<1wk: ${maintenanceVehicleBuckets.within_1_week.length} · 1-2wk: ${maintenanceVehicleBuckets.weeks_1_2.length} · 3-4wk: ${maintenanceVehicleBuckets.weeks_3_4.length} · 1mo+: ${maintenanceVehicleBuckets.over_1_month.length}.${
+        weakestModuleInfo
+          ? ` With ${weakestModuleInfo.mod} already the fleet's structural weak point, expect that module to keep resupplying the <1wk and 1-2wk tiers unless it gets addressed fleet-wide rather than vehicle-by-vehicle.`
+          : ""
+      }`,
       action: "Action: schedule workshop slots for the <1wk and 1-2wk tiers first to avoid breakdown risk.",
       color: "#38bdf8",
     },
@@ -4461,10 +4581,18 @@ export default function CockpitView({
         ? `${topDriverVehicle.driver_score ?? 0}/100`
         : "N/A",
       detail: topDriverVehicle
-        ? `${topDriverVehicle.driver || "Unassigned"} · ${topDriverVehicle.vehicle_id}`
+        ? `${topDriverVehicle.driver || "Unassigned"} on ${topDriverVehicle.vehicle_id}${
+            executiveMetrics.avgDriver !== null
+              ? `, ${Math.max(0, Math.round(Number(topDriverVehicle.driver_score ?? 0) - executiveMetrics.avgDriver))} pts above the fleet average`
+              : ""
+          }${
+            lowestDriverVehicle?.driver_score
+              ? ` and ${Math.max(0, Math.round(Number(topDriverVehicle.driver_score ?? 0) - Number(lowestDriverVehicle.driver_score)))} pts ahead of ${lowestDriverVehicle.driver || "the lowest-scoring driver"}`
+              : ""
+          }.`
         : "Awaiting driver-score data",
       action: topDriverVehicle
-        ? "Action: use this driver's technique as the coaching benchmark for lower-scoring drivers."
+        ? `Action: use ${topDriverVehicle.driver || "this driver"}'s technique as the coaching benchmark for lower-scoring drivers${lowestDriverVehicle?.driver ? `, starting with ${lowestDriverVehicle.driver}` : ""}.`
         : "Action: no benchmark driver identified yet.",
       color: "#22c55e",
     },
@@ -4474,10 +4602,18 @@ export default function CockpitView({
         ? `${weakestModuleInfo.mod.charAt(0).toUpperCase() + weakestModuleInfo.mod.slice(1)} · ${weakestModuleInfo.avg.toFixed(1)}%`
         : "N/A",
       detail: weakestModuleInfo
-        ? `Lowest average contribution across all monitored vehicles`
+        ? `Lowest average contribution across all monitored vehicles — ${weakestModuleInfo.affected} vehicle${weakestModuleInfo.affected === 1 ? "" : "s"} sit below the 60% concern line on this module specifically.${
+            worstVehicleModule && worstVehicleModule.mod === weakestModuleInfo.mod
+              ? ` ${lowestHealthVehicle?.vehicle_id}, the fleet's lowest-health vehicle, is one of them (${worstVehicleModule.v.toFixed(1)}%) — the same weak point showing up in two places at once.`
+              : ""
+          }${
+            topFaultDetail && topFaultDetail.module === weakestModuleInfo.mod
+              ? ` It also matches the module behind ${topFaultCodeInfo.code}, the most-triggered fault fleet-wide — structural weakness and active fault are the same story here.`
+              : ""
+          }`
         : "Awaiting module contribution data",
       action: weakestModuleInfo
-        ? `Action: prioritize ${weakestModuleInfo.mod} diagnostics fleet-wide during upcoming service windows.`
+        ? `Action: prioritize ${weakestModuleInfo.mod} diagnostics fleet-wide during upcoming service windows, not just for the worst individual vehicle.`
         : "Action: no module-level trend available yet.",
       color: "#a855f7",
     },
@@ -4485,10 +4621,14 @@ export default function CockpitView({
       label: "Most common fault fleet-wide",
       value: topFaultCodeInfo ? `${topFaultCodeInfo.code}` : "N/A",
       detail: topFaultCodeInfo
-        ? `${topFaultCodeInfo.severity} · ${topFaultCodeInfo.count}× across ${topFaultCodeInfo.vehicle_count} vehicle${topFaultCodeInfo.vehicle_count === 1 ? "" : "s"}`
+        ? `${topFaultCodeInfo.severity}${topFaultDetail?.description ? ` — ${topFaultDetail.description}` : ""}, seen ${topFaultCodeInfo.count}× across ${topFaultCodeInfo.vehicle_count} vehicle${topFaultCodeInfo.vehicle_count === 1 ? "" : "s"}.${
+            topFaultDetail?.module
+              ? ` It's ${withArticle(topFaultDetail.module)} fault${weakestModuleInfo && topFaultDetail.module === weakestModuleInfo.mod ? `, and ${topFaultDetail.module} is already the fleet's structurally weakest module (${weakestModuleInfo.avg.toFixed(1)}% avg) — this isn't a coincidence, it's one root cause showing up twice` : ""}.`
+              : ""
+          }`
         : "No DTC analysis runs recorded yet",
       action: topFaultCodeInfo
-        ? "Action: check DTC Investigation for this code's root-cause pattern across affected vehicles."
+        ? `Action: check DTC Investigation for ${topFaultCodeInfo.code}'s root-cause pattern across the ${topFaultCodeInfo.vehicle_count} affected vehicle${topFaultCodeInfo.vehicle_count === 1 ? "" : "s"}.`
         : "Action: no fault-code trend available yet.",
       color: "#f43f5e",
     },
@@ -4997,7 +5137,7 @@ export default function CockpitView({
                         />
                       )}
 
-                      {selectedIsActive && !isTripDataPlaceholder && tripData?.events && (
+                      {selectedIsActive && showActiveTripEvents && !isTripDataPlaceholder && tripData?.events && (
                         <EventMarkers events={tripData.events} />
                       )}
                       {historicalRouteOverlay && (
@@ -5006,7 +5146,7 @@ export default function CockpitView({
                             positions={historicalRouteOverlay.polyline}
                             pathOptions={{ color: "#8b5cf6", weight: 3, opacity: 0.75 }}
                           />
-                          {historicalRouteOverlay.events.map((evt, i) => (
+                          {showHistTripEvents && historicalRouteOverlay.events.map((evt, i) => (
                             <Marker
                               key={`hist-evt-${i}`}
                               position={[evt.lat, evt.lng]}
@@ -6141,7 +6281,7 @@ export default function CockpitView({
                       }}
                     />
                   )}
-                  {selectedIsActive && !isTripDataPlaceholder && tripData?.events && (
+                  {selectedIsActive && showActiveTripEvents && !isTripDataPlaceholder && tripData?.events && (
                     <EventMarkers events={tripData.events} />
                   )}
                   {historicalRouteOverlay && (
@@ -6150,7 +6290,7 @@ export default function CockpitView({
                         positions={historicalRouteOverlay.polyline}
                         pathOptions={{ color: "#8b5cf6", weight: 3, opacity: 0.75 }}
                       />
-                      {historicalRouteOverlay.events.map((evt, i) => (
+                      {showHistTripEvents && historicalRouteOverlay.events.map((evt, i) => (
                         <Marker
                           key={`hist-evt-exp-${i}`}
                           position={[evt.lat, evt.lng]}
@@ -6599,6 +6739,39 @@ export default function CockpitView({
                                     >
                                       {showHistTripOverlay ? "Hide Trip" : "Load Last Trip"}
                                     </Button>
+                                  )}
+                                  {lastTripData?.last_trip && (
+                                    <Tooltip
+                                      title={
+                                        showHistTripOverlay
+                                          ? "Toggle event markers on the highlighted route"
+                                          : "Load the last trip first to enable this"
+                                      }
+                                      arrow
+                                    >
+                                      <span>
+                                        <Stack
+                                          direction="row"
+                                          alignItems="center"
+                                          spacing={0.2}
+                                          onMouseDown={(e) => e.stopPropagation()}
+                                          sx={{ opacity: showHistTripOverlay ? 1 : 0.5 }}
+                                        >
+                                          <Switch
+                                            size="small"
+                                            checked={showHistTripEvents}
+                                            disabled={!showHistTripOverlay}
+                                            onChange={(e) => setShowHistTripEvents(e.target.checked)}
+                                            sx={{ transform: "scale(0.7)" }}
+                                          />
+                                          <Typography
+                                            sx={{ fontSize: "8px !important", fontWeight: 700, whiteSpace: "nowrap" }}
+                                          >
+                                            Events
+                                          </Typography>
+                                        </Stack>
+                                      </span>
+                                    </Tooltip>
                                   )}
                                   {!disableExternalNav && (
                                     <Button
@@ -7501,6 +7674,28 @@ export default function CockpitView({
                                           </Typography>
                                         </Box>
                                       </Box>
+
+                                      {/* Events toggle */}
+                                      <Stack
+                                        direction="row"
+                                        alignItems="center"
+                                        spacing={0.3}
+                                        sx={{ mb: 1.5 }}
+                                      >
+                                        <Switch
+                                          size="small"
+                                          checked={showActiveTripEvents}
+                                          onChange={(e) => setShowActiveTripEvents(e.target.checked)}
+                                          sx={{ transform: "scale(0.75)" }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{ fontSize: "9px !important", fontWeight: 700 }}
+                                        >
+                                          Show events on route
+                                        </Typography>
+                                      </Stack>
 
                                       {/* Distance */}
                                       <Box
@@ -9302,7 +9497,7 @@ export default function CockpitView({
                   </Box>
                   <Typography
                     sx={{
-                      fontSize: 10,
+                      fontSize: 11.5,
                       fontWeight: 900,
                       color: isDark ? "#f8fafc" : "#0f172a",
                       textTransform: "uppercase",
@@ -9334,7 +9529,7 @@ export default function CockpitView({
                     minHeight: 0,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 0.45,
+                    gap: 0.85,
                     overflowY: "auto",
                     overflowX: "hidden",
                     pr: 0.35,
@@ -9342,8 +9537,8 @@ export default function CockpitView({
                 >
                   <Typography
                     sx={{
-                      fontSize: 11,
-                      lineHeight: 1.4,
+                      fontSize: 13.5,
+                      lineHeight: 1.55,
                       color: "text.secondary",
                       flexShrink: 0,
                       mb: 0.3,
@@ -9358,9 +9553,9 @@ export default function CockpitView({
                         minWidth: 0,
                         display: "flex",
                         alignItems: "flex-start",
-                        gap: 0.65,
+                        gap: 0.9,
                         px: 0.15,
-                        py: 0.4,
+                        py: 0.85,
                         borderBottom: `1px solid ${
                           isDark ? "rgba(148,163,184,0.14)" : "rgba(148,163,184,0.22)"
                         }`,
@@ -9370,9 +9565,9 @@ export default function CockpitView({
                       <Box
                         aria-hidden="true"
                         sx={{
-                          width: 7,
-                          height: 7,
-                          mt: 0.35,
+                          width: 8,
+                          height: 8,
+                          mt: 0.5,
                           borderRadius: "50%",
                           bgcolor: insight.color,
                           boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
@@ -9380,11 +9575,11 @@ export default function CockpitView({
                         }}
                       />
                       <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Stack direction="row" alignItems="baseline" flexWrap="wrap" spacing={0.5}>
+                        <Stack direction="row" alignItems="baseline" flexWrap="wrap" spacing={0.75}>
                           <Typography
                             sx={{
                               minWidth: 0,
-                              fontSize: 8.7,
+                              fontSize: 12.5,
                               fontWeight: 900,
                               color: isDark ? "#f8fafc" : "#0f172a",
                             }}
@@ -9393,12 +9588,12 @@ export default function CockpitView({
                           </Typography>
                           <Typography
                             sx={{
-                              fontSize: 10.8,
-                              lineHeight: 1.1,
+                              fontSize: 13.5,
+                              lineHeight: 1.2,
                               fontWeight: 900,
                               color: insight.color,
-                              px: 0.45,
-                              py: 0.12,
+                              px: 0.6,
+                              py: 0.2,
                               borderRadius: 0.65,
                               bgcolor: alpha(insight.color, isDark ? 0.14 : 0.09),
                             }}
@@ -9406,14 +9601,14 @@ export default function CockpitView({
                             {insight.value}
                           </Typography>
                         </Stack>
-                        <Typography sx={{ mt: 0.2, fontSize: 8.3, lineHeight: 1.2, color: "text.secondary" }}>
+                        <Typography sx={{ mt: 0.35, fontSize: 12.5, lineHeight: 1.5, color: "text.secondary" }}>
                           {insight.detail}
                         </Typography>
                         <Typography
                           sx={{
-                            mt: 0.15,
-                            fontSize: 8.3,
-                            lineHeight: 1.2,
+                            mt: 0.3,
+                            fontSize: 12.5,
+                            lineHeight: 1.5,
                             fontWeight: 750,
                             color: isDark ? "#dbeafe" : "#334155",
                           }}
@@ -9810,11 +10005,13 @@ export default function CockpitView({
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {activeTableRows
-                        .slice(
-                          page * rowsPerPage,
-                          page * rowsPerPage + rowsPerPage
-                        )
+                      {(tableExpanded
+                        ? activeTableRows
+                        : activeTableRows.slice(
+                            page * rowsPerPage,
+                            page * rowsPerPage + rowsPerPage
+                          )
+                      )
                         .map((row, rowIdx) => {
                           const liveHealth = getLiveHealth(row);
                           const hs = getHealthStatus(liveHealth);
@@ -10460,7 +10657,7 @@ export default function CockpitView({
                 <Box
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: "1fr auto 1fr",
+                    gridTemplateColumns: tableExpanded ? "1fr" : "1fr auto 1fr",
                     alignItems: "center",
                     px: 2,
                     py: 1.25,
@@ -10468,118 +10665,143 @@ export default function CockpitView({
                     bgcolor: isDark ? "#0f172a" : "#ffffff",
                   }}
                 >
-                  <Typography
-                    sx={{
-                      fontSize: "12px",
-                      color: "text.secondary",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Showing{" "}
-                    <Box
-                      component="span"
-                      sx={{
-                        fontWeight: 700,
-                        color: isDark ? "#e2e8f0" : "#1e293b",
-                      }}
-                    >
-                      {Math.min(
-                        rowsPerPage,
-                        Math.max(0, activeTableRows.length - page * rowsPerPage)
-                      )}
-                    </Box>
-                    {" of "}
-                    <Box
-                      component="span"
-                      sx={{
-                        fontWeight: 700,
-                        color: isDark ? "#e2e8f0" : "#1e293b",
-                      }}
-                    >
-                      {activeTableRows.length}
-                    </Box>
-                    {showWorstPerformers ? " worst vehicles" : " active vehicles"}
-                  </Typography>
-
-                  <Pagination
-                    count={Math.max(
-                      1,
-                      Math.ceil(activeTableRows.length / rowsPerPage)
-                    )}
-                    page={page + 1}
-                    onChange={(_, value) => handleChangePage(null, value - 1)}
-                    shape="rounded"
-                    siblingCount={1}
-                    boundaryCount={1}
-                    sx={{
-                      "& .MuiPaginationItem-root": {
-                        fontSize: "12px",
-                        color: isDark ? "#94a3b8" : "#64748b",
-                        backgroundColor: isDark ? "#0f1f31" : "transparent",
-                        border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
-                        "&:hover": {
-                          backgroundColor: isDark ? "#102235" : undefined,
-                          color: isDark ? "#e2e8f0" : undefined,
-                        },
-                        "&.Mui-selected": {
-                          backgroundColor: isDark ? "#38bdf8" : "#005071",
-                          color: isDark ? "#04131f" : "#fff",
-                          borderColor: isDark ? "#38bdf8" : "#005071",
-                          "&:hover": {
-                            backgroundColor: isDark ? "#0ea5e9" : "#003e59",
-                          },
-                        },
-                        "&.MuiPaginationItem-ellipsis": {
-                          backgroundColor: "transparent",
-                          border: "none",
-                        },
-                      },
-                    }}
-                  />
-
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    justifyContent="flex-end"
-                  >
+                  {tableExpanded ? (
                     <Typography
                       sx={{
-                        fontSize: "10px",
+                        fontSize: "12px",
                         color: "text.secondary",
-                        whiteSpace: "nowrap",
+                        fontWeight: 500,
+                        textAlign: "center",
                       }}
                     >
-                      Rows per page
+                      Showing all{" "}
+                      <Box
+                        component="span"
+                        sx={{
+                          fontWeight: 700,
+                          color: isDark ? "#e2e8f0" : "#1e293b",
+                        }}
+                      >
+                        {activeTableRows.length}
+                      </Box>
+                      {showWorstPerformers ? " worst vehicles" : " active vehicles"}
                     </Typography>
-                    <Select
-                      size="small"
-                      value={rowsPerPage}
-                      onChange={(e) => {
-                        setRowsPerPage(Number(e.target.value));
-                        setPage(0);
-                      }}
-                      sx={{
-                        fontSize: "10px",
-                        height: 28,
-                        "& .MuiOutlinedInput-notchedOutline": {
-                          borderColor: isDark ? "#334155" : "#e2e8f0",
-                        },
-                        "& .MuiSelect-select": {
-                          py: 0,
-                          px: 1,
-                          fontSize: "10px",
-                        },
-                        bgcolor: isDark ? "#1e293b" : "#f8fafc",
-                        color: isDark ? "#e2e8f0" : "#1e293b",
-                      }}
-                    >
-                      <MenuItem value={5}>5</MenuItem>
-                      <MenuItem value={10}>10</MenuItem>
-                      <MenuItem value={25}>25</MenuItem>
-                      <MenuItem value={50}>50</MenuItem>
-                    </Select>
-                  </Stack>
+                  ) : (
+                    <>
+                      <Typography
+                        sx={{
+                          fontSize: "12px",
+                          color: "text.secondary",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Showing{" "}
+                        <Box
+                          component="span"
+                          sx={{
+                            fontWeight: 700,
+                            color: isDark ? "#e2e8f0" : "#1e293b",
+                          }}
+                        >
+                          {Math.min(
+                            rowsPerPage,
+                            Math.max(0, activeTableRows.length - page * rowsPerPage)
+                          )}
+                        </Box>
+                        {" of "}
+                        <Box
+                          component="span"
+                          sx={{
+                            fontWeight: 700,
+                            color: isDark ? "#e2e8f0" : "#1e293b",
+                          }}
+                        >
+                          {activeTableRows.length}
+                        </Box>
+                        {showWorstPerformers ? " worst vehicles" : " active vehicles"}
+                      </Typography>
+
+                      <Pagination
+                        count={Math.max(
+                          1,
+                          Math.ceil(activeTableRows.length / rowsPerPage)
+                        )}
+                        page={page + 1}
+                        onChange={(_, value) => handleChangePage(null, value - 1)}
+                        shape="rounded"
+                        siblingCount={1}
+                        boundaryCount={1}
+                        sx={{
+                          "& .MuiPaginationItem-root": {
+                            fontSize: "12px",
+                            color: isDark ? "#94a3b8" : "#64748b",
+                            backgroundColor: isDark ? "#0f1f31" : "transparent",
+                            border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+                            "&:hover": {
+                              backgroundColor: isDark ? "#102235" : undefined,
+                              color: isDark ? "#e2e8f0" : undefined,
+                            },
+                            "&.Mui-selected": {
+                              backgroundColor: isDark ? "#38bdf8" : "#005071",
+                              color: isDark ? "#04131f" : "#fff",
+                              borderColor: isDark ? "#38bdf8" : "#005071",
+                              "&:hover": {
+                                backgroundColor: isDark ? "#0ea5e9" : "#003e59",
+                              },
+                            },
+                            "&.MuiPaginationItem-ellipsis": {
+                              backgroundColor: "transparent",
+                              border: "none",
+                            },
+                          },
+                        }}
+                      />
+
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent="flex-end"
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: "10px",
+                            color: "text.secondary",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Rows per page
+                        </Typography>
+                        <Select
+                          size="small"
+                          value={rowsPerPage}
+                          onChange={(e) => {
+                            setRowsPerPage(Number(e.target.value));
+                            setPage(0);
+                          }}
+                          sx={{
+                            fontSize: "10px",
+                            height: 28,
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: isDark ? "#334155" : "#e2e8f0",
+                            },
+                            "& .MuiSelect-select": {
+                              py: 0,
+                              px: 1,
+                              fontSize: "10px",
+                            },
+                            bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                            color: isDark ? "#e2e8f0" : "#1e293b",
+                          }}
+                        >
+                          <MenuItem value={5}>5</MenuItem>
+                          <MenuItem value={10}>10</MenuItem>
+                          <MenuItem value={25}>25</MenuItem>
+                          <MenuItem value={50}>50</MenuItem>
+                        </Select>
+                      </Stack>
+                    </>
+                  )}
                 </Box>
               </Paper>
             </Grid>

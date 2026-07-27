@@ -3,25 +3,32 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   Box,
   Button,
   Chip,
+  Divider,
   Fab,
   IconButton,
+  Menu,
+  MenuItem,
   Paper,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
+import AddCommentRoundedIcon from "@mui/icons-material/AddCommentRounded";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SmartToyRoundedIcon from "@mui/icons-material/SmartToyRounded";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -38,6 +45,7 @@ import {
 import {
   pageKeyForPath,
   topicsFor,
+  ALL_TOPICS,
   NO_VEHICLE_MSG,
   type AssistantRole,
   type AssistantTopic,
@@ -109,9 +117,62 @@ type Message = {
   knowledgeSection?: string;
 };
 
+type ChatSession = {
+  id: string;
+  title: string;
+  messages: Message[];
+  updatedAt: number;
+};
+
 type FleetChatAssistantProps = {
   activeAlertCount: number;
   currentRoleLabel: string;
+};
+
+const SESSIONS_STORAGE_KEY = "telemetrix-fleet-chat-sessions-v1";
+const ACTIVE_SESSION_STORAGE_KEY = "telemetrix-fleet-chat-active-session-v1";
+const RESET_TOKEN_STORAGE_KEY = "telemetrix-fleet-chat-reset-token-v1";
+const RESET_TOKEN_API = "http://127.0.0.1:8005/api/session/reset-token";
+const GREETING_TEXT =
+  "Hi! I’m your AI Fleet Assistant. Ask me about fleet performance, vehicle diagnostics, driver insights, or telemetry—I’m here to help.";
+
+const makeSessionId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+const freshGreeting = (): Message[] => [{ id: 1, role: "assistant", text: GREETING_TEXT }];
+
+const deriveSessionTitle = (messages: Message[]) => {
+  const firstUserMessage = messages.find((m) => m.role === "user");
+  if (!firstUserMessage) return "New chat";
+  return firstUserMessage.text.length > 42
+    ? `${firstUserMessage.text.slice(0, 42)}…`
+    : firstUserMessage.text;
+};
+
+const loadStoredSessions = (): ChatSession[] => {
+  try {
+    const raw = window.localStorage.getItem(SESSIONS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistSessions = (sessions: ChatSession[]) => {
+  window.localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+};
+
+const loadInitialChatState = (): { sessions: ChatSession[]; activeSessionId: string; messages: Message[] } => {
+  const sessions = loadStoredSessions();
+  const savedActiveId = window.localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+  const activeSession = sessions.find((s) => s.id === savedActiveId);
+  if (activeSession) {
+    return { sessions, activeSessionId: activeSession.id, messages: activeSession.messages };
+  }
+  return { sessions, activeSessionId: makeSessionId(), messages: freshGreeting() };
 };
 
 const roleTopics: Record<string, string[]> = {
@@ -194,13 +255,11 @@ export default function FleetChatAssistant({
   });
   const [typing, setTyping] = useState(false);
   const [questionInput, setQuestionInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      role: "assistant",
-      text: "Hi! I’m your AI Fleet Assistant. Ask me about fleet performance, vehicle diagnostics, driver insights, or telemetry—I’m here to help.",
-    },
-  ]);
+  const [initialChatState] = useState(loadInitialChatState);
+  const [sessions, setSessions] = useState<ChatSession[]>(initialChatState.sessions);
+  const [activeSessionId, setActiveSessionId] = useState(initialChatState.activeSessionId);
+  const [messages, setMessages] = useState<Message[]>(initialChatState.messages);
+  const [historyAnchorEl, setHistoryAnchorEl] = useState<HTMLElement | null>(null);
   const pageTopics = useMemo(() => topicsFor(pageKey, assistantRole), [pageKey, assistantRole]);
   const topicCtx: TopicContext = useMemo(
     () => ({
@@ -208,8 +267,9 @@ export default function FleetChatAssistant({
       selectedModule: pageSelectedModule,
       fleetPositions,
       fleetSummary,
+      connected,
     }),
-    [pageSelectedVehicle, pageSelectedModule, fleetPositions, fleetSummary]
+    [pageSelectedVehicle, pageSelectedModule, fleetPositions, fleetSummary, connected]
   );
   const resolvedTopics = useMemo(() => {
     if (pageTopics.length) {
@@ -229,7 +289,11 @@ export default function FleetChatAssistant({
       topic: null as AssistantTopic | null,
     }));
   }, [pageTopics, topicCtx, assistantRole]);
-  const nextId = useRef(2);
+  const nextId = useRef(
+    initialChatState.messages.length
+      ? Math.max(...initialChatState.messages.map((m) => m.id)) + 1
+      : 2
+  );
   const cancelledRef = useRef(false);
   useEffect(() => () => {
     cancelledRef.current = true;
@@ -437,6 +501,59 @@ export default function FleetChatAssistant({
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing, open]);
 
+  // Keeps the active chat's saved copy in sync with what's on screen, so
+  // reopening it later (or just reloading the page) picks up right where it
+  // left off. Runs on every message change — cheap, and simpler than a
+  // separate explicit "save" step scattered across every place messages
+  // change (ask, askPageTopic, pushAssistantAnswer, session switches).
+  useEffect(() => {
+    window.localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+    setSessions((current) => {
+      const title = deriveSessionTitle(messages);
+      const updated: ChatSession = { id: activeSessionId, title, messages, updatedAt: Date.now() };
+      const index = current.findIndex((s) => s.id === activeSessionId);
+      const next =
+        index >= 0
+          ? current.map((s, i) => (i === index ? updated : s))
+          : [updated, ...current];
+      persistSessions(next);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, activeSessionId]);
+
+  // `run.py --reset` can't reach into the browser's localStorage on its
+  // own — it only kills processes and clears server-side files — so this is
+  // the bridge: check once on load whether the backend's reset token has
+  // moved past what we last saw, and if so, wipe every saved chat session
+  // (including the one currently on screen) rather than leaving stale
+  // pre-reset conversations sitting in the browser indefinitely.
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get(RESET_TOKEN_API)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const remoteToken = String(data?.reset_token ?? "none");
+        const seenToken = window.localStorage.getItem(RESET_TOKEN_STORAGE_KEY);
+        if (seenToken !== null && seenToken !== remoteToken) {
+          persistSessions([]);
+          setSessions([]);
+          const freshId = makeSessionId();
+          window.localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, freshId);
+          setActiveSessionId(freshId);
+          setMessages(freshGreeting());
+          nextId.current = 2;
+        }
+        window.localStorage.setItem(RESET_TOKEN_STORAGE_KEY, remoteToken);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   useEffect(() => {
     const keepLauncherOnScreen = () => {
@@ -641,9 +758,20 @@ export default function FleetChatAssistant({
         : unavailable;
     }
     if (normalized.includes("safety") && normalized.includes("score")) {
-      return footerMetrics.safetyScore !== null
-        ? `The fleet safety score is ${footerMetrics.safetyScore.toFixed(1)}/100, calculated from the backend fleet value or the available vehicle safety scores.`
-        : "A safety score is not currently provided by the fleet backend.";
+      // There is no distinct "safety_score" field anywhere in the backend —
+      // driver_score already IS the safety-behavior metric (built from harsh
+      // braking/accel/cornering rates upstream), so treat them as the same
+      // real number instead of returning a "not provided" dead-end.
+      const scored = (fleetPositions ?? [])
+        .map((p) => ({ id: String(p.vehicle_id ?? p["id"] ?? ""), driver: String(p.driver ?? "Unassigned"), score: Number(p.driver_score) }))
+        .filter((p) => Number.isFinite(p.score));
+      if (!scored.length) return unavailable;
+      const avg = scored.reduce((s, p) => s + p.score, 0) / scored.length;
+      const worst = [...scored].sort((a, b) => a.score - b.score)[0];
+      const best = [...scored].sort((a, b) => b.score - a.score)[0];
+      const atRisk = scored.filter((p) => p.score < 70).length;
+      const read = avg >= 85 ? "strong — above the 85 threshold we treat as safe" : avg >= 70 ? "acceptable but worth watching" : "a genuine concern";
+      return `Fleet safety score (from driver behavior — harsh braking, acceleration and cornering rates) is ${avg.toFixed(1)}/100, which is ${read}. ${worst.driver} (${worst.id}) is the outlier at ${worst.score}/100${atRisk > 1 ? `, and ${atRisk} drivers overall are below the 70 safety threshold` : ""}; ${best.driver} (${best.id}) is the benchmark at ${best.score}/100. Recommend a coaching session with ${worst.driver} focused on the specific harsh-event pattern before their next long route.`;
     }
     if (normalized.includes("parked")) {
       return fleetCounts.parked !== null
@@ -709,13 +837,20 @@ export default function FleetChatAssistant({
   ): Promise<string> => {
     if (topic.requiresVehicle && !ctx.selectedVehicle) return NO_VEHICLE_MSG;
     try {
-      let data: any;
-      if (topic.fetch) {
-        const spec = topic.fetch(ctx);
-        data = await queryClient.fetchQuery({
-          queryKey: ["chat-topic", spec.url, JSON.stringify(spec.params ?? {})],
-          queryFn: () => axios.get(spec.url, { params: spec.params }).then((r) => r.data),
-          staleTime: 10000,
+      const data: Record<string, any> = {};
+      if (topic.fetches) {
+        const specs = topic.fetches(ctx);
+        const results = await Promise.all(
+          specs.map((spec) =>
+            queryClient.fetchQuery({
+              queryKey: ["chat-topic", spec.url, JSON.stringify(spec.params ?? {})],
+              queryFn: () => axios.get(spec.url, { params: spec.params }).then((r) => r.data),
+              staleTime: 10000,
+            })
+          )
+        );
+        specs.forEach((spec, i) => {
+          data[spec.key] = results[i];
         });
       }
       return topic.respond(data, ctx);
@@ -726,10 +861,18 @@ export default function FleetChatAssistant({
 
   const resolveAnswer = async (question: string): Promise<string | KnowledgeRepoAnswer> => {
     const normalized = question.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-    const matchedTopic = pageTopics.find(
+    // Current page's own topics win first — a bare "full briefing" should
+    // mean *this* page's briefing, not whichever other page's topic happens
+    // to share the same generic trigger words. Only once nothing local
+    // matches do we search every topic on every page/role, so a distinctly-
+    // worded question (a DTC code, "recent trips", "workshop queue", etc.)
+    // still resolves correctly no matter where you're standing.
+    const localMatch = pageTopics.find(
       (t): t is AssistantTopic => typeof t !== "string" && t.match(normalized)
     );
-    if (matchedTopic) return runTopic(matchedTopic, topicCtx);
+    if (localMatch) return runTopic(localMatch, topicCtx);
+    const globalMatch = ALL_TOPICS.find((t) => t.match(normalized));
+    if (globalMatch) return runTopic(globalMatch, topicCtx);
     return answerFor(question);
   };
 
@@ -776,6 +919,49 @@ export default function FleetChatAssistant({
       pushAssistantAnswer(answer)
     );
   };
+
+  // Switching sessions or starting a new one while an answer is still in
+  // flight would let that pending answer land in whichever session happens
+  // to be active by the time it resolves — the hamburger button and its menu
+  // items are disabled while typing (below) so this can't actually happen,
+  // but these still guard defensively since they're plain functions, not
+  // disabled JSX themselves.
+  const startNewChat = () => {
+    if (typing) return;
+    const freshId = makeSessionId();
+    nextId.current = 2;
+    setActiveSessionId(freshId);
+    setMessages(freshGreeting());
+    setHistoryAnchorEl(null);
+  };
+
+  const openSession = (session: ChatSession) => {
+    if (typing) return;
+    setActiveSessionId(session.id);
+    setMessages(session.messages);
+    nextId.current = session.messages.length
+      ? Math.max(...session.messages.map((m) => m.id)) + 1
+      : 2;
+    setHistoryAnchorEl(null);
+  };
+
+  const deleteSession = (id: string, event: ReactMouseEvent) => {
+    event.stopPropagation();
+    const remaining = sessions.filter((s) => s.id !== id);
+    persistSessions(remaining);
+    setSessions(remaining);
+    if (id !== activeSessionId) return;
+    if (remaining.length) {
+      openSession([...remaining].sort((a, b) => b.updatedAt - a.updatedAt)[0]);
+    } else {
+      startNewChat();
+    }
+  };
+
+  const orderedSessions = useMemo(
+    () => [...sessions].sort((a, b) => b.updatedAt - a.updatedAt),
+    [sessions]
+  );
 
   const dark = theme.palette.mode === "dark";
   const accent = dark ? "#38bdf8" : "#005071";
@@ -1072,6 +1258,67 @@ export default function FleetChatAssistant({
                 : "linear-gradient(135deg, #005071, #0b7fab)",
             }}
           >
+            <IconButton
+              aria-label="Chat history"
+              aria-haspopup="menu"
+              aria-expanded={Boolean(historyAnchorEl)}
+              onClick={(event) => setHistoryAnchorEl(event.currentTarget)}
+              disabled={typing}
+              size="small"
+              sx={{ color: "inherit" }}
+            >
+              <MenuRoundedIcon fontSize="small" />
+            </IconButton>
+            <Menu
+              anchorEl={historyAnchorEl}
+              open={Boolean(historyAnchorEl)}
+              onClose={() => setHistoryAnchorEl(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+              transformOrigin={{ vertical: "top", horizontal: "left" }}
+              slotProps={{ paper: { sx: { width: 260, maxHeight: 360 } } }}
+            >
+              <MenuItem onClick={startNewChat} sx={{ gap: 1 }}>
+                <AddCommentRoundedIcon sx={{ fontSize: 18, color: accent }} />
+                <Typography sx={{ fontSize: 12.5, fontWeight: 700 }}>New chat</Typography>
+              </MenuItem>
+              <Divider />
+              {orderedSessions.length ? (
+                orderedSessions.map((session) => (
+                  <MenuItem
+                    key={session.id}
+                    onClick={() => openSession(session)}
+                    selected={session.id === activeSessionId}
+                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    <Typography
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: 12,
+                        fontWeight: session.id === activeSessionId ? 800 : 500,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {session.title}
+                    </Typography>
+                    <IconButton
+                      aria-label={`Delete chat: ${session.title}`}
+                      size="small"
+                      onClick={(event) => deleteSession(session.id, event)}
+                      sx={{ p: 0.4, color: "text.secondary", "&:hover": { color: "#ef4444" } }}
+                    >
+                      <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </MenuItem>
+                ))
+              ) : (
+                <MenuItem disabled sx={{ fontSize: 12, fontStyle: "italic" }}>
+                  No previous chats yet
+                </MenuItem>
+              )}
+            </Menu>
             <Box
               sx={{
                 width: 36,
@@ -1081,11 +1328,12 @@ export default function FleetChatAssistant({
                 placeItems: "center",
                 bgcolor: "rgba(255,255,255,.16)",
                 border: "1px solid rgba(255,255,255,.25)",
+                flexShrink: 0,
               }}
             >
               <SmartToyRoundedIcon fontSize="small" />
             </Box>
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ fontSize: 14, fontWeight: 800 }}>
                 Fleet Assistant
               </Typography>
