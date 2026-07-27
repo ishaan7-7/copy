@@ -1,5 +1,6 @@
 import asyncio
 import json
+import math
 import os
 
 import uvicorn
@@ -8,6 +9,31 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from trip_engine import TripEngine
 from fleet_config import VEHICLES, get_fleet_summary, get_maintenance_forecast
+
+_ENDPOINT_MATCH_KM = 20.0
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _nearest_route_endpoint_label(
+    lat: float, lng: float, route_coords: list, origin_name: str, dest_name: str
+) -> str:
+    o_lat, o_lng = route_coords[0]
+    d_lat, d_lng = route_coords[-1]
+    d_to_origin = _haversine_km(lat, lng, o_lat, o_lng)
+    d_to_dest = _haversine_km(lat, lng, d_lat, d_lng)
+    if d_to_origin <= d_to_dest and d_to_origin <= _ENDPOINT_MATCH_KM:
+        return origin_name
+    if d_to_dest < d_to_origin and d_to_dest <= _ENDPOINT_MATCH_KM:
+        return dest_name
+    return f"En route ({origin_name.split(',')[0]} – {dest_name.split(',')[0]})"
 
 app = FastAPI(title="Fleet Simulator", version="1.0.0")
 
@@ -156,8 +182,26 @@ async def vehicle_last_trip(vehicle_id: str):
             if os.path.exists(route_path):
                 with open(route_path, "r", encoding="utf-8") as fh:
                     rd = json.load(fh)
-                    origin = rd.get("origin", "")
-                    destination = rd.get("destination", "")
+                    route_origin_name = rd.get("origin", "")
+                    route_dest_name = rd.get("destination", "")
+                    route_coords = rd.get("coordinates", [])
+                # A trip's own route_waypoints often cover only part of the
+                # full route (repeated shorter journeys, not always
+                # end-to-end), so the full route's origin/destination only
+                # apply when the trip's own endpoints actually sit near
+                # them — otherwise label with whichever named endpoint the
+                # trip actually starts/ends closest to, so a short segment
+                # near one city isn't stamped with the other end's name too.
+                wp = (last_trip or {}).get("route_waypoints") or []
+                if wp and route_coords:
+                    origin = _nearest_route_endpoint_label(
+                        wp[0][0], wp[0][1], route_coords, route_origin_name, route_dest_name
+                    )
+                    destination = _nearest_route_endpoint_label(
+                        wp[-1][0], wp[-1][1], route_coords, route_origin_name, route_dest_name
+                    )
+                else:
+                    origin, destination = route_origin_name, route_dest_name
     if last_trip:
         # last_trip (from trips.json) already carries its own accurate
         # route_waypoints for the actual segment driven on that trip — dict()
