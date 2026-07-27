@@ -126,6 +126,35 @@ const VEHICLE_COLORS = [
   "#a855f7",
 ];
 
+// Single source of truth for the Maintenance Forecast windows: bucket
+// assignment, the bar-chart tooltip text, and the popup's explanation
+// banner all derive their numbers from this list. Edit maxHealth here to
+// change the ranges — nothing else needs to change to stay in sync.
+type MaintenanceTierKey = "within_1_week" | "weeks_1_2" | "weeks_3_4" | "over_1_month";
+const MAINTENANCE_TIERS: {
+  key: MaintenanceTierKey;
+  label: string;
+  maxHealth: number; // exclusive upper bound on live health %; last tier ignores this
+  color: string;
+  action: string; // short phrase describing what to do in this window
+}[] = [
+  { key: "within_1_week", label: "< 1 Week", maxHealth: 40, color: "#ef4444", action: "immediate service required to prevent breakdown" },
+  { key: "weeks_1_2", label: "1-2 Weeks", maxHealth: 50, color: "#f59e0b", action: "schedule within two weeks before risk escalates to breakdown" },
+  { key: "weeks_3_4", label: "3-4 Weeks", maxHealth: 80, color: "#22c55e", action: "plan service around route windows to minimise downtime" },
+  { key: "over_1_month", label: "> 1 Month", maxHealth: Infinity, color: "#06b6d4", action: "healthy vehicles — group into routine monthly maintenance cycle" },
+];
+
+function maintenanceTierForHealth(health: number) {
+  return MAINTENANCE_TIERS.find((t) => health < t.maxHealth) ?? MAINTENANCE_TIERS[MAINTENANCE_TIERS.length - 1];
+}
+
+function maintenanceTierRangeLabel(index: number): string {
+  const tier = MAINTENANCE_TIERS[index];
+  const lo = index === 0 ? 0 : MAINTENANCE_TIERS[index - 1].maxHealth;
+  if (tier.maxHealth === Infinity) return `Health ≥ ${lo}%`;
+  return index === 0 ? `Health below ${tier.maxHealth}%` : `Health ${lo}–${tier.maxHealth}%`;
+}
+
 type Severity = "active" | "parked" | "warning" | "critical" | "service";
 
 type FleetFilter =
@@ -3875,10 +3904,7 @@ export default function CockpitView({
   // same value shown in its popup) instead of the static per-vehicle
   // "health" baked into fleet_config.py, which never changes at runtime.
   const maintenanceVehicleBuckets = useMemo(() => {
-    const buckets: Record<
-      "within_1_week" | "weeks_1_2" | "weeks_3_4" | "over_1_month",
-      (VehiclePosition & { liveHealth: number })[]
-    > = {
+    const buckets: Record<MaintenanceTierKey, (VehiclePosition & { liveHealth: number })[]> = {
       within_1_week: [],
       weeks_1_2: [],
       weeks_3_4: [],
@@ -3886,13 +3912,9 @@ export default function CockpitView({
     };
     for (const v of allPositions) {
       const liveHealth = getLiveHealth(v);
-      const entry = { ...v, liveHealth };
-      if (liveHealth < 40) buckets.within_1_week.push(entry);
-      else if (liveHealth < 50) buckets.weeks_1_2.push(entry);
-      else if (liveHealth < 80) buckets.weeks_3_4.push(entry);
-      else buckets.over_1_month.push(entry);
+      buckets[maintenanceTierForHealth(liveHealth).key].push({ ...v, liveHealth });
     }
-    for (const key of Object.keys(buckets) as (keyof typeof buckets)[]) {
+    for (const key of Object.keys(buckets) as MaintenanceTierKey[]) {
       buckets[key].sort((a, b) => a.liveHealth - b.liveHealth);
     }
     return buckets;
@@ -4162,40 +4184,13 @@ export default function CockpitView({
     },
   ];
 
-  const maintenanceRows = [
-    {
-      label: "< 1 Week",
-      bucketKey: "within_1_week" as const,
-      value: maintenanceVehicleBuckets.within_1_week.length,
-      color: "#ef4444",
-      reason:
-        "Health below 40% — immediate service required to prevent breakdown.",
-    },
-    {
-      label: "1-2 Weeks",
-      bucketKey: "weeks_1_2" as const,
-      value: maintenanceVehicleBuckets.weeks_1_2.length,
-      color: "#f59e0b",
-      reason:
-        "Health 40–50%: schedule within two weeks before risk escalates to breakdown.",
-    },
-    {
-      label: "3-4 Weeks",
-      bucketKey: "weeks_3_4" as const,
-      value: maintenanceVehicleBuckets.weeks_3_4.length,
-      color: "#22c55e",
-      reason:
-        "Health 50–80%: plan service around route windows to minimise downtime.",
-    },
-    {
-      label: "> 1 Month",
-      bucketKey: "over_1_month" as const,
-      value: maintenanceVehicleBuckets.over_1_month.length,
-      color: "#06b6d4",
-      reason:
-        "Health ≥ 80%: healthy vehicles — group into routine monthly maintenance cycle.",
-    },
-  ];
+  const maintenanceRows = MAINTENANCE_TIERS.map((tier, index) => ({
+    label: tier.label,
+    bucketKey: tier.key,
+    value: maintenanceVehicleBuckets[tier.key].length,
+    color: tier.color,
+    reason: `${maintenanceTierRangeLabel(index)} — ${tier.action}.`,
+  }));
 
   const chartCards = [
     {
@@ -4210,7 +4205,7 @@ export default function CockpitView({
       value: `${maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length}`,
       hint: "need service within 2 weeks",
       rows: maintenanceRows,
-      info: `Forecast derived from each vehicle's live health score. ${maintenanceVehicleBuckets.within_1_week.length} vehicles need immediate service (health < 40%), ${maintenanceVehicleBuckets.weeks_1_2.length} within 2 weeks (health 40–50%). Click to see every vehicle in each window.`,
+      info: `Forecast derived from each vehicle's live health score. ${maintenanceVehicleBuckets.within_1_week.length} vehicles need immediate service (${maintenanceTierRangeLabel(0)}), ${maintenanceVehicleBuckets.weeks_1_2.length} within 2 weeks (${maintenanceTierRangeLabel(1)}). Click to see every vehicle in each window.`,
     },
   ];
 
@@ -5605,9 +5600,14 @@ export default function CockpitView({
                   <Typography sx={{ fontSize: 11, color: "text.secondary", lineHeight: 1.5 }}>
                     Every vehicle is bucketed by its current live health score
                     — the same value shown in its own popup — into a
-                    recommended service window: <b>&lt; 1 Week</b> below 40%,{" "}
-                    <b>1-2 Weeks</b> at 40–50%, <b>3-4 Weeks</b> at 50–80%, and{" "}
-                    <b>&gt; 1 Month</b> at 80% and above.
+                    recommended service window:{" "}
+                    {MAINTENANCE_TIERS.map((tier, index) => (
+                      <React.Fragment key={tier.key}>
+                        <b>{tier.label}</b> (
+                        {maintenanceTierRangeLabel(index).replace("Health ", "")})
+                        {index < MAINTENANCE_TIERS.length - 1 ? ", " : "."}
+                      </React.Fragment>
+                    ))}
                   </Typography>
                 </Box>
                 {maintenanceRows.map((row) => {
