@@ -23,6 +23,7 @@ import {
   Tab,
   Divider,
   CircularProgress,
+  Tooltip as MuiTooltip,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useTheme } from "@mui/material/styles";
@@ -2738,17 +2739,24 @@ export default function AutomotiveDive({
                             {group.drivers.map((d: any, i: number) => {
                               const barPct = group.maxScore > 0 ? (d.score / group.maxScore) * 100 : 0;
                               return (
-                                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.9 }}>
-                                  <Typography sx={{ fontSize: "10px", fontWeight: 600, flex: 1, color: darkMode ? "#e2e8f0" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {formatFeatureKey(d.feature)}
-                                  </Typography>
-                                  <Box sx={{ width: 70, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.18), flexShrink: 0, position: "relative", overflow: "hidden" }}>
-                                    <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, bgcolor: modColor, borderRadius: 3 }} />
+                                <MuiTooltip
+                                  key={i}
+                                  title={`Raw anomaly magnitude: ${fmtDriverScore(d.score)}`}
+                                  arrow
+                                  placement="top"
+                                >
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.9, cursor: "default" }}>
+                                    <Typography sx={{ fontSize: "10px", fontWeight: 600, flex: 1, color: darkMode ? "#e2e8f0" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                      {formatFeatureKey(d.feature)}
+                                    </Typography>
+                                    <Box sx={{ width: 70, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.18), flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                                      <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, bgcolor: modColor, borderRadius: 3 }} />
+                                    </Box>
+                                    <Typography sx={{ fontSize: "9.5px", fontWeight: 700, fontFamily: "monospace", width: 34, textAlign: "right", color: modColor, flexShrink: 0, overflow: "hidden" }}>
+                                      {Math.round(barPct)}%
+                                    </Typography>
                                   </Box>
-                                  <Typography sx={{ fontSize: "9.5px", fontWeight: 700, fontFamily: "monospace", width: 44, textAlign: "right", color: modColor, flexShrink: 0, overflow: "hidden" }}>
-                                    {fmtDriverScore(d.score)}
-                                  </Typography>
-                                </Box>
+                                </MuiTooltip>
                               );
                             })}
                           </Box>
