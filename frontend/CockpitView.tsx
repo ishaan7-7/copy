@@ -9627,7 +9627,7 @@ export default function CockpitView({
                   </Box>
                   <Typography
                     sx={{
-                      fontSize: 11.5,
+                      fontSize: 10.5,
                       fontWeight: 900,
                       color: isDark ? "#f8fafc" : "#0f172a",
                       textTransform: "uppercase",
@@ -9674,7 +9674,7 @@ export default function CockpitView({
                   {aiSummaryExpanded && (
                     <Typography
                       sx={{
-                        fontSize: 11.5,
+                        fontSize: 10.5,
                         lineHeight: 1.55,
                         color: "text.secondary",
                         flexShrink: 0,
@@ -9718,7 +9718,7 @@ export default function CockpitView({
                               <Typography
                                 sx={{
                                   minWidth: 0,
-                                  fontSize: 11.5,
+                                  fontSize: 10.5,
                                   fontWeight: 900,
                                   color: isDark ? "#f8fafc" : "#0f172a",
                                 }}
@@ -9727,7 +9727,7 @@ export default function CockpitView({
                               </Typography>
                               <Typography
                                 sx={{
-                                  fontSize: 11.5,
+                                  fontSize: 10.5,
                                   lineHeight: 1.2,
                                   fontWeight: 900,
                                   color: insight.color,
@@ -9740,13 +9740,13 @@ export default function CockpitView({
                                 {insight.value}
                               </Typography>
                             </Stack>
-                            <Typography sx={{ mt: 0.35, fontSize: 11.5, lineHeight: 1.5, color: "text.secondary" }}>
+                            <Typography sx={{ mt: 0.35, fontSize: 10.5, lineHeight: 1.5, color: "text.secondary" }}>
                               {insight.detail}
                             </Typography>
                             <Typography
                               sx={{
                                 mt: 0.3,
-                                fontSize: 11.5,
+                                fontSize: 10.5,
                                 lineHeight: 1.5,
                                 fontWeight: 750,
                                 color: isDark ? "#dbeafe" : "#334155",
@@ -9782,7 +9782,7 @@ export default function CockpitView({
                             }}
                           />
                           <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography sx={{ fontSize: 11.5, lineHeight: 1.5 }}>
+                            <Typography sx={{ fontSize: 10.5, lineHeight: 1.5 }}>
                               <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
                                 {insight.label}:
                               </Box>{" "}
@@ -9794,7 +9794,7 @@ export default function CockpitView({
                             <Typography
                               sx={{
                                 mt: 0.2,
-                                fontSize: 11.5,
+                                fontSize: 10.5,
                                 lineHeight: 1.4,
                                 fontWeight: 750,
                                 color: isDark ? "#dbeafe" : "#334155",
