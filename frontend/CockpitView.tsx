@@ -4001,7 +4001,20 @@ export default function CockpitView({
     const riskIndex = total
       ? Math.round(((criticalCount * 1.8 + warningCount * 0.75) / total) * 100)
       : 0;
-    const predictedFailures = criticalCount + Math.ceil(warningCount * 0.35);
+    // predictedFailures forecasts NEW vehicles likely to need service beyond
+    // what's already known — so it must only look at vehicles not already
+    // in the workshop. criticalCount/warningCount above are fleet-wide
+    // (including in_service vehicles, which are almost always unhealthy by
+    // definition), so reusing them here would double-count: a vehicle
+    // already sitting in serviceCount would also be counted again through
+    // criticalCount/warningCount, inflating maintenanceForecast.
+    const nonServicePositions = allPositions.filter((v) => v.status !== "in_service");
+    const nonServiceCritical = nonServicePositions.filter((v) => getLiveHealth(v) < 50).length;
+    const nonServiceWarning = nonServicePositions.filter((v) => {
+      const h = getLiveHealth(v);
+      return h >= 50 && h < 80;
+    }).length;
+    const predictedFailures = nonServiceCritical + Math.ceil(nonServiceWarning * 0.35);
     const maintenanceForecast = serviceCount + predictedFailures;
     const resolvedToday = alertsMetrics?.closed_alerts?.length ?? 0;
     const backendSummaryDriver = Number(summary.avg_driver_score);
@@ -4436,6 +4449,22 @@ export default function CockpitView({
   const priorityInWithinWeek = priorityVehicle
     ? maintenanceVehicleBuckets.within_1_week.some((v) => v.vehicle_id === priorityVehicle.vehicle_id)
     : false;
+  // priorityVehicle (health < 50) very often falls inside the within_1_week
+  // bucket (health < 40) too, since it's the single worst-health vehicle
+  // fleet-wide. Naming/counting the "rest of the queue" must exclude it —
+  // otherwise it gets sequenced a second time behind itself.
+  const within1WeekOthers = maintenanceVehicleBuckets.within_1_week.filter(
+    (v) => !priorityVehicle || v.vehicle_id !== priorityVehicle.vehicle_id
+  );
+  const fmtMaintBucket = (bucket: typeof maintenanceVehicleBuckets.within_1_week) =>
+    bucket.length
+      ? bucket
+          .map((v) => `${v.vehicle_id} (${Math.round(v.liveHealth)}%${v.status === "in_service" ? ", already in service" : ""})`)
+          .join(", ")
+      : "none";
+  const within2WeeksVehicles = [...maintenanceVehicleBuckets.within_1_week, ...maintenanceVehicleBuckets.weeks_1_2];
+  const within2WeeksNotYetInService = within2WeeksVehicles.filter((v) => v.status !== "in_service");
+  const within2WeeksAlreadyInService = within2WeeksVehicles.length - within2WeeksNotYetInService.length;
 
   const aiExecutiveInsights = [
     {
@@ -4503,10 +4532,16 @@ export default function CockpitView({
             !priorityAlert && priorityVehicle.status !== "active" && priorityVehicleLastClosed
               ? ` It's currently off the road, so this reflects its last-known state rather than a live reading — its history shows a resolved ${String(priorityVehicleLastClosed.module || "").toLowerCase()} alert on ${String(priorityVehicleLastClosed.peak_anomaly_ts || "").slice(0, 10)}.`
               : ""
-          } ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold. The ${executiveMetrics.maintenanceForecast} "flagged" figure is broader than that: it's ${serviceCount} vehicle${serviceCount === 1 ? "" : "s"} already in the workshop plus ${executiveMetrics.predictedFailures} predicted at-risk (every critical vehicle, plus roughly a third of warning-tier ones) — a forecast, not a live count.`
+          } ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold. The ${executiveMetrics.maintenanceForecast} "flagged" figure is broader than that: it's ${serviceCount} vehicle${serviceCount === 1 ? "" : "s"} already in the workshop plus ${executiveMetrics.predictedFailures} more predicted at-risk among the vehicles still on active or parked duty (every non-workshop critical vehicle, plus roughly a third of non-workshop warning-tier ones) — a forecast of what's coming next, kept separate from what's already in for service so nothing gets counted twice.`
         : priorityIssue,
       action: priorityVehicle
-        ? `Action: move ${priorityVehicle.vehicle_id} to inspection now; sequence the remaining ${maintenanceVehicleBuckets.within_1_week.length} vehicle${maintenanceVehicleBuckets.within_1_week.length === 1 ? "" : "s"} due within a week right behind it.`
+        ? `Action: move ${priorityVehicle.vehicle_id} to inspection now${
+            within1WeekOthers.length > 0
+              ? `; sequence ${within1WeekOthers.map((v) => v.vehicle_id).join(", ")} right behind it — also in the <1-week tier.`
+              : maintenanceVehicleBuckets.weeks_1_2.length > 0
+              ? `; next in line after that is the 1-2 week tier: ${maintenanceVehicleBuckets.weeks_1_2.map((v) => v.vehicle_id).join(", ")}.`
+              : " — no other vehicle is currently in the <1-week or 1-2-week tiers."
+          }`
         : "Action: retain the normal preventive-maintenance cycle.",
       color: immediateCareVehicles.length ? "#dc2626" : "#22c55e",
     },
@@ -4631,13 +4666,15 @@ export default function CockpitView({
     },
     {
       label: "Maintenance pipeline",
-      value: `${maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length} due within 2 weeks`,
-      detail: `<1wk: ${maintenanceVehicleBuckets.within_1_week.length} · 1-2wk: ${maintenanceVehicleBuckets.weeks_1_2.length} · 3-4wk: ${maintenanceVehicleBuckets.weeks_3_4.length} · 1mo+: ${maintenanceVehicleBuckets.over_1_month.length}.${
+      value: `${within2WeeksVehicles.length} due within 2 weeks`,
+      detail: `<1wk: ${maintenanceVehicleBuckets.within_1_week.length} [${fmtMaintBucket(maintenanceVehicleBuckets.within_1_week)}] · 1-2wk: ${maintenanceVehicleBuckets.weeks_1_2.length} [${fmtMaintBucket(maintenanceVehicleBuckets.weeks_1_2)}] · 3-4wk: ${maintenanceVehicleBuckets.weeks_3_4.length} · 1mo+: ${maintenanceVehicleBuckets.over_1_month.length}. Of the ${within2WeeksVehicles.length} due within 2 weeks, ${within2WeeksAlreadyInService} ${within2WeeksAlreadyInService === 1 ? "is" : "are"} already in the workshop and ${within2WeeksNotYetInService.length} still ${within2WeeksNotYetInService.length === 1 ? "needs" : "need"} to be moved in${within2WeeksNotYetInService.length ? `: ${within2WeeksNotYetInService.map((v) => v.vehicle_id).join(", ")}` : ""}.${
         weakestModuleInfo
           ? ` With ${weakestModuleInfo.mod} already the fleet's structural weak point, expect that module to keep resupplying the <1wk and 1-2wk tiers unless it gets addressed fleet-wide rather than vehicle-by-vehicle.`
           : ""
       }`,
-      action: "Action: schedule workshop slots for the <1wk and 1-2wk tiers first to avoid breakdown risk.",
+      action: within2WeeksNotYetInService.length
+        ? `Action: schedule workshop slots for ${within2WeeksNotYetInService.map((v) => v.vehicle_id).join(", ")} first — they're due within 2 weeks and not yet in service.`
+        : "Action: no vehicle due within 2 weeks is still waiting on a workshop slot.",
       color: "#38bdf8",
     },
     {
