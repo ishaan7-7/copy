@@ -1188,6 +1188,14 @@ const getHealthStatus = (health: number) => {
   };
 };
 
+const HEALTH_RANGE_BUCKETS: { value: string; label: string; range: [number, number] }[] = [
+  { value: "all", label: "All Health", range: [0, 100] },
+  { value: "excellent", label: "Excellent (90-100)", range: [90, 100] },
+  { value: "good", label: "Good (81-89)", range: [81, 89] },
+  { value: "average", label: "Average (60-80)", range: [60, 80] },
+  { value: "poor", label: "Poor (0-59)", range: [0, 59] },
+];
+
 function Distribution({ summary }: { summary: FleetSummary }) {
   const rows = [
     ["Active", summary.active, "#22c55e"],
@@ -2911,13 +2919,11 @@ export default function CockpitView({
     | "critical"
   >("all");
   const [healthScoreFilter, setHealthScoreFilter] = useState("all");
-  // Top-priority "Health" range filter (replaces the old preset-bucket
-  // dropdown). Column-header filters below apply on top of this and the
-  // status dropdown — every filter stacks as an AND, per column filters
-  // never override the top-level ones.
+  // Top-priority "Health" range filter (dropdown, bucketed against
+  // getHealthStatus's own thresholds). Column-header filters below apply
+  // on top of this and the status dropdown — every filter stacks as an
+  // AND, per column filters never override the top-level ones.
   const [healthRangeFilter, setHealthRangeFilter] = useState<[number, number]>([0, 100]);
-  const [healthRangePopoverAnchor, setHealthRangePopoverAnchor] = useState<HTMLElement | null>(null);
-  const [healthRangeDraft, setHealthRangeDraft] = useState<[number, number]>([0, 100]);
 
   // Column-header ("Excel-style") filters — each stacks as an additional AND
   // on top of the statusFilter/healthRangeFilter dropdowns above. Empty
@@ -2945,7 +2951,6 @@ export default function CockpitView({
   const resetAllFleetTableFilters = () => {
     setStatusFilter("all");
     setHealthRangeFilter([0, 100]);
-    setHealthRangeDraft([0, 100]);
     setNameSearchColFilter("");
     setStatusColFilter(new Set());
     setTypeColFilter(new Set());
@@ -3038,9 +3043,19 @@ export default function CockpitView({
   };
 
   const compactNumberFieldSx = {
-    width: 38,
+    width: 26,
+    flexShrink: 0,
     "& .MuiOutlinedInput-root": { borderRadius: 1 },
-    "& .MuiOutlinedInput-input": { fontSize: "9.5px", padding: "3px 2px", textAlign: "center" as const },
+    "& .MuiOutlinedInput-input": { fontSize: "8px", padding: "2px 1px", textAlign: "center" as const },
+  };
+
+  const compactRangeSliderSx = {
+    color: "#3b82f6",
+    mx: 0.75,
+    flex: 1,
+    minWidth: 0,
+    "& .MuiSlider-thumb": { width: 10, height: 10 },
+    "& .MuiSlider-track, & .MuiSlider-rail": { height: 2 },
   };
 
   const handleChangeRowsPerPage = (
@@ -10149,123 +10164,36 @@ export default function CockpitView({
                             <MenuItem value="in_service">In Workshop</MenuItem>
                           </Select>
                         </FormControl>
-                        <Button
-                          size="small"
-                          onClick={(e) => {
-                            setHealthRangeDraft(healthRangeFilter);
-                            setHealthRangePopoverAnchor(e.currentTarget);
-                          }}
-                          sx={{
-                            height: 32,
-                            minWidth: 118,
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            textTransform: "none",
-                            borderRadius: 1,
-                            bgcolor: isDark ? "#1e293b" : "#f8fafc",
-                            color:
-                              healthRangeFilter[0] === 0 && healthRangeFilter[1] === 100
-                                ? "text.secondary"
-                                : "#3b82f6",
-                            border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
-                            "&:hover": { bgcolor: isDark ? "#263044" : "#f1f5f9" },
-                          }}
-                        >
-                          {healthRangeFilter[0] === 0 && healthRangeFilter[1] === 100
-                            ? "All Health"
-                            : `Health ${healthRangeFilter[0]}-${healthRangeFilter[1]}`}
-                        </Button>
-                        <Popover
-                          open={!!healthRangePopoverAnchor}
-                          anchorEl={healthRangePopoverAnchor}
-                          onClose={() => {
-                            setHealthRangeFilter(healthRangeDraft);
-                            setHealthRangePopoverAnchor(null);
-                            setPage(0);
-                          }}
-                          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-                          transformOrigin={{ vertical: "top", horizontal: "left" }}
-                          slotProps={{
-                            paper: {
-                              sx: {
-                                mt: 0.5,
-                                p: 1.1,
-                                minWidth: 168,
-                                borderRadius: 1.5,
-                                border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
-                                bgcolor: isDark ? "#0f172a" : "#ffffff",
-                                boxShadow: `0 12px 32px ${alpha("#000", isDark ? 0.4 : 0.15)}`,
-                              },
-                            },
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontSize: "8.5px",
-                              fontWeight: 800,
-                              color: "text.secondary",
-                              textTransform: "uppercase",
-                              letterSpacing: ".04em",
-                              mb: 0.5,
-                            }}
-                          >
-                            Health Range
-                          </Typography>
-                          <Stack direction="row" spacing={0.5} alignItems="center">
-                            <TextField
-                              size="small"
-                              type="number"
-                              value={healthRangeDraft[0]}
-                              onChange={(e) => {
-                                const v = clampRangeInput(e.target.value, healthRangeDraft[1], true);
-                                const next: [number, number] = [v, healthRangeDraft[1]];
-                                setHealthRangeDraft(next);
-                                setHealthRangeFilter(next);
-                                setPage(0);
-                              }}
-                              inputProps={{ min: 0, max: 100 }}
-                              sx={compactNumberFieldSx}
-                            />
-                            <Slider
-                              value={healthRangeDraft}
-                              onChange={(_e, v) => setHealthRangeDraft(v as [number, number])}
-                              onChangeCommitted={(_e, v) => {
-                                setHealthRangeFilter(v as [number, number]);
-                                setPage(0);
-                              }}
-                              size="small"
-                              min={0}
-                              max={100}
-                              sx={{ color: "#3b82f6", mx: 0.25 }}
-                            />
-                            <TextField
-                              size="small"
-                              type="number"
-                              value={healthRangeDraft[1]}
-                              onChange={(e) => {
-                                const v = clampRangeInput(e.target.value, healthRangeDraft[0], false);
-                                const next: [number, number] = [healthRangeDraft[0], v];
-                                setHealthRangeDraft(next);
-                                setHealthRangeFilter(next);
-                                setPage(0);
-                              }}
-                              inputProps={{ min: 0, max: 100 }}
-                              sx={compactNumberFieldSx}
-                            />
-                          </Stack>
-                          <Button
-                            size="small"
-                            fullWidth
-                            onClick={() => {
-                              setHealthRangeDraft([0, 100]);
-                              setHealthRangeFilter([0, 100]);
+                        <FormControl size="small">
+                          <Select
+                            value={
+                              HEALTH_RANGE_BUCKETS.find(
+                                (b) => b.range[0] === healthRangeFilter[0] && b.range[1] === healthRangeFilter[1]
+                              )?.value ?? "all"
+                            }
+                            onChange={(e) => {
+                              const bucket = HEALTH_RANGE_BUCKETS.find((b) => b.value === e.target.value);
+                              setHealthRangeFilter(bucket ? bucket.range : [0, 100]);
                               setPage(0);
                             }}
-                            sx={{ fontSize: "9px", textTransform: "none", mt: 0.5, minHeight: 22, py: 0.25 }}
+                            sx={{
+                              height: 32,
+                              minWidth: 128,
+                              fontSize: "10px",
+                              bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                              color:
+                                healthRangeFilter[0] === 0 && healthRangeFilter[1] === 100
+                                  ? "inherit"
+                                  : "#3b82f6",
+                            }}
                           >
-                            Reset
-                          </Button>
-                        </Popover>
+                            {HEALTH_RANGE_BUCKETS.map((b) => (
+                              <MenuItem key={b.value} value={b.value} sx={{ fontSize: "11px" }}>
+                                {b.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </>
                     }
                     <TextField
@@ -11074,11 +11002,11 @@ export default function CockpitView({
                   slotProps={{
                     paper: {
                       sx: {
-                        mt: 0.5,
-                        p: 1,
-                        minWidth: 180,
-                        maxWidth: 210,
-                        borderRadius: 1.5,
+                        mt: 0.4,
+                        p: 0.65,
+                        minWidth: 148,
+                        maxWidth: 168,
+                        borderRadius: 1.25,
                         border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
                         bgcolor: isDark ? "#0f172a" : "#ffffff",
                         boxShadow: `0 12px 32px ${alpha("#000", isDark ? 0.4 : 0.15)}`,
@@ -11088,18 +11016,18 @@ export default function CockpitView({
                 >
                   {colFilterAnchor?.colId === "name" && (
                     <Box>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.4 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
                         Sort
                       </Typography>
-                      <Stack direction="row" spacing={0.4} sx={{ mb: 0.75 }}>
-                        <Button size="small" variant={orderBy === "name" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("name", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "name" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("name", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           A → Z
                         </Button>
-                        <Button size="small" variant={orderBy === "name" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("name", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                        <Button size="small" variant={orderBy === "name" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("name", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           Z → A
                         </Button>
                       </Stack>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.3 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.25 }}>
                         Search
                       </Typography>
                       <TextField
@@ -11111,9 +11039,9 @@ export default function CockpitView({
                           setNameSearchColFilter(e.target.value);
                           setPage(0);
                         }}
-                        sx={{ mb: 0.75, "& .MuiOutlinedInput-root": { fontSize: "9.5px", height: 24 } }}
+                        sx={{ mb: 0.5, "& .MuiOutlinedInput-root": { fontSize: "8.5px", height: 20 } }}
                       />
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.1 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.1 }}>
                         Status
                       </Typography>
                       {[
@@ -11125,16 +11053,16 @@ export default function CockpitView({
                         .map((s) => (
                           <FormControlLabel
                             key={s.key}
-                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 20 }}
+                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 16 }}
                             control={
                               <Checkbox
                                 size="small"
                                 checked={statusColFilter.has(s.key)}
                                 onChange={() => toggleSetValue(setStatusColFilter, statusColFilter, s.key)}
-                                sx={{ p: 0.25 }}
+                                sx={{ p: 0.15 }}
                               />
                             }
-                            label={<Typography sx={{ fontSize: "9.5px" }}>{s.label}</Typography>}
+                            label={<Typography sx={{ fontSize: "8.5px" }}>{s.label}</Typography>}
                           />
                         ))}
                       <Button
@@ -11145,7 +11073,7 @@ export default function CockpitView({
                           setStatusColFilter(new Set());
                           setPage(0);
                         }}
-                        sx={{ mt: 0.5, fontSize: "8.5px", textTransform: "none", minHeight: 22, py: 0.25 }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
                       >
                         Reset
                       </Button>
@@ -11154,18 +11082,18 @@ export default function CockpitView({
 
                   {colFilterAnchor?.colId === "type" && (
                     <Box>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.4 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
                         Sort
                       </Typography>
-                      <Stack direction="row" spacing={0.4} sx={{ mb: 0.75 }}>
-                        <Button size="small" variant={orderBy === "type" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("type", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "type" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("type", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           A → Z
                         </Button>
-                        <Button size="small" variant={orderBy === "type" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("type", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                        <Button size="small" variant={orderBy === "type" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("type", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           Z → A
                         </Button>
                       </Stack>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.1 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.1 }}>
                         Type
                       </Typography>
                       {Array.from(availableTypeOptions)
@@ -11173,20 +11101,20 @@ export default function CockpitView({
                         .map((t) => (
                           <FormControlLabel
                             key={t}
-                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 20 }}
+                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 16 }}
                             control={
                               <Checkbox
                                 size="small"
                                 checked={typeColFilter.has(t)}
                                 onChange={() => toggleSetValue(setTypeColFilter, typeColFilter, t)}
-                                sx={{ p: 0.25 }}
+                                sx={{ p: 0.15 }}
                               />
                             }
-                            label={<Typography sx={{ fontSize: "9.5px" }}>{t}</Typography>}
+                            label={<Typography sx={{ fontSize: "8.5px" }}>{t}</Typography>}
                           />
                         ))}
                       {availableTypeOptions.size === 0 && (
-                        <Typography sx={{ fontSize: "9px", color: "text.secondary", py: 0.5 }}>
+                        <Typography sx={{ fontSize: "8px", color: "text.secondary", py: 0.4 }}>
                           No vehicles match the other active filters.
                         </Typography>
                       )}
@@ -11197,7 +11125,7 @@ export default function CockpitView({
                           setTypeColFilter(new Set());
                           setPage(0);
                         }}
-                        sx={{ mt: 0.5, fontSize: "8.5px", textTransform: "none", minHeight: 22, py: 0.25 }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
                       >
                         Reset
                       </Button>
@@ -11206,18 +11134,18 @@ export default function CockpitView({
 
                   {colFilterAnchor?.colId === "health_status" && (
                     <Box>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.4 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
                         Sort
                       </Typography>
-                      <Stack direction="row" spacing={0.4} sx={{ mb: 0.75 }}>
-                        <Button size="small" variant={orderBy === "health_status" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("health_status", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "health_status" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("health_status", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           Worst → Best
                         </Button>
-                        <Button size="small" variant={orderBy === "health_status" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("health_status", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                        <Button size="small" variant={orderBy === "health_status" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("health_status", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           Best → Worst
                         </Button>
                       </Stack>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.1 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.1 }}>
                         Health Status
                       </Typography>
                       {["Excellent", "Good", "Average", "Poor"]
@@ -11225,16 +11153,16 @@ export default function CockpitView({
                         .map((s) => (
                           <FormControlLabel
                             key={s}
-                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 20 }}
+                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 16 }}
                             control={
                               <Checkbox
                                 size="small"
                                 checked={healthStatusColFilter.has(s)}
                                 onChange={() => toggleSetValue(setHealthStatusColFilter, healthStatusColFilter, s)}
-                                sx={{ p: 0.25 }}
+                                sx={{ p: 0.15 }}
                               />
                             }
-                            label={<Typography sx={{ fontSize: "9.5px" }}>{s}</Typography>}
+                            label={<Typography sx={{ fontSize: "8.5px" }}>{s}</Typography>}
                           />
                         ))}
                       <Button
@@ -11244,7 +11172,7 @@ export default function CockpitView({
                           setHealthStatusColFilter(new Set());
                           setPage(0);
                         }}
-                        sx={{ mt: 0.5, fontSize: "8.5px", textTransform: "none", minHeight: 22, py: 0.25 }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
                       >
                         Reset
                       </Button>
@@ -11253,21 +11181,21 @@ export default function CockpitView({
 
                   {colFilterAnchor?.colId === "health" && (
                     <Box>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.4 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
                         Sort
                       </Typography>
-                      <Stack direction="row" spacing={0.4} sx={{ mb: 0.75 }}>
-                        <Button size="small" variant={orderBy === "health" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("health", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "health" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("health", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           Low → High
                         </Button>
-                        <Button size="small" variant={orderBy === "health" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("health", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                        <Button size="small" variant={orderBy === "health" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("health", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           High → Low
                         </Button>
                       </Stack>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.5 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.4 }}>
                         Range — sort applies within it
                       </Typography>
-                      <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Stack direction="row" spacing={0.3} alignItems="center">
                         <TextField
                           size="small"
                           type="number"
@@ -11288,7 +11216,7 @@ export default function CockpitView({
                           size="small"
                           min={0}
                           max={100}
-                          sx={{ color: "#3b82f6", mx: 0.25 }}
+                          sx={compactRangeSliderSx}
                         />
                         <TextField
                           size="small"
@@ -11313,7 +11241,7 @@ export default function CockpitView({
                           setHealthScoreColRange([0, 100]);
                           setPage(0);
                         }}
-                        sx={{ mt: 0.5, fontSize: "8.5px", textTransform: "none", minHeight: 22, py: 0.25 }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
                       >
                         Reset
                       </Button>
@@ -11322,21 +11250,21 @@ export default function CockpitView({
 
                   {colFilterAnchor?.colId === "driver_score" && (
                     <Box>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.4 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
                         Sort
                       </Typography>
-                      <Stack direction="row" spacing={0.4} sx={{ mb: 0.75 }}>
-                        <Button size="small" variant={orderBy === "driver_score" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("driver_score", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "driver_score" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("driver_score", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           Low → High
                         </Button>
-                        <Button size="small" variant={orderBy === "driver_score" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("driver_score", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 22, py: 0.25 }}>
+                        <Button size="small" variant={orderBy === "driver_score" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("driver_score", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
                           High → Low
                         </Button>
                       </Stack>
-                      <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".04em", mb: 0.5 }}>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.4 }}>
                         Range — sort applies within it
                       </Typography>
-                      <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Stack direction="row" spacing={0.3} alignItems="center">
                         <TextField
                           size="small"
                           type="number"
@@ -11357,7 +11285,7 @@ export default function CockpitView({
                           size="small"
                           min={0}
                           max={100}
-                          sx={{ color: "#3b82f6", mx: 0.25 }}
+                          sx={compactRangeSliderSx}
                         />
                         <TextField
                           size="small"
@@ -11382,7 +11310,7 @@ export default function CockpitView({
                           setDriverScoreColRange([0, 100]);
                           setPage(0);
                         }}
-                        sx={{ mt: 0.5, fontSize: "8.5px", textTransform: "none", minHeight: 22, py: 0.25 }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
                       >
                         Reset
                       </Button>
