@@ -62,8 +62,8 @@ import {
   Cell,
   Brush,
 } from "recharts";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useStore } from "../store";
 import { liveInterval, useRefetchOnActivate } from "../hooks/useApi";
@@ -192,7 +192,9 @@ interface AlertEntry {
   module: string;
   source_id: string;
   peak_anomaly_ts: string;
+  last_updated_ts: string;
   max_composite_score: number;
+  analyzed?: boolean;
 }
 
 interface AlertsMetrics {
@@ -232,6 +234,12 @@ function deduplicateAlerts(alerts: AlertEntry[]): AlertEntry[] {
 
 function normPeakTs(ts: string): string {
   return String(ts || "").slice(0, 16).replace(" ", "T");
+}
+
+function alertSeverity(score: number): "CRITICAL" | "WARNING" | "LOW" {
+  if (score >= 0.8) return "CRITICAL";
+  if (score >= 0.5) return "WARNING";
+  return "LOW";
 }
 
 function timeAgo(ts: string): string {
@@ -552,7 +560,9 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const [activeModule, setActiveModule] = useState<Module>("engine");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [ageSec, setAgeSec] = useState(0);
-  const [showClosedAlerts, setShowClosedAlerts] = useState(false);
+  const [alertsFeedTab, setAlertsFeedTab] = useState<"open" | "critical" | "warning" | "resolved">("open");
+  const [alertsSearch, setAlertsSearch] = useState("");
+  const [alertsSortDir, setAlertsSortDir] = useState<"asc" | "desc">("desc");
   const [alertsPage, setAlertsPage] = useState(0);
   const [alertsRowsPerPage, setAlertsRowsPerPage] = useState(10);
   const [batchRunning, setBatchRunning] = useState(false);
@@ -561,7 +571,15 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const abortRef = useRef<AbortController | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const tab = searchParams.get("alertsTab");
+    if (tab === "open" || tab === "critical" || tab === "warning" || tab === "resolved") {
+      setAlertsFeedTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (location.hash !== "#alerts-feed") return;
@@ -596,6 +614,18 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
     queryFn: () => axios.get(`${API}/api/alerts/metrics`).then((r) => r.data),
     refetchInterval: liveInterval(20_000, isActive, autoRefresh),
     staleTime: 8_000,
+  });
+
+  const resolveAlertMutation = useMutation({
+    mutationFn: (alert: AlertEntry) =>
+      axios.post(`${API}/api/alerts/resolve/${encodeURIComponent(alert.alert_id)}`, null, {
+        params: { source_id: alert.source_id, module: alert.module },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alertsMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["autoVehicleAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["histAlerts"] });
+    },
   });
 
   const dtcDistQuery = useQuery<DtcDistribution>({
@@ -770,13 +800,36 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
 
   const openAlerts = alertsData?.open_alerts ?? [];
   const closedAlerts = alertsData?.closed_alerts ?? [];
-  const displayedAlerts = showClosedAlerts ? closedAlerts : openAlerts;
+  const alertTabCounts = {
+    open: openAlerts.length,
+    critical: openAlerts.filter((a) => alertSeverity(a.max_composite_score ?? 0) === "CRITICAL").length,
+    warning: openAlerts.filter((a) => alertSeverity(a.max_composite_score ?? 0) === "WARNING").length,
+    resolved: closedAlerts.length,
+  };
+  const displayedAlerts = useMemo(() => {
+    const base =
+      alertsFeedTab === "resolved"
+        ? closedAlerts
+        : alertsFeedTab === "critical"
+        ? openAlerts.filter((a) => alertSeverity(a.max_composite_score ?? 0) === "CRITICAL")
+        : alertsFeedTab === "warning"
+        ? openAlerts.filter((a) => alertSeverity(a.max_composite_score ?? 0) === "WARNING")
+        : openAlerts;
+    const term = alertsSearch.trim().toLowerCase();
+    const searched = term ? base.filter((a) => (a.source_id ?? "").toLowerCase().includes(term)) : base;
+    const sorted = [...searched].sort((a, b) => {
+      const ta = new Date(a.peak_anomaly_ts).getTime();
+      const tb = new Date(b.peak_anomaly_ts).getTime();
+      return alertsSortDir === "desc" ? tb - ta : ta - tb;
+    });
+    return sorted;
+  }, [alertsFeedTab, openAlerts, closedAlerts, alertsSearch, alertsSortDir]);
   const alertsStartIdx = alertsPage * alertsRowsPerPage;
   const alertsPageSlice = displayedAlerts.slice(alertsStartIdx, alertsStartIdx + alertsRowsPerPage);
   const alertsTotal = displayedAlerts.length;
   const alertsTotalPages = Math.max(1, Math.ceil(alertsTotal / alertsRowsPerPage));
 
-  useEffect(() => { setAlertsPage(0); }, [showClosedAlerts]);
+  useEffect(() => { setAlertsPage(0); }, [alertsFeedTab, alertsSearch]);
 
   const dtcHistoryRuns: any[] = dtcHistQuery.data?.runs ?? [];
   const analyzedKeySet = useMemo(
@@ -1512,7 +1565,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
                 </Typography>
                 <Box
                   className={isDark ? "ag-theme-balham-dark" : "ag-theme-balham"}
-                  sx={{ height: Math.min((modRankingQuery.data?.rankings?.length ?? 0) * 28 + 32, 400), width: "100%", ...agGridSx(isDark) }}
+                  sx={{ height: Math.min((modRankingQuery.data?.rankings?.length ?? 0) * 28 + 32, 300), width: "100%", ...agGridSx(isDark) }}
                 >
                   <AgGridReact
                     rowData={modRankingQuery.data?.rankings ?? []}
@@ -1733,46 +1786,54 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
             accent={accentRed}
             right={
               <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                <Chip
-                  label={`${openAlerts.length} open`}
+                {(
+                  [
+                    { key: "open", label: `${alertTabCounts.open} open`, color: "#38bdf8" },
+                    { key: "critical", label: `${alertTabCounts.critical} critical`, color: accentRed },
+                    { key: "warning", label: `${alertTabCounts.warning} warning`, color: accentAmber },
+                    { key: "resolved", label: `${alertTabCounts.resolved} resolved`, color: accentGreen },
+                  ] as const
+                ).map((tab) => (
+                  <Chip
+                    key={tab.key}
+                    label={tab.label}
+                    size="small"
+                    clickable
+                    onClick={() => setAlertsFeedTab(tab.key)}
+                    sx={{
+                      height: 18, fontSize: "9px", fontWeight: 700,
+                      bgcolor: alertsFeedTab === tab.key ? tab.color : alpha(tab.color, 0.08),
+                      color: alertsFeedTab === tab.key ? "#fff" : tab.color,
+                      border: `1.5px solid ${tab.color}`,
+                      boxShadow: alertsFeedTab === tab.key ? `0 0 0 2px ${alpha(tab.color, 0.25)}` : "none",
+                      "& .MuiChip-label": { px: 0.75 },
+                    }}
+                  />
+                ))}
+                <TextField
                   size="small"
-                  clickable
-                  onClick={() => setShowClosedAlerts(false)}
+                  placeholder="Search vehicle…"
+                  value={alertsSearch}
+                  onChange={(e) => setAlertsSearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <SearchRoundedIcon sx={{ fontSize: 13, mr: 0.5, color: isDark ? "#64748b" : "#94a3b8" }} />
+                    ),
+                  }}
                   sx={{
-                    height: 18, fontSize: "9px", fontWeight: 700,
-                    bgcolor: !showClosedAlerts ? alpha(accentRed, 0.2) : alpha(accentRed, 0.08),
-                    color: accentRed,
-                    border: `1px solid ${!showClosedAlerts ? accentRed : "transparent"}`,
-                    "& .MuiChip-label": { px: 0.75 },
+                    width: 150,
+                    ml: 0.5,
+                    "& .MuiOutlinedInput-root": {
+                      height: 24,
+                      borderRadius: 1.5,
+                      fontSize: "10px",
+                      bgcolor: isDark ? alpha("#1e293b", 0.5) : "#f8fafc",
+                      "& fieldset": { borderColor: isDark ? alpha("#334155", 0.6) : "#e2e8f0" },
+                    },
+                    "& .MuiOutlinedInput-input": { py: 0, px: 0 },
+                    "& input::placeholder": { fontSize: "10px", opacity: 1 },
                   }}
                 />
-                <Chip
-                  label={`${closedAlerts.length} resolved`}
-                  size="small"
-                  clickable
-                  onClick={() => setShowClosedAlerts(true)}
-                  sx={{
-                    height: 18, fontSize: "9px", fontWeight: 700,
-                    bgcolor: showClosedAlerts ? alpha("#22c55e", 0.2) : alpha("#22c55e", 0.08),
-                    color: "#22c55e",
-                    border: `1px solid ${showClosedAlerts ? "#22c55e" : "transparent"}`,
-                    "& .MuiChip-label": { px: 0.75 },
-                  }}
-                />
-                {alertsData?.critical_vehicles != null && alertsData.critical_vehicles > 0 && (
-                  <Chip
-                    label={`${alertsData.critical_vehicles} critical veh`}
-                    size="small"
-                    sx={{ height: 18, fontSize: "9px", fontWeight: 700, bgcolor: alpha(accentRed, 0.12), color: accentRed, "& .MuiChip-label": { px: 0.75 } }}
-                  />
-                )}
-                {alertsData?.processing_lag != null && alertsData.processing_lag > 0 && (
-                  <Chip
-                    label={`lag ${alertsData.processing_lag}`}
-                    size="small"
-                    sx={{ height: 18, fontSize: "9px", fontWeight: 700, bgcolor: alpha(accentAmber, 0.12), color: accentAmber, "& .MuiChip-label": { px: 0.75 } }}
-                  />
-                )}
               </Box>
             }
           />
@@ -1780,18 +1841,26 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
             <Table size="small" sx={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: isDark ? alpha("#1e293b", 0.9) : alpha("#f1f5f9", 1) }}>
-                  {(["VEHICLE", "MODULE", "SEVERITY", "SCORE", "STATUS", "PEAK TS", "AGE", "ACTION"] as const).map((col) => (
+                  {(["VEHICLE", "MODULE", "SEVERITY", "SCORE", "STATUS", "DTC ANALYSIS", "PEAK TS", "AGE", "ACTION", "RESOLVE"] as const).map((col) => (
                     <TableCell
                       key={col}
+                      onClick={col === "PEAK TS" ? () => setAlertsSortDir((d) => (d === "desc" ? "asc" : "desc")) : undefined}
                       sx={{
                         fontSize: "9px", fontWeight: 700, color: isDark ? "#64748b" : "#94a3b8",
                         textTransform: "uppercase", letterSpacing: 0.5, py: 0.75, px: 1,
                         borderBottom: `1px solid ${isDark ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1)}`,
                         whiteSpace: "nowrap",
-                        width: col === "VEHICLE" ? "13%" : col === "MODULE" ? "10%" : col === "SEVERITY" ? "10%" : col === "SCORE" ? "16%" : col === "STATUS" ? "9%" : col === "PEAK TS" ? "17%" : col === "AGE" ? "9%" : "16%",
+                        cursor: col === "PEAK TS" ? "pointer" : "default",
+                        userSelect: col === "PEAK TS" ? "none" : "auto",
+                        width: col === "VEHICLE" ? "11%" : col === "MODULE" ? "8%" : col === "SEVERITY" ? "8%" : col === "SCORE" ? "13%" : col === "STATUS" ? "8%" : col === "DTC ANALYSIS" ? "9%" : col === "PEAK TS" ? "14%" : col === "AGE" ? "7%" : col === "ACTION" ? "12%" : "10%",
                       }}
                     >
                       {col}
+                      {col === "PEAK TS" && (
+                        <Box component="span" sx={{ ml: 0.4, fontSize: "9px" }}>
+                          {alertsSortDir === "desc" ? "↓" : "↑"}
+                        </Box>
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -1799,7 +1868,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
               <TableBody>
                 {alertsPageSlice.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} sx={{ textAlign: "center", py: 3, color: "text.secondary", fontSize: "11px", border: "none" }}>
+                    <TableCell colSpan={10} sx={{ textAlign: "center", py: 3, color: "text.secondary", fontSize: "11px", border: "none" }}>
                       {alertsTotal === 0 ? "No alerts" : "Loading…"}
                     </TableCell>
                   </TableRow>
@@ -1808,8 +1877,8 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
                   const scoreColor = score >= 0.8 ? "#ef4444" : score >= 0.5 ? "#f59e0b" : "#22c55e";
                   const sevLabel = score >= 0.8 ? "CRITICAL" : score >= 0.5 ? "WARNING" : "LOW";
                   const modColor = MODULE_COLORS[(a.module ?? "").toLowerCase() as Module] ?? "#94a3b8";
-                  const statusLabel = showClosedAlerts ? "RESOLVED" : "OPEN";
-                  const statusColor = showClosedAlerts ? "#22c55e" : "#f59e0b";
+                  const statusLabel = alertsFeedTab === "resolved" ? "RESOLVED" : "OPEN";
+                  const statusColor = alertsFeedTab === "resolved" ? "#22c55e" : "#f59e0b";
                   const cellSx = { py: 0.85, px: 1, borderBottom: `1px solid ${isDark ? alpha("#334155", 0.35) : alpha("#e2e8f0", 0.8)}` };
                   return (
                     <TableRow
@@ -1844,11 +1913,21 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
                           <Typography sx={{ fontSize: "8px", fontWeight: 700, color: statusColor, lineHeight: 1 }}>{statusLabel}</Typography>
                         </Box>
                       </TableCell>
+                      <TableCell sx={cellSx}>
+                        {a.analyzed ? (
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.4 }}>
+                            <CheckCircleRoundedIcon sx={{ fontSize: 11, color: "#22c55e" }} />
+                            <Typography sx={{ fontSize: "8px", fontWeight: 700, color: "#22c55e" }}>Analyzed</Typography>
+                          </Box>
+                        ) : (
+                          <Typography sx={{ fontSize: "8px", fontWeight: 700, color: isDark ? "#64748b" : "#94a3b8" }}>Unanalyzed</Typography>
+                        )}
+                      </TableCell>
                       <TableCell sx={{ ...cellSx, fontSize: "9px", fontFamily: "monospace", color: isDark ? "#94a3b8" : "#475569", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {a.peak_anomaly_ts ? a.peak_anomaly_ts.slice(0, 19).replace("T", " ") : "—"}
                       </TableCell>
                       <TableCell sx={{ ...cellSx, fontSize: "9px", color: isDark ? "#64748b" : "#94a3b8", whiteSpace: "nowrap" }}>
-                        {timeAgo(a.peak_anomaly_ts)}
+                        {timeAgo(a.last_updated_ts)}
                       </TableCell>
                       <TableCell sx={cellSx}>
                         <Chip
@@ -1860,6 +1939,25 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
                           sx={{ height: 18, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#38bdf8", 0.12), color: "#38bdf8", "& .MuiChip-label": { px: 0.5 }, "&:hover": { bgcolor: alpha("#38bdf8", 0.22) } }}
                         />
                       </TableCell>
+                      <TableCell sx={cellSx}>
+                        {alertsFeedTab === "resolved" ? (
+                          <Chip
+                            label="Resolved"
+                            size="small"
+                            icon={<CheckCircleRoundedIcon style={{ fontSize: 10 }} />}
+                            sx={{ height: 18, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#22c55e", 0.12), color: "#22c55e", "& .MuiChip-label": { px: 0.5 } }}
+                          />
+                        ) : (
+                          <Chip
+                            label={resolveAlertMutation.isPending && resolveAlertMutation.variables?.alert_id === a.alert_id ? "Resolving…" : "Resolve"}
+                            size="small"
+                            clickable
+                            disabled={resolveAlertMutation.isPending}
+                            onClick={() => resolveAlertMutation.mutate(a)}
+                            sx={{ height: 18, fontSize: "8px", fontWeight: 700, bgcolor: alpha("#22c55e", 0.12), color: "#22c55e", "& .MuiChip-label": { px: 0.5 }, "&:hover": { bgcolor: alpha("#22c55e", 0.22) } }}
+                          />
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -1870,7 +1968,7 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
             <Typography sx={{ fontSize: "9px", color: isDark ? "#64748b" : "#94a3b8", minWidth: 130 }}>
               {alertsTotal === 0
                 ? "No alerts"
-                : `${alertsStartIdx + 1}–${Math.min(alertsStartIdx + alertsRowsPerPage, alertsTotal)} of ${alertsTotal} ${showClosedAlerts ? "resolved" : "open"} alerts`}
+                : `${alertsStartIdx + 1}–${Math.min(alertsStartIdx + alertsRowsPerPage, alertsTotal)} of ${alertsTotal} ${alertsFeedTab} alerts`}
             </Typography>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
               <IconButton

@@ -70,7 +70,6 @@ def _sync_update_metrics():
                 pass
         if current_mtime > 0 and current_mtime <= _last_silver_mtime:
             return
-        _last_silver_mtime = current_mtime
         # 1. Load System Alerts
         all_alerts = []
         for mod in VEHICLE_MODULES:
@@ -167,8 +166,12 @@ def _sync_update_metrics():
         INFERENCE_METRICS_CACHE["module_stats"] = module_stats
         INFERENCE_METRICS_CACHE["recent_alerts"] = recent_alerts[:10]
 
+        # Only recorded once every field above was successfully written — if
+        # anything earlier in this function threw, the guard stays put and
+        # the next cycle retries instead of freezing the cache forever.
+        _last_silver_mtime = current_mtime
     except Exception as e:
-        print(f"Inference metrics computation failed: {e}")
+        print(f"Inference metrics computation failed, will retry next cycle: {e}")
 
 async def update_inference_metrics_loop():
     while True:

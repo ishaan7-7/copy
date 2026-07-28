@@ -46,6 +46,9 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Slider,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import {
   MapContainer,
@@ -144,6 +147,15 @@ const MAINTENANCE_TIERS: {
   { key: "weeks_3_4", label: "3-4 Weeks", maxHealth: 60, color: "#22c55e", action: "plan service around route windows to minimise downtime" },
   { key: "over_1_month", label: "> 1 Month", maxHealth: Infinity, color: "#06b6d4", action: "healthy vehicles — group into routine monthly maintenance cycle" },
 ];
+
+// Grabs the first real sentence out of a longer detail string, for use in
+// short-form summaries. Requires the char right before the punctuation to be
+// lowercase/digit/paren so single-capital abbreviations (e.g. "R. Sharma")
+// don't get mistaken for a sentence boundary.
+function firstSentence(text: string): string {
+  const m = text.match(/^.*?[a-z0-9)][.!?](?=\s|$)/);
+  return m ? m[0] : text;
+}
 
 function maintenanceTierForHealth(health: number) {
   return MAINTENANCE_TIERS.find((t) => health < t.maxHealth) ?? MAINTENANCE_TIERS[MAINTENANCE_TIERS.length - 1];
@@ -1176,6 +1188,14 @@ const getHealthStatus = (health: number) => {
   };
 };
 
+const HEALTH_RANGE_BUCKETS: { value: string; label: string; range: [number, number] }[] = [
+  { value: "all", label: "All Health", range: [0, 100] },
+  { value: "excellent", label: "Excellent (90-100)", range: [90, 100] },
+  { value: "good", label: "Good (81-89)", range: [81, 89] },
+  { value: "average", label: "Average (60-80)", range: [60, 80] },
+  { value: "poor", label: "Poor (0-59)", range: [0, 59] },
+];
+
 function Distribution({ summary }: { summary: FleetSummary }) {
   const rows = [
     ["Active", summary.active, "#22c55e"],
@@ -1990,7 +2010,7 @@ function RecentAlerts({
               size="small"
               variant="outlined"
               sx={{ fontSize: "8px", py: "1px", px: "6px" }}
-              onClick={() => { if (!disableExternalNav) navigate("/fleet-health#alerts-feed"); }}
+              onClick={() => { if (!disableExternalNav) navigate("/fleet-health?alertsTab=open#alerts-feed"); }}
             >
               View All
             </Button>
@@ -2110,7 +2130,7 @@ function RecentAlerts({
       )}
       {!loading && total > displayed.length && displayed.length > 0 && (
         <Box
-          onClick={() => { if (!disableExternalNav) navigate("/fleet-health#alerts-feed"); }}
+          onClick={() => { if (!disableExternalNav) navigate("/fleet-health?alertsTab=open#alerts-feed"); }}
           sx={{
             mt: 0.3,
             textAlign: "center",
@@ -2882,6 +2902,7 @@ export default function CockpitView({
   const [openFleetMap, setOpenFleetMap] = useState(false);
   const [mapResetToken, setMapResetToken] = useState(0);
   const [tableExpanded, setTableExpanded] = useState(false);
+  const [aiSummaryExpanded, setAiSummaryExpanded] = useState(false);
   const [openMaintenanceForecast, setOpenMaintenanceForecast] = useState(false);
   const [showWorstPerformers, setShowWorstPerformers] = useState(false);
   const [worstPerformerSort, setWorstPerformerSort] = useState<
@@ -2898,6 +2919,49 @@ export default function CockpitView({
     | "critical"
   >("all");
   const [healthScoreFilter, setHealthScoreFilter] = useState("all");
+  // Top-priority "Health" range filter (dropdown, bucketed against
+  // getHealthStatus's own thresholds). Column-header filters below apply
+  // on top of this and the status dropdown — every filter stacks as an
+  // AND, per column filters never override the top-level ones.
+  const [healthRangeFilter, setHealthRangeFilter] = useState<[number, number]>([0, 100]);
+
+  // Column-header ("Excel-style") filters — each stacks as an additional AND
+  // on top of the statusFilter/healthRangeFilter dropdowns above. Empty
+  // Set = no restriction from that column.
+  const [colFilterAnchor, setColFilterAnchor] = useState<{ colId: FleetTableColId; el: HTMLElement } | null>(null);
+  const [nameSearchColFilter, setNameSearchColFilter] = useState("");
+  const [statusColFilter, setStatusColFilter] = useState<Set<string>>(new Set());
+  const [typeColFilter, setTypeColFilter] = useState<Set<string>>(new Set());
+  const [healthStatusColFilter, setHealthStatusColFilter] = useState<Set<string>>(new Set());
+  const [healthScoreColRange, setHealthScoreColRange] = useState<[number, number]>([0, 100]);
+  const [healthScoreColRangeDraft, setHealthScoreColRangeDraft] = useState<[number, number]>([0, 100]);
+  const [driverScoreColRange, setDriverScoreColRange] = useState<[number, number]>([0, 100]);
+  const [driverScoreColRangeDraft, setDriverScoreColRangeDraft] = useState<[number, number]>([0, 100]);
+
+  const hasAnyColumnFilter =
+    nameSearchColFilter.trim() !== "" ||
+    statusColFilter.size > 0 ||
+    typeColFilter.size > 0 ||
+    healthStatusColFilter.size > 0 ||
+    healthScoreColRange[0] !== 0 ||
+    healthScoreColRange[1] !== 100 ||
+    driverScoreColRange[0] !== 0 ||
+    driverScoreColRange[1] !== 100;
+
+  const resetAllFleetTableFilters = () => {
+    setStatusFilter("all");
+    setHealthRangeFilter([0, 100]);
+    setNameSearchColFilter("");
+    setStatusColFilter(new Set());
+    setTypeColFilter(new Set());
+    setHealthStatusColFilter(new Set());
+    setHealthScoreColRange([0, 100]);
+    setHealthScoreColRangeDraft([0, 100]);
+    setDriverScoreColRange([0, 100]);
+    setDriverScoreColRangeDraft([0, 100]);
+    setSearch("");
+    setPage(0);
+  };
 
   const [statusFilterMap, setStatusFilterMap] = useState("all");
   const [vehicleType, setVehicleType] = useState("all");
@@ -2948,6 +3012,50 @@ export default function CockpitView({
       setOrder("asc");
     }
     setPage(0);
+  };
+
+  const setColSort = (colId: string, dir: "asc" | "desc") => {
+    setOrderBy(colId);
+    setOrder(dir);
+    setPage(0);
+  };
+
+  const toggleSetValue = (
+    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
+    current: Set<string>,
+    value: string
+  ) => {
+    const next = new Set(current);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    setter(next);
+    setPage(0);
+  };
+
+  // Parses a typed min/max box for a 0-100 range filter, clamping it into
+  // bounds and never letting min cross above max (or max below min) so the
+  // slider stays in sync with whatever was typed.
+  const clampRangeInput = (raw: string, otherBound: number, isMin: boolean): number => {
+    let v = Number(raw);
+    if (!Number.isFinite(v)) v = isMin ? 0 : 100;
+    v = Math.min(100, Math.max(0, Math.round(v)));
+    return isMin ? Math.min(v, otherBound) : Math.max(v, otherBound);
+  };
+
+  const compactNumberFieldSx = {
+    width: 26,
+    flexShrink: 0,
+    "& .MuiOutlinedInput-root": { borderRadius: 1 },
+    "& .MuiOutlinedInput-input": { fontSize: "8px", padding: "2px 1px", textAlign: "center" as const },
+  };
+
+  const compactRangeSliderSx = {
+    color: "#3b82f6",
+    mx: 0.75,
+    flex: 1,
+    minWidth: 0,
+    "& .MuiSlider-thumb": { width: 10, height: 10 },
+    "& .MuiSlider-track, & .MuiSlider-rail": { height: 2 },
   };
 
   const handleChangeRowsPerPage = (
@@ -3158,6 +3266,15 @@ export default function CockpitView({
       retry: 1,
       refetchInterval: isActive && autoRefresh ? 8000 : false,
     });
+
+  // True whenever the pipeline (Bronze/Silver/Gold-derived) fleet summary
+  // has come back empty. Covers both cases: positions/status still real
+  // from the fleet simulator but health/driver scores running on hardcoded
+  // per-vehicle fallbacks (`?? 75` etc.), and the harder outage where
+  // `positions` itself is also empty and the page falls back to
+  // `fallbackVehicles`' entirely fabricated demo fleet. Surfaced as a
+  // visible banner instead of failing silently either way.
+  const pipelineDataMissing = (pipelineFleet?.vehicles?.length ?? 0) === 0;
 
   const { data: alertsMetrics } = useQuery({
     queryKey: ["alertsMetrics"],
@@ -3800,22 +3917,59 @@ export default function CockpitView({
     }
   }, [healthTimelineVehicle, timelineVehicleIds]);
 
+  // Column-header ("Excel-style") predicate — each flag lets a cascading
+  // options computation skip that one condition, so a column's own popover
+  // can show options based on every OTHER active filter without being
+  // narrowed by its own current selection.
+  const passesColumnFilters = (
+    v: VehiclePosition,
+    opts: {
+      skipStatus?: boolean;
+      skipName?: boolean;
+      skipType?: boolean;
+      skipHealthStatus?: boolean;
+      skipHealthRange?: boolean;
+      skipDriverRange?: boolean;
+    } = {}
+  ): boolean => {
+    const liveHealth = getLiveHealth(v);
+    if (
+      !opts.skipHealthRange &&
+      (liveHealth < healthScoreColRange[0] || liveHealth > healthScoreColRange[1])
+    )
+      return false;
+    if (!opts.skipDriverRange) {
+      const ds = Number(v.driver_score ?? 0);
+      if (ds < driverScoreColRange[0] || ds > driverScoreColRange[1]) return false;
+    }
+    if (!opts.skipStatus && statusColFilter.size > 0 && !statusColFilter.has(v.status ?? ""))
+      return false;
+    if (!opts.skipType && typeColFilter.size > 0 && !typeColFilter.has(v.type ?? ""))
+      return false;
+    if (
+      !opts.skipHealthStatus &&
+      healthStatusColFilter.size > 0 &&
+      !healthStatusColFilter.has(getHealthStatus(liveHealth).label)
+    )
+      return false;
+    if (!opts.skipName && nameSearchColFilter.trim()) {
+      const t = nameSearchColFilter.trim().toLowerCase();
+      if (
+        !v.vehicle_id.toLowerCase().includes(t) &&
+        !(v.name ?? "").toLowerCase().includes(t)
+      )
+        return false;
+    }
+    return true;
+  };
+
   const tableRows = useMemo(
     () =>
       (filteredPositions ?? []).filter((v) => {
         const liveHealth = getLiveHealth(v);
-        if (healthScoreFilter === "excellent" && liveHealth < 90) return false;
-        if (
-          healthScoreFilter === "good" &&
-          (liveHealth <= 80 || liveHealth >= 90)
-        )
+        if (liveHealth < healthRangeFilter[0] || liveHealth > healthRangeFilter[1])
           return false;
-        if (
-          healthScoreFilter === "average" &&
-          (liveHealth < 60 || liveHealth > 80)
-        )
-          return false;
-        if (healthScoreFilter === "poor" && liveHealth >= 60) return false;
+        if (!passesColumnFilters(v)) return false;
         const text = search.trim().toLowerCase();
         if (!text) return true;
         return (
@@ -3827,8 +3981,56 @@ export default function CockpitView({
           (v.road_type ?? "").toLowerCase().includes(text)
         );
       }),
-    [filteredPositions, healthScoreFilter, pipelineHealthMap, search]
+    [
+      filteredPositions,
+      healthRangeFilter,
+      pipelineHealthMap,
+      search,
+      statusColFilter,
+      typeColFilter,
+      healthStatusColFilter,
+      healthScoreColRange,
+      driverScoreColRange,
+      nameSearchColFilter,
+    ]
   );
+
+  // Cascading option sets for each column popover — computed from data that's
+  // already passed the top-level dropdowns and every OTHER column filter, so
+  // (like Excel) a column's own checkboxes only ever offer choices that are
+  // still reachable given what's currently selected elsewhere.
+  const cascadeBase = useMemo(
+    () =>
+      (filteredPositions ?? []).filter((v) => {
+        const liveHealth = getLiveHealth(v);
+        return liveHealth >= healthRangeFilter[0] && liveHealth <= healthRangeFilter[1];
+      }),
+    [filteredPositions, healthRangeFilter, pipelineHealthMap]
+  );
+
+  const availableStatusOptions = useMemo(() => {
+    const opts = new Set<string>();
+    cascadeBase
+      .filter((v) => passesColumnFilters(v, { skipStatus: true }))
+      .forEach((v) => v.status && opts.add(v.status));
+    return opts;
+  }, [cascadeBase, typeColFilter, healthStatusColFilter, healthScoreColRange, driverScoreColRange, nameSearchColFilter]);
+
+  const availableTypeOptions = useMemo(() => {
+    const opts = new Set<string>();
+    cascadeBase
+      .filter((v) => passesColumnFilters(v, { skipType: true }))
+      .forEach((v) => v.type && opts.add(v.type));
+    return opts;
+  }, [cascadeBase, statusColFilter, healthStatusColFilter, healthScoreColRange, driverScoreColRange, nameSearchColFilter]);
+
+  const availableHealthStatusOptions = useMemo(() => {
+    const opts = new Set<string>();
+    cascadeBase
+      .filter((v) => passesColumnFilters(v, { skipHealthStatus: true }))
+      .forEach((v) => opts.add(getHealthStatus(getLiveHealth(v)).label));
+    return opts;
+  }, [cascadeBase, statusColFilter, typeColFilter, healthScoreColRange, driverScoreColRange, nameSearchColFilter]);
 
   const mapVehicles = useMemo(
     () =>
@@ -3945,8 +4147,24 @@ export default function CockpitView({
     return [...topPerformingRows].reverse();
   }, [topPerformingRows]);
 
+  // "Worst Performing" is a re-ordering of the SAME already-filtered rows
+  // (tableRows), not a separate unfiltered view — so it respects every
+  // active Status/Health/column filter exactly like the normal sort does.
+  // topPerformingRows/worstPerformingRows above stay untouched since the AI
+  // Executive Summary relies on topPerformingRows[0] as the fleet-wide best
+  // driver, independent of whatever's filtered in the table right now.
+  const worstFirstTableRows = useMemo(() => {
+    const scoreOf = (v: (typeof tableRows)[number]) =>
+      worstPerformerSort === "health"
+        ? getLiveHealth(v)
+        : worstPerformerSort === "driver"
+        ? v.driver_score ?? 0
+        : getLiveHealth(v) * 0.65 + (v.driver_score ?? 0) * 0.35;
+    return [...tableRows].sort((a, b) => scoreOf(a) - scoreOf(b));
+  }, [tableRows, pipelineHealthMap, worstPerformerSort]);
+
   const activeTableRows = showWorstPerformers
-    ? worstPerformingRows
+    ? worstFirstTableRows
     : sortedTableRows;
 
   const criticalCount = allPositions.filter(
@@ -3991,7 +4209,20 @@ export default function CockpitView({
     const riskIndex = total
       ? Math.round(((criticalCount * 1.8 + warningCount * 0.75) / total) * 100)
       : 0;
-    const predictedFailures = criticalCount + Math.ceil(warningCount * 0.35);
+    // predictedFailures forecasts NEW vehicles likely to need service beyond
+    // what's already known — so it must only look at vehicles not already
+    // in the workshop. criticalCount/warningCount above are fleet-wide
+    // (including in_service vehicles, which are almost always unhealthy by
+    // definition), so reusing them here would double-count: a vehicle
+    // already sitting in serviceCount would also be counted again through
+    // criticalCount/warningCount, inflating maintenanceForecast.
+    const nonServicePositions = allPositions.filter((v) => v.status !== "in_service");
+    const nonServiceCritical = nonServicePositions.filter((v) => getLiveHealth(v) < 50).length;
+    const nonServiceWarning = nonServicePositions.filter((v) => {
+      const h = getLiveHealth(v);
+      return h >= 50 && h < 80;
+    }).length;
+    const predictedFailures = nonServiceCritical + Math.ceil(nonServiceWarning * 0.35);
     const maintenanceForecast = serviceCount + predictedFailures;
     const resolvedToday = alertsMetrics?.closed_alerts?.length ?? 0;
     const backendSummaryDriver = Number(summary.avg_driver_score);
@@ -4204,18 +4435,21 @@ export default function CockpitView({
       value: criticalAlertCount,
       color: "#ef4444",
       reason: `${criticalAlertCount} open alerts with anomaly score ≥ 0.8 require immediate triage.`,
+      alertsTab: "critical",
     },
     {
       label: "Warning Alerts",
       value: warningAlertCount,
       color: "#f59e0b",
       reason: `${warningAlertCount} open alerts with anomaly score 0.5–0.8 have risk signals that can escalate.`,
+      alertsTab: "warning",
     },
     {
       label: "Resolved Today",
-      value: 0,
+      value: executiveMetrics.resolvedToday,
       color: "#3b82f6",
-      reason: "Resolved-alert history is not yet tracked by the alerts backend.",
+      reason: `${executiveMetrics.resolvedToday} alert${executiveMetrics.resolvedToday === 1 ? "" : "s"} marked resolved.`,
+      alertsTab: "resolved",
     },
   ];
 
@@ -4426,6 +4660,22 @@ export default function CockpitView({
   const priorityInWithinWeek = priorityVehicle
     ? maintenanceVehicleBuckets.within_1_week.some((v) => v.vehicle_id === priorityVehicle.vehicle_id)
     : false;
+  // priorityVehicle (health < 50) very often falls inside the within_1_week
+  // bucket (health < 40) too, since it's the single worst-health vehicle
+  // fleet-wide. Naming/counting the "rest of the queue" must exclude it —
+  // otherwise it gets sequenced a second time behind itself.
+  const within1WeekOthers = maintenanceVehicleBuckets.within_1_week.filter(
+    (v) => !priorityVehicle || v.vehicle_id !== priorityVehicle.vehicle_id
+  );
+  const fmtMaintBucket = (bucket: typeof maintenanceVehicleBuckets.within_1_week) =>
+    bucket.length
+      ? bucket
+          .map((v) => `${v.vehicle_id} (${Math.round(v.liveHealth)}%${v.status === "in_service" ? ", already in service" : ""})`)
+          .join(", ")
+      : "none";
+  const within2WeeksVehicles = [...maintenanceVehicleBuckets.within_1_week, ...maintenanceVehicleBuckets.weeks_1_2];
+  const within2WeeksNotYetInService = within2WeeksVehicles.filter((v) => v.status !== "in_service");
+  const within2WeeksAlreadyInService = within2WeeksVehicles.length - within2WeeksNotYetInService.length;
 
   const aiExecutiveInsights = [
     {
@@ -4470,6 +4720,10 @@ export default function CockpitView({
               : worstVehicleLastClosed
               ? ` It's currently off the road (${lowestHealthVehicle.status === "in_service" ? "in the workshop" : "parked"}), so there's no live alert to check — but its own history shows a resolved ${String(worstVehicleLastClosed.module || "").toLowerCase()} alert as recently as ${String(worstVehicleLastClosed.peak_anomaly_ts || "").slice(0, 10)}, worth confirming that's actually fixed.`
               : ""
+          }${
+            lowestDriverVehicle && lowestDriverVehicle.vehicle_id === lowestHealthVehicle.vehicle_id
+              ? ` This is also the fleet's lowest-scoring driver assignment — mechanical wear and driving behavior may both be contributing here, not just one or the other.`
+              : ""
           }`
         : "Awaiting vehicle-health data",
       action: lowestHealthVehicle
@@ -4481,7 +4735,7 @@ export default function CockpitView({
     },
     {
       label: "Immediate maintenance",
-      value: `${immediateCareVehicles.length} critical · ${executiveMetrics.maintenanceForecast} due`,
+      value: `${immediateCareVehicles.length} critical · ${executiveMetrics.maintenanceForecast} flagged`,
       detail: priorityVehicle
         ? `${priorityVehicle.vehicle_id}: ${priorityIssue}${
             priorityInWithinWeek ? " — already flagged in the <1-week maintenance window" : ""
@@ -4489,10 +4743,16 @@ export default function CockpitView({
             !priorityAlert && priorityVehicle.status !== "active" && priorityVehicleLastClosed
               ? ` It's currently off the road, so this reflects its last-known state rather than a live reading — its history shows a resolved ${String(priorityVehicleLastClosed.module || "").toLowerCase()} alert on ${String(priorityVehicleLastClosed.peak_anomaly_ts || "").slice(0, 10)}.`
               : ""
-          } ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold, out of ${executiveMetrics.maintenanceForecast} total flagged for maintenance across the whole forecast.`
+          } ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold. The ${executiveMetrics.maintenanceForecast} "flagged" figure is broader than that: it's ${serviceCount} vehicle${serviceCount === 1 ? "" : "s"} already in the workshop plus ${executiveMetrics.predictedFailures} more predicted at-risk among the vehicles still on active or parked duty (every non-workshop critical vehicle, plus roughly a third of non-workshop warning-tier ones).`
         : priorityIssue,
       action: priorityVehicle
-        ? `Action: move ${priorityVehicle.vehicle_id} to inspection now; sequence the remaining ${maintenanceVehicleBuckets.within_1_week.length} vehicle${maintenanceVehicleBuckets.within_1_week.length === 1 ? "" : "s"} due within a week right behind it.`
+        ? `Action: move ${priorityVehicle.vehicle_id} to inspection now${
+            within1WeekOthers.length > 0
+              ? `; sequence ${within1WeekOthers.map((v) => v.vehicle_id).join(", ")} right behind it — also in the <1-week tier.`
+              : maintenanceVehicleBuckets.weeks_1_2.length > 0
+              ? `; next in line after that is the 1-2 week tier: ${maintenanceVehicleBuckets.weeks_1_2.map((v) => v.vehicle_id).join(", ")}.`
+              : " — no other vehicle is currently in the <1-week or 1-2-week tiers."
+          }`
         : "Action: retain the normal preventive-maintenance cycle.",
       color: immediateCareVehicles.length ? "#dc2626" : "#22c55e",
     },
@@ -4513,6 +4773,10 @@ export default function CockpitView({
           }.${
             coachingVehicleHealth !== null && coachingVehicleHealth < 60
               ? ` This vehicle's own health is also weak at ${Math.round(coachingVehicleHealth)}% — harsh driving and mechanical wear may be compounding each other here.`
+              : ""
+          }${
+            maintenanceVehicleBuckets.within_1_week.some((v) => v.vehicle_id === lowestDriverVehicle.vehicle_id)
+              ? ` It's also already in the fleet's <1-week maintenance queue, so this isn't a driving-only concern.`
               : ""
           }`
         : "Awaiting driver-score data",
@@ -4537,6 +4801,10 @@ export default function CockpitView({
                     : ", so running at pace isn't compounding an existing risk"
                 }.`
               : ""
+          }${
+            fastestVehicle && Number.isFinite(Number(fastestVehicle.driver_score)) && executiveMetrics.avgDriver !== null && Number(fastestVehicle.driver_score) < executiveMetrics.avgDriver - 10
+              ? ` Its driver score is ${Math.round(Number(fastestVehicle.driver_score))}/100, meaningfully below the fleet average — speed and driving style may be linked here.`
+              : ""
           }`
         : "Awaiting live-speed data",
       action:
@@ -4555,6 +4823,10 @@ export default function CockpitView({
       detail: highestHealthVehicle
         ? `${highestHealthVehicle.status}, ${highestHealthVehicle.type} — ${Math.max(0, Math.round(getLiveHealth(highestHealthVehicle) - healthScoreValue))} pts above the fleet average.${
             bestVehicleModule ? ` Its strongest module is ${bestVehicleModule.mod} at ${bestVehicleModule.v.toFixed(1)}%.` : ""
+          }${
+            topDriverVehicle && topDriverVehicle.vehicle_id === highestHealthVehicle.vehicle_id
+              ? ` It's also driven by ${topDriverVehicle.driver}, the fleet's top-scoring driver — strong vehicle health and strong driving are lining up on the same asset here.`
+              : ""
           }`
         : "Awaiting vehicle-health data",
       action:
@@ -4605,13 +4877,15 @@ export default function CockpitView({
     },
     {
       label: "Maintenance pipeline",
-      value: `${maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length} due within 2 weeks`,
-      detail: `<1wk: ${maintenanceVehicleBuckets.within_1_week.length} · 1-2wk: ${maintenanceVehicleBuckets.weeks_1_2.length} · 3-4wk: ${maintenanceVehicleBuckets.weeks_3_4.length} · 1mo+: ${maintenanceVehicleBuckets.over_1_month.length}.${
+      value: `${within2WeeksVehicles.length} due within 2 weeks`,
+      detail: `<1wk: ${maintenanceVehicleBuckets.within_1_week.length} [${fmtMaintBucket(maintenanceVehicleBuckets.within_1_week)}] · 1-2wk: ${maintenanceVehicleBuckets.weeks_1_2.length} [${fmtMaintBucket(maintenanceVehicleBuckets.weeks_1_2)}] · 3-4wk: ${maintenanceVehicleBuckets.weeks_3_4.length} · 1mo+: ${maintenanceVehicleBuckets.over_1_month.length}. Of the ${within2WeeksVehicles.length} due within 2 weeks, ${within2WeeksAlreadyInService} ${within2WeeksAlreadyInService === 1 ? "is" : "are"} already in the workshop and ${within2WeeksNotYetInService.length} still ${within2WeeksNotYetInService.length === 1 ? "needs" : "need"} to be moved in${within2WeeksNotYetInService.length ? `: ${within2WeeksNotYetInService.map((v) => v.vehicle_id).join(", ")}` : ""}.${
         weakestModuleInfo
           ? ` With ${weakestModuleInfo.mod} already the fleet's structural weak point, expect that module to keep resupplying the <1wk and 1-2wk tiers unless it gets addressed fleet-wide rather than vehicle-by-vehicle.`
           : ""
       }`,
-      action: "Action: schedule workshop slots for the <1wk and 1-2wk tiers first to avoid breakdown risk.",
+      action: within2WeeksNotYetInService.length
+        ? `Action: schedule workshop slots for ${within2WeeksNotYetInService.map((v) => v.vehicle_id).join(", ")} first — they're due within 2 weeks and not yet in service.`
+        : "Action: no vehicle due within 2 weeks is still waiting on a workshop slot.",
       color: "#38bdf8",
     },
     {
@@ -4870,6 +5144,29 @@ export default function CockpitView({
           </Box>
         </Stack>
 
+        {pipelineDataMissing && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              px: 1.5,
+              py: 0.75,
+              borderRadius: 1.5,
+              bgcolor: alpha("#f59e0b", isDark ? 0.14 : 0.08),
+              border: `1px solid ${alpha("#f59e0b", 0.3)}`,
+              flexShrink: 0,
+            }}
+          >
+            <WarningAmberOutlinedIcon sx={{ fontSize: 16, color: "#f59e0b", flexShrink: 0 }} />
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#f59e0b" }}>
+              Live health/driver data is unavailable right now — vehicle positions are real,
+              but health, battery and driver scores below are placeholder values until the
+              pipeline feed recovers.
+            </Typography>
+          </Box>
+        )}
+
         <Box
           sx={{
             display: "grid",
@@ -5014,7 +5311,7 @@ export default function CockpitView({
             color="#ef4444"
             trend="down"
             iconLogo={true}
-            onClick={disableExternalNav ? undefined : () => navigate("/fleet-health#alerts-feed")}
+            onClick={disableExternalNav ? undefined : () => navigate("/fleet-health?alertsTab=open#alerts-feed")}
           />
         </Box>
 
@@ -5678,6 +5975,14 @@ export default function CockpitView({
                                   placement="top"
                                 >
                                   <Box
+                                    onClick={
+                                      disableExternalNav
+                                        ? undefined
+                                        : (e) => {
+                                            e.stopPropagation();
+                                            navigate(`/fleet-health?alertsTab=${(row as any).alertsTab}#alerts-feed`);
+                                          }
+                                    }
                                     sx={{
                                       display: "grid",
                                       gridTemplateColumns: "24px 1fr auto",
@@ -5686,6 +5991,8 @@ export default function CockpitView({
                                       px: 0.65,
                                       py: 0.55,
                                       borderRadius: 1,
+                                      cursor: disableExternalNav ? "default" : "pointer",
+                                      transition: "border-color 0.15s, transform 0.15s",
                                       bgcolor: alpha(
                                         row.color,
                                         isDark ? 0.13 : 0.08
@@ -5694,6 +6001,12 @@ export default function CockpitView({
                                         row.color,
                                         0.12
                                       )}`,
+                                      ...(!disableExternalNav && {
+                                        "&:hover": {
+                                          borderColor: alpha(row.color, 0.5),
+                                          transform: "translateY(-1px)",
+                                        },
+                                      }),
                                     }}
                                   >
                                     <Box
@@ -9500,6 +9813,18 @@ export default function CockpitView({
                 gap: 0.75,
               }}
             >
+              {aiSummaryExpanded && (
+                <Box
+                  onClick={() => setAiSummaryExpanded(false)}
+                  sx={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 1299,
+                    bgcolor: alpha("#000", isDark ? 0.6 : 0.4),
+                    backdropFilter: "blur(2px)",
+                  }}
+                />
+              )}
               <Card
                 sx={{
                   p: 1,
@@ -9508,7 +9833,11 @@ export default function CockpitView({
                   display: "flex",
                   flexDirection: "column",
                   border: `1px solid ${alpha("#06b6d4", 0.28)}`,
-                  background: isDark
+                  background: aiSummaryExpanded
+                    ? isDark
+                      ? "#0f172a"
+                      : "#ffffff"
+                    : isDark
                     ? `linear-gradient(145deg, ${alpha(
                         "#06b6d4",
                         0.12
@@ -9517,6 +9846,18 @@ export default function CockpitView({
                         "#06b6d4",
                         0.08
                       )}, #ffffff)`,
+                  transition: "all 0.2s ease",
+                  ...(aiSummaryExpanded
+                    ? {
+                        position: "fixed",
+                        top: "4vh",
+                        left: "4vw",
+                        right: "4vw",
+                        bottom: "4vh",
+                        zIndex: 1300,
+                        boxShadow: `0 24px 60px ${alpha("#000", 0.4)}`,
+                      }
+                    : {}),
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, mb: 0.6 }}>
@@ -9536,7 +9877,7 @@ export default function CockpitView({
                   </Box>
                   <Typography
                     sx={{
-                      fontSize: 11.5,
+                      fontSize: 10.5,
                       fontWeight: 900,
                       color: isDark ? "#f8fafc" : "#0f172a",
                       textTransform: "uppercase",
@@ -9545,22 +9886,28 @@ export default function CockpitView({
                     AI Executive Summary
                   </Typography>
                   <Box sx={{ flex: 1 }} />
-                  <Box
-                    sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      display: "grid",
-                      placeItems: "center",
-                      color: "#3b82f6",
-                      background: `radial-gradient(circle, ${alpha("#3b82f6", 0.3)} 0%, ${alpha("#06b6d4", 0.16)} 55%, transparent 80%)`,
-                      border: `1px solid ${alpha("#3b82f6", 0.28)}`,
-                      boxShadow: `0 0 10px ${alpha("#3b82f6", isDark ? 0.3 : 0.2)}`,
-                    }}
-                  >
-                    <PsychologyOutlinedIcon sx={{ fontSize: 15 }} />
-                  </Box>
+                  <Tooltip title={aiSummaryExpanded ? "Collapse summary" : "Click for detailed summary"} arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => setAiSummaryExpanded((v) => !v)}
+                      sx={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        color: "#3b82f6",
+                        background: `radial-gradient(circle, ${alpha("#3b82f6", 0.3)} 0%, ${alpha("#06b6d4", 0.16)} 55%, transparent 80%)`,
+                        border: `1px solid ${alpha("#3b82f6", 0.28)}`,
+                        boxShadow: `0 0 10px ${alpha("#3b82f6", isDark ? 0.3 : 0.2)}`,
+                      }}
+                    >
+                      {aiSummaryExpanded ? (
+                        <CloseFullscreenOutlinedIcon sx={{ fontSize: 17 }} />
+                      ) : (
+                        <PsychologyOutlinedIcon sx={{ fontSize: 22 }} />
+                      )}
+                    </IconButton>
+                  </Tooltip>
                 </Stack>
                 <Box
                   sx={{
@@ -9574,89 +9921,140 @@ export default function CockpitView({
                     pr: 0.35,
                   }}
                 >
-                  <Typography
-                    sx={{
-                      fontSize: 13.5,
-                      lineHeight: 1.55,
-                      color: "text.secondary",
-                      flexShrink: 0,
-                      mb: 0.3,
-                    }}
-                  >
-                    {aiExecutiveStory}
-                  </Typography>
-                  {aiExecutiveInsights.map((insight) => (
-                    <Box
-                      key={insight.label}
+                  {aiSummaryExpanded && (
+                    <Typography
                       sx={{
-                        minWidth: 0,
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 0.9,
-                        px: 0.15,
-                        py: 0.85,
-                        borderBottom: `1px solid ${
-                          isDark ? "rgba(148,163,184,0.14)" : "rgba(148,163,184,0.22)"
-                        }`,
-                        "&:last-of-type": { borderBottom: "none" },
+                        fontSize: 10.5,
+                        lineHeight: 1.55,
+                        color: "text.secondary",
+                        flexShrink: 0,
+                        mb: 0.3,
                       }}
                     >
-                      <Box
-                        aria-hidden="true"
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          mt: 0.5,
-                          borderRadius: "50%",
-                          bgcolor: insight.color,
-                          boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Stack direction="row" alignItems="baseline" flexWrap="wrap" spacing={0.75}>
-                          <Typography
-                            sx={{
-                              minWidth: 0,
-                              fontSize: 12.5,
-                              fontWeight: 900,
-                              color: isDark ? "#f8fafc" : "#0f172a",
-                            }}
-                          >
-                            {insight.label}:
-                          </Typography>
-                          <Typography
-                            sx={{
-                              fontSize: 13.5,
-                              lineHeight: 1.2,
-                              fontWeight: 900,
-                              color: insight.color,
-                              px: 0.6,
-                              py: 0.2,
-                              borderRadius: 0.65,
-                              bgcolor: alpha(insight.color, isDark ? 0.14 : 0.09),
-                            }}
-                          >
-                            {insight.value}
-                          </Typography>
-                        </Stack>
-                        <Typography sx={{ mt: 0.35, fontSize: 12.5, lineHeight: 1.5, color: "text.secondary" }}>
-                          {insight.detail}
-                        </Typography>
-                        <Typography
+                      {aiExecutiveStory}
+                    </Typography>
+                  )}
+                  {aiSummaryExpanded
+                    ? aiExecutiveInsights.map((insight) => (
+                        <Box
+                          key={insight.label}
                           sx={{
-                            mt: 0.3,
-                            fontSize: 12.5,
-                            lineHeight: 1.5,
-                            fontWeight: 750,
-                            color: isDark ? "#dbeafe" : "#334155",
+                            minWidth: 0,
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 0.9,
+                            px: 0.15,
+                            py: 0.85,
+                            borderBottom: `1px solid ${
+                              isDark ? "rgba(148,163,184,0.14)" : "rgba(148,163,184,0.22)"
+                            }`,
+                            "&:last-of-type": { borderBottom: "none" },
                           }}
                         >
-                          {insight.action}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  ))}
+                          <Box
+                            aria-hidden="true"
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              mt: 0.5,
+                              borderRadius: "50%",
+                              bgcolor: insight.color,
+                              boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Stack direction="row" alignItems="baseline" flexWrap="wrap" spacing={0.75}>
+                              <Typography
+                                sx={{
+                                  minWidth: 0,
+                                  fontSize: 10.5,
+                                  fontWeight: 900,
+                                  color: isDark ? "#f8fafc" : "#0f172a",
+                                }}
+                              >
+                                {insight.label}:
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: 10.5,
+                                  lineHeight: 1.2,
+                                  fontWeight: 900,
+                                  color: insight.color,
+                                  px: 0.6,
+                                  py: 0.2,
+                                  borderRadius: 0.65,
+                                  bgcolor: alpha(insight.color, isDark ? 0.14 : 0.09),
+                                }}
+                              >
+                                {insight.value}
+                              </Typography>
+                            </Stack>
+                            <Typography sx={{ mt: 0.35, fontSize: 10.5, lineHeight: 1.5, color: "text.secondary" }}>
+                              {insight.detail}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                mt: 0.3,
+                                fontSize: 10.5,
+                                lineHeight: 1.5,
+                                fontWeight: 750,
+                                color: isDark ? "#dbeafe" : "#334155",
+                              }}
+                            >
+                              {insight.action}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))
+                    : aiExecutiveInsights.slice(0, 6).map((insight) => (
+                        <Box
+                          key={insight.label}
+                          sx={{
+                            minWidth: 0,
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 0.9,
+                            px: 0.15,
+                            py: 0.5,
+                          }}
+                        >
+                          <Box
+                            aria-hidden="true"
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              mt: 0.5,
+                              borderRadius: "50%",
+                              bgcolor: insight.color,
+                              boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography sx={{ fontSize: 10.5, lineHeight: 1.5 }}>
+                              <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                                {insight.label}:
+                              </Box>{" "}
+                              <Box component="span" sx={{ fontWeight: 900, color: insight.color }}>
+                                {insight.value}.
+                              </Box>{" "}
+                              {firstSentence(insight.detail)}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                mt: 0.2,
+                                fontSize: 10.5,
+                                lineHeight: 1.4,
+                                fontWeight: 750,
+                                color: isDark ? "#dbeafe" : "#334155",
+                              }}
+                            >
+                              {insight.action}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
                 </Box>
               </Card>
             </Grid>
@@ -9761,7 +10159,7 @@ export default function CockpitView({
                         {activeTableRows.length} Vehicles
                       </Typography>
                     </Box>
-                    {showWorstPerformers ? (
+                    {showWorstPerformers && (
                       <FormControl size="small" sx={{ minWidth: 142 }}>
                         <InputLabel sx={{ fontSize: "10px" }}>
                           Worst By
@@ -9786,7 +10184,8 @@ export default function CockpitView({
                           <MenuItem value="driver">Driver Score</MenuItem>
                         </Select>
                       </FormControl>
-                    ) : (
+                    )}
+                    {
                       <>
                         <FormControl size="small" sx={{ minWidth: 132 }}>
                           <InputLabel sx={{ fontSize: "10px" }}>
@@ -9816,32 +10215,38 @@ export default function CockpitView({
                             <MenuItem value="in_service">In Workshop</MenuItem>
                           </Select>
                         </FormControl>
-                        <FormControl size="small" sx={{ minWidth: 118 }}>
-                          <InputLabel sx={{ fontSize: "10px" }}>
-                            Health
-                          </InputLabel>
+                        <FormControl size="small">
                           <Select
-                            label="Health"
-                            value={healthScoreFilter}
+                            value={
+                              HEALTH_RANGE_BUCKETS.find(
+                                (b) => b.range[0] === healthRangeFilter[0] && b.range[1] === healthRangeFilter[1]
+                              )?.value ?? "all"
+                            }
                             onChange={(e) => {
-                              setHealthScoreFilter(e.target.value);
+                              const bucket = HEALTH_RANGE_BUCKETS.find((b) => b.value === e.target.value);
+                              setHealthRangeFilter(bucket ? bucket.range : [0, 100]);
                               setPage(0);
                             }}
                             sx={{
                               height: 32,
+                              minWidth: 128,
                               fontSize: "10px",
                               bgcolor: isDark ? "#1e293b" : "#f8fafc",
+                              color:
+                                healthRangeFilter[0] === 0 && healthRangeFilter[1] === 100
+                                  ? "inherit"
+                                  : "#3b82f6",
                             }}
                           >
-                            <MenuItem value="all">All Health</MenuItem>
-                            <MenuItem value="excellent">Excellent</MenuItem>
-                            <MenuItem value="good">Good</MenuItem>
-                            <MenuItem value="average">Average</MenuItem>
-                            <MenuItem value="poor">Poor</MenuItem>
+                            {HEALTH_RANGE_BUCKETS.map((b) => (
+                              <MenuItem key={b.value} value={b.value} sx={{ fontSize: "11px" }}>
+                                {b.label}
+                              </MenuItem>
+                            ))}
                           </Select>
                         </FormControl>
                       </>
-                    )}
+                    }
                     <TextField
                       size="small"
                       placeholder="Search vehicle / driver / route…"
@@ -9887,6 +10292,38 @@ export default function CockpitView({
                         },
                       }}
                     />
+                    {(() => {
+                      const anyFilterActive =
+                        statusFilter !== "all" ||
+                        healthRangeFilter[0] !== 0 ||
+                        healthRangeFilter[1] !== 100 ||
+                        hasAnyColumnFilter ||
+                        search.trim() !== "";
+                      return (
+                        <Button
+                          size="small"
+                          disabled={!anyFilterActive}
+                          onClick={resetAllFleetTableFilters}
+                          sx={{
+                            height: 32,
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            textTransform: "none",
+                            borderRadius: 1,
+                            color: anyFilterActive ? "#ef4444" : "text.disabled",
+                            border: `1px solid ${
+                              anyFilterActive ? alpha("#ef4444", 0.35) : isDark ? "#334155" : "#e2e8f0"
+                            }`,
+                            bgcolor: anyFilterActive ? alpha("#ef4444", isDark ? 0.1 : 0.06) : "transparent",
+                            "&:hover": {
+                              bgcolor: anyFilterActive ? alpha("#ef4444", isDark ? 0.16 : 0.1) : "transparent",
+                            },
+                          }}
+                        >
+                          Reset all filters
+                        </Button>
+                      );
+                    })()}
                     <Stack
                       direction="row"
                       alignItems="center"
@@ -9942,43 +10379,25 @@ export default function CockpitView({
                   <Table stickyHeader>
                     <TableHead>
                       <TableRow>
-                        {(showWorstPerformers
-                          ? [
-                              {
-                                id: "vehicle",
-                                label: "Vehicle",
-                                sortable: false,
-                              },
-                              {
-                                id: "driver",
-                                label: "Driver",
-                                sortable: false,
-                              },
-                              {
-                                id: "mileage",
-                                label: "Mileage",
-                                sortable: false,
-                              },
-                              {
-                                id: "driver_score",
-                                label: "Driver Score",
-                                sortable: false,
-                              },
-                              {
-                                id: "health",
-                                label: "Health",
-                                sortable: false,
-                              },
-                            ]
-                          : FLEET_TABLE_COLUMNS
-                        ).map((col) => (
+                        {FLEET_TABLE_COLUMNS.map((col) => {
+                          const colHasFilter =
+                            (col.id === "name" &&
+                              (nameSearchColFilter.trim() !== "" || statusColFilter.size > 0)) ||
+                            (col.id === "type" && typeColFilter.size > 0) ||
+                            (col.id === "health_status" && healthStatusColFilter.size > 0) ||
+                            (col.id === "health" &&
+                              (healthScoreColRange[0] !== 0 || healthScoreColRange[1] !== 100)) ||
+                            (col.id === "driver_score" &&
+                              (driverScoreColRange[0] !== 0 || driverScoreColRange[1] !== 100));
+                          return (
                           <TableCell
                             key={col.id}
-                            onClick={() =>
-                              !showWorstPerformers &&
-                              col.sortable &&
-                              handleTableSort(col.id as FleetTableColId)
-                            }
+                            onClick={(e) => {
+                              if (!col.sortable) return;
+                              setColFilterAnchor({ colId: col.id as FleetTableColId, el: e.currentTarget });
+                              setHealthScoreColRangeDraft(healthScoreColRange);
+                              setDriverScoreColRangeDraft(driverScoreColRange);
+                            }}
                             sx={{
                               bgcolor: isDark ? "#1e293b" : "#f8fafc",
                               color: isDark ? "#94a3b8" : "#64748b",
@@ -9991,15 +10410,11 @@ export default function CockpitView({
                               py: 0.25,
                               px: 1.5,
                               whiteSpace: "nowrap",
-                              cursor:
-                                !showWorstPerformers && col.sortable
-                                  ? "pointer"
-                                  : "default",
+                              cursor: col.sortable ? "pointer" : "default",
                               userSelect: "none",
-                              "&:hover":
-                                !showWorstPerformers && col.sortable
-                                  ? { bgcolor: isDark ? "#263044" : "#f1f5f9" }
-                                  : {},
+                              "&:hover": col.sortable
+                                ? { bgcolor: isDark ? "#263044" : "#f1f5f9" }
+                                : {},
                             }}
                           >
                             <Stack
@@ -10008,7 +10423,19 @@ export default function CockpitView({
                               spacing={0.4}
                             >
                               <span>{col.label}</span>
-                              {!showWorstPerformers && col.sortable && (
+                              {colHasFilter && (
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: "50%",
+                                    bgcolor: "#3b82f6",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              )}
+                              {col.sortable && !showWorstPerformers && (
                                 <Box
                                   component="span"
                                   sx={{
@@ -10040,7 +10467,8 @@ export default function CockpitView({
                               )}
                             </Stack>
                           </TableCell>
-                        ))}
+                          );
+                        })}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -10079,88 +10507,6 @@ export default function CockpitView({
                             : rowIdx % 2 === 0
                             ? "#ffffff"
                             : "#f8fafc";
-
-                          if (showWorstPerformers) {
-                            const mileage = Math.max(
-                              4.8,
-                              Math.min(
-                                9.8,
-                                liveHealth * 0.055 + driverScore * 0.045
-                              )
-                            ).toFixed(1);
-                            return (
-                              <TableRow
-                                key={`top-${row.vehicle_id}`}
-                                hover
-                                onClick={disableExternalNav ? undefined : () => navigate(`/automotive?vehicle=${encodeURIComponent(row.vehicle_id)}`)}
-                                sx={{
-                                  cursor: disableExternalNav ? "default" : "pointer",
-                                  bgcolor: rowBg,
-                                  "&:hover": {
-                                    bgcolor: isDark
-                                      ? alpha("#ef4444", 0.08)
-                                      : alpha("#ef4444", 0.06),
-                                  },
-                                }}
-                              >
-                                <TableCell
-                                  sx={{
-                                    py: 0.75,
-                                    px: 1.5,
-                                    fontSize: 11,
-                                    fontWeight: 800,
-                                    color: isDark ? "#22d3ee" : "#0891b2",
-                                  }}
-                                >
-                                  {row.name || row.vehicle_id}
-                                </TableCell>
-                                <TableCell
-                                  sx={{
-                                    py: 0.75,
-                                    px: 1.5,
-                                    fontSize: 11,
-                                    color: "text.secondary",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  {row.driver || "Unassigned"}
-                                </TableCell>
-                                <TableCell
-                                  sx={{
-                                    py: 0.75,
-                                    px: 1.5,
-                                    fontSize: 11,
-                                    color: "text.secondary",
-                                    fontWeight: 800,
-                                  }}
-                                >
-                                  {mileage} km/L
-                                </TableCell>
-                                <TableCell
-                                  sx={{
-                                    py: 0.75,
-                                    px: 1.5,
-                                    fontSize: 11,
-                                    color: scoreColor,
-                                    fontWeight: 900,
-                                  }}
-                                >
-                                  {driverScore}
-                                </TableCell>
-                                <TableCell
-                                  sx={{
-                                    py: 0.75,
-                                    px: 1.5,
-                                    fontSize: 11,
-                                    color: hs.color,
-                                    fontWeight: 900,
-                                  }}
-                                >
-                                  {Math.round(liveHealth)}%
-                                </TableCell>
-                              </TableRow>
-                            );
-                          }
 
                           let HealthIcon: React.ElementType =
                             HealthAndSafetyOutlinedIcon;
@@ -10692,6 +11038,336 @@ export default function CockpitView({
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                <Popover
+                  open={!!colFilterAnchor}
+                  anchorEl={colFilterAnchor?.el}
+                  onClose={() => {
+                    setHealthScoreColRange(healthScoreColRangeDraft);
+                    setDriverScoreColRange(driverScoreColRangeDraft);
+                    setColFilterAnchor(null);
+                    setPage(0);
+                  }}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  transformOrigin={{ vertical: "top", horizontal: "left" }}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 0.4,
+                        p: 0.65,
+                        minWidth: 148,
+                        maxWidth: 168,
+                        borderRadius: 1.25,
+                        border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+                        bgcolor: isDark ? "#0f172a" : "#ffffff",
+                        boxShadow: `0 12px 32px ${alpha("#000", isDark ? 0.4 : 0.15)}`,
+                      },
+                    },
+                  }}
+                >
+                  {colFilterAnchor?.colId === "name" && (
+                    <Box>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
+                        Sort
+                      </Typography>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "name" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("name", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          A → Z
+                        </Button>
+                        <Button size="small" variant={orderBy === "name" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("name", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          Z → A
+                        </Button>
+                      </Stack>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.25 }}>
+                        Search
+                      </Typography>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        placeholder="Sim ID or name…"
+                        value={nameSearchColFilter}
+                        onChange={(e) => {
+                          setNameSearchColFilter(e.target.value);
+                          setPage(0);
+                        }}
+                        sx={{ mb: 0.5, "& .MuiOutlinedInput-root": { fontSize: "8.5px", height: 20 } }}
+                      />
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.1 }}>
+                        Status
+                      </Typography>
+                      {[
+                        { key: "active", label: "Active" },
+                        { key: "parked", label: "Parked" },
+                        { key: "in_service", label: "In Workshop" },
+                      ]
+                        .filter((s) => availableStatusOptions.has(s.key))
+                        .map((s) => (
+                          <FormControlLabel
+                            key={s.key}
+                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 16 }}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={statusColFilter.has(s.key)}
+                                onChange={() => toggleSetValue(setStatusColFilter, statusColFilter, s.key)}
+                                sx={{ p: 0.15 }}
+                              />
+                            }
+                            label={<Typography sx={{ fontSize: "8.5px" }}>{s.label}</Typography>}
+                          />
+                        ))}
+                      <Button
+                        size="small"
+                        fullWidth
+                        onClick={() => {
+                          setNameSearchColFilter("");
+                          setStatusColFilter(new Set());
+                          setPage(0);
+                        }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
+                      >
+                        Reset
+                      </Button>
+                    </Box>
+                  )}
+
+                  {colFilterAnchor?.colId === "type" && (
+                    <Box>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
+                        Sort
+                      </Typography>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "type" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("type", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          A → Z
+                        </Button>
+                        <Button size="small" variant={orderBy === "type" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("type", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          Z → A
+                        </Button>
+                      </Stack>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.1 }}>
+                        Type
+                      </Typography>
+                      {Array.from(availableTypeOptions)
+                        .sort()
+                        .map((t) => (
+                          <FormControlLabel
+                            key={t}
+                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 16 }}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={typeColFilter.has(t)}
+                                onChange={() => toggleSetValue(setTypeColFilter, typeColFilter, t)}
+                                sx={{ p: 0.15 }}
+                              />
+                            }
+                            label={<Typography sx={{ fontSize: "8.5px" }}>{t}</Typography>}
+                          />
+                        ))}
+                      {availableTypeOptions.size === 0 && (
+                        <Typography sx={{ fontSize: "8px", color: "text.secondary", py: 0.4 }}>
+                          No vehicles match the other active filters.
+                        </Typography>
+                      )}
+                      <Button
+                        size="small"
+                        fullWidth
+                        onClick={() => {
+                          setTypeColFilter(new Set());
+                          setPage(0);
+                        }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
+                      >
+                        Reset
+                      </Button>
+                    </Box>
+                  )}
+
+                  {colFilterAnchor?.colId === "health_status" && (
+                    <Box>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
+                        Sort
+                      </Typography>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "health_status" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("health_status", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          Worst → Best
+                        </Button>
+                        <Button size="small" variant={orderBy === "health_status" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("health_status", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          Best → Worst
+                        </Button>
+                      </Stack>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.1 }}>
+                        Health Status
+                      </Typography>
+                      {["Excellent", "Good", "Average", "Poor"]
+                        .filter((s) => availableHealthStatusOptions.has(s))
+                        .map((s) => (
+                          <FormControlLabel
+                            key={s}
+                            sx={{ display: "flex", ml: 0, mr: 0, minHeight: 16 }}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={healthStatusColFilter.has(s)}
+                                onChange={() => toggleSetValue(setHealthStatusColFilter, healthStatusColFilter, s)}
+                                sx={{ p: 0.15 }}
+                              />
+                            }
+                            label={<Typography sx={{ fontSize: "8.5px" }}>{s}</Typography>}
+                          />
+                        ))}
+                      <Button
+                        size="small"
+                        fullWidth
+                        onClick={() => {
+                          setHealthStatusColFilter(new Set());
+                          setPage(0);
+                        }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
+                      >
+                        Reset
+                      </Button>
+                    </Box>
+                  )}
+
+                  {colFilterAnchor?.colId === "health" && (
+                    <Box>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
+                        Sort
+                      </Typography>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "health" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("health", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          Low → High
+                        </Button>
+                        <Button size="small" variant={orderBy === "health" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("health", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          High → Low
+                        </Button>
+                      </Stack>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.4 }}>
+                        Range — sort applies within it
+                      </Typography>
+                      <Stack direction="row" spacing={0.3} alignItems="center">
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={healthScoreColRangeDraft[0]}
+                          onChange={(e) => {
+                            const v = clampRangeInput(e.target.value, healthScoreColRangeDraft[1], true);
+                            const next: [number, number] = [v, healthScoreColRangeDraft[1]];
+                            setHealthScoreColRangeDraft(next);
+                            setHealthScoreColRange(next);
+                            setPage(0);
+                          }}
+                          inputProps={{ min: 0, max: 100 }}
+                          sx={compactNumberFieldSx}
+                        />
+                        <Slider
+                          value={healthScoreColRangeDraft}
+                          onChange={(_e, v) => setHealthScoreColRangeDraft(v as [number, number])}
+                          size="small"
+                          min={0}
+                          max={100}
+                          sx={compactRangeSliderSx}
+                        />
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={healthScoreColRangeDraft[1]}
+                          onChange={(e) => {
+                            const v = clampRangeInput(e.target.value, healthScoreColRangeDraft[0], false);
+                            const next: [number, number] = [healthScoreColRangeDraft[0], v];
+                            setHealthScoreColRangeDraft(next);
+                            setHealthScoreColRange(next);
+                            setPage(0);
+                          }}
+                          inputProps={{ min: 0, max: 100 }}
+                          sx={compactNumberFieldSx}
+                        />
+                      </Stack>
+                      <Button
+                        size="small"
+                        fullWidth
+                        onClick={() => {
+                          setHealthScoreColRangeDraft([0, 100]);
+                          setHealthScoreColRange([0, 100]);
+                          setPage(0);
+                        }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
+                      >
+                        Reset
+                      </Button>
+                    </Box>
+                  )}
+
+                  {colFilterAnchor?.colId === "driver_score" && (
+                    <Box>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.3 }}>
+                        Sort
+                      </Typography>
+                      <Stack direction="row" spacing={0.3} sx={{ mb: 0.5 }}>
+                        <Button size="small" variant={orderBy === "driver_score" && order === "asc" ? "contained" : "outlined"} onClick={() => setColSort("driver_score", "asc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          Low → High
+                        </Button>
+                        <Button size="small" variant={orderBy === "driver_score" && order === "desc" ? "contained" : "outlined"} onClick={() => setColSort("driver_score", "desc")} sx={{ flex: 1, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}>
+                          High → Low
+                        </Button>
+                      </Stack>
+                      <Typography sx={{ fontSize: "8px", fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".03em", mb: 0.4 }}>
+                        Range — sort applies within it
+                      </Typography>
+                      <Stack direction="row" spacing={0.3} alignItems="center">
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={driverScoreColRangeDraft[0]}
+                          onChange={(e) => {
+                            const v = clampRangeInput(e.target.value, driverScoreColRangeDraft[1], true);
+                            const next: [number, number] = [v, driverScoreColRangeDraft[1]];
+                            setDriverScoreColRangeDraft(next);
+                            setDriverScoreColRange(next);
+                            setPage(0);
+                          }}
+                          inputProps={{ min: 0, max: 100 }}
+                          sx={compactNumberFieldSx}
+                        />
+                        <Slider
+                          value={driverScoreColRangeDraft}
+                          onChange={(_e, v) => setDriverScoreColRangeDraft(v as [number, number])}
+                          size="small"
+                          min={0}
+                          max={100}
+                          sx={compactRangeSliderSx}
+                        />
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={driverScoreColRangeDraft[1]}
+                          onChange={(e) => {
+                            const v = clampRangeInput(e.target.value, driverScoreColRangeDraft[0], false);
+                            const next: [number, number] = [driverScoreColRangeDraft[0], v];
+                            setDriverScoreColRangeDraft(next);
+                            setDriverScoreColRange(next);
+                            setPage(0);
+                          }}
+                          inputProps={{ min: 0, max: 100 }}
+                          sx={compactNumberFieldSx}
+                        />
+                      </Stack>
+                      <Button
+                        size="small"
+                        fullWidth
+                        onClick={() => {
+                          setDriverScoreColRangeDraft([0, 100]);
+                          setDriverScoreColRange([0, 100]);
+                          setPage(0);
+                        }}
+                        sx={{ mt: 0.4, fontSize: "8px", textTransform: "none", minHeight: 18, py: 0.15 }}
+                      >
+                        Reset
+                      </Button>
+                    </Box>
+                  )}
+                </Popover>
 
                 <Box
                   sx={{

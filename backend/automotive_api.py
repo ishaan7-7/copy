@@ -11,6 +11,31 @@ _PROJECT_ROOT_FOR_IMPORT = os.path.abspath(os.path.join(os.path.dirname(__file__
 if _PROJECT_ROOT_FOR_IMPORT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT_FOR_IMPORT)
 from common import duck_reader as dr
+try:
+    from common import alert_resolutions
+except ImportError as _alert_res_err:
+    # Deployment gap on some device (file not yet copied over), not a reason
+    # to take down every /api/automotive/* route via main_v2.py's blanket
+    # import-failure catch — degrade to "manual resolve does nothing" and
+    # keep the rest of the dashboard fully functional.
+    print(f"WARNING: common/alert_resolutions.py not importable ({_alert_res_err}); "
+          f"manual alert-resolve will no-op, everything else unaffected.")
+
+    class _AlertResolutionsStub:
+        # Deliberately a path that can never exist, so every
+        # os.path.exists(alert_resolutions.RESOLVED_ALERTS_FILE) check
+        # elsewhere in this file stays False instead of raising.
+        RESOLVED_ALERTS_FILE = os.path.join(_PROJECT_ROOT_FOR_IMPORT, "data", "_alert_resolutions_unavailable")
+
+        @staticmethod
+        def load_resolved_ids():
+            return set()
+
+        @staticmethod
+        def resolve_alert_id(alert_id, source_id="", module=""):
+            return {"source_id": source_id, "module": module, "resolved_ts": None}
+
+    alert_resolutions = _AlertResolutionsStub()
 
 router = APIRouter()
 
@@ -905,7 +930,11 @@ def get_vehicle_alerts(vehicle_id: str):
     import pandas as pd
     if vehicle_id in _HISTORICAL_IDS:
         _bf = os.path.join(_BATCH_ALERTS_ROOT, f"{vehicle_id}.parquet")
-        vehicle_df = pd.read_parquet(_bf) if os.path.exists(_bf) else pd.DataFrame()
+        try:
+            vehicle_df = pd.read_parquet(_bf) if os.path.exists(_bf) else pd.DataFrame()
+        except Exception as e:
+            print(f"Historical alerts read failed for {vehicle_id}: {e}")
+            vehicle_df = pd.DataFrame()
     else:
         if not os.path.exists(_GOLD_ALERTS_DIR):
             return {"vehicle_id": vehicle_id, "open": [], "closed": []}
@@ -933,6 +962,9 @@ def get_vehicle_alerts(vehicle_id: str):
     vehicle_df[obj_cols] = vehicle_df[obj_cols].fillna("")
     num_cols = vehicle_df.select_dtypes(include=["number"]).columns
     vehicle_df[num_cols] = vehicle_df[num_cols].fillna(0)
+    resolved_ids = alert_resolutions.load_resolved_ids()
+    if resolved_ids and "alert_id" in vehicle_df.columns:
+        vehicle_df.loc[vehicle_df["alert_id"].isin(resolved_ids), "status"] = "CLOSED"
     open_df = vehicle_df[vehicle_df["status"] == "OPEN"].sort_values("peak_anomaly_ts", ascending=False)
     closed_df = vehicle_df[vehicle_df["status"] == "CLOSED"].sort_values("alert_end_ts", ascending=False)
     return {
@@ -940,6 +972,12 @@ def get_vehicle_alerts(vehicle_id: str):
         "open": open_df.head(50).to_dict(orient="records"),
         "closed": closed_df.head(50).to_dict(orient="records"),
     }
+
+
+@router.post("/api/alerts/resolve/{alert_id}")
+def resolve_alert(alert_id: str, source_id: str = "", module: str = ""):
+    entry = alert_resolutions.resolve_alert_id(alert_id, source_id, module)
+    return {"alert_id": alert_id, "resolved": True, **entry}
 
 
 @router.get("/api/automotive/dtc-history/{vehicle_id}")
@@ -1005,9 +1043,15 @@ def get_fleet_position(vehicle_id: str):
         return cached
     try:
         import urllib.request as _urllib_req
-        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=2)
+        # 5s to match the gateway's generic proxy_request timeout to the same
+        # fleet simulator — a tighter timeout here meant this endpoint alone
+        # went blank under exactly the transient slowness every other path
+        # hitting port 8009 tolerated fine (e.g. the vehicle .../behavior
+        # call via main_v2.py's proxy).
+        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=5)
         result = json.loads(_req.read())
-    except Exception:
+    except Exception as e:
+        print(f"Fleet position lookup failed for {vehicle_id}: {e}")
         result = {}
     _set_cache(f"fleet-pos-{vehicle_id}", result)
     return result
@@ -1253,11 +1297,11 @@ def get_vehicle_summary(vehicle_id: str):
     trip_data: dict = {}
     try:
         import urllib.request as _urllib_req
-        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=2)
+        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=5)
         fleet_sim = json.loads(_req.read())
         if fleet_sim.get("status") == "active":
             try:
-                _treq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/trip", timeout=2)
+                _treq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/trip", timeout=5)
                 trip_data = json.loads(_treq.read())
             except Exception:
                 pass
@@ -1403,11 +1447,14 @@ def _precompute_module_fleet_health(module: str) -> None:
         current_mtime = _dir_latest_mtime(os.path.join(_SILVER_ROOT, module))
         if current_mtime > 0 and current_mtime <= _loop_dir_mtimes.get(f"silver-{module}", 0.0):
             return
-        _loop_dir_mtimes[f"silver-{module}"] = current_mtime
         result = _compute_module_fleet_health(module)
         _set_live(f"module-fleet-health-{module}", result)
-    except Exception:
-        pass
+        # Only recorded once the compute+cache-write above succeeded — if it
+        # throws, the guard stays put and the next cycle retries this module
+        # instead of freezing it silently forever.
+        _loop_dir_mtimes[f"silver-{module}"] = current_mtime
+    except Exception as e:
+        print(f"Module fleet-health precompute failed for {module}, will retry next cycle: {e}")
 
 
 @router.get("/api/automotive/module-fleet-health/{module}")
@@ -1421,7 +1468,11 @@ def get_module_fleet_health(module: str):
         return cached
     if module not in _VEHICLE_MODULES:
         raise HTTPException(status_code=400, detail="Invalid module")
-    result = _compute_module_fleet_health(module)
+    try:
+        result = _compute_module_fleet_health(module)
+    except Exception as e:
+        print(f"Module fleet-health on-demand compute failed for {module}: {e}")
+        result = {"module": module, "vehicles": [], "series": []}
     _set_cache(f"fleet-health-{module}", result)
     return result
 
@@ -1726,10 +1777,13 @@ def _dir_latest_mtime(directory: str) -> float:
 
 def _sync_refresh_automotive_cache() -> None:
     import pandas as pd
-    current_mtime = max(_dir_latest_mtime(_GOLD_ROOT), _dir_latest_mtime(_GOLD_ALERTS_DIR))
+    resolved_file_mtime = (
+        os.path.getmtime(alert_resolutions.RESOLVED_ALERTS_FILE)
+        if os.path.exists(alert_resolutions.RESOLVED_ALERTS_FILE) else 0.0
+    )
+    current_mtime = max(_dir_latest_mtime(_GOLD_ROOT), _dir_latest_mtime(_GOLD_ALERTS_DIR), resolved_file_mtime)
     if current_mtime > 0 and current_mtime <= _loop_dir_mtimes.get("gold", 0.0):
         return
-    _loop_dir_mtimes["gold"] = current_mtime
     try:
         # ── Gold: read once, shared across all vehicle computations ──────────
         gold_df = pd.DataFrame()
@@ -1819,6 +1873,7 @@ def _sync_refresh_automotive_cache() -> None:
                             adf_all.sort_values("last_updated_ts")
                             .drop_duplicates(subset=["alert_id"], keep="last")
                         )
+                    resolved_ids = alert_resolutions.load_resolved_ids()
                     for vid in vehicle_ids:
                         try:
                             if not adf_all.empty and "source_id" in adf_all.columns:
@@ -1829,6 +1884,8 @@ def _sync_refresh_automotive_cache() -> None:
                                 vdf[num_cols] = vdf[num_cols].fillna(0)
                                 for col in vdf.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
                                     vdf[col] = vdf[col].astype(str)
+                                if resolved_ids and "alert_id" in vdf.columns:
+                                    vdf.loc[vdf["alert_id"].isin(resolved_ids), "status"] = "CLOSED"
                                 open_df = vdf[vdf["status"] == "OPEN"].sort_values("peak_anomaly_ts", ascending=False)
                                 closed_df = vdf[vdf["status"] == "CLOSED"].sort_values("alert_end_ts", ascending=False)
                                 _set_live(f"alerts-{vid}", {
@@ -1838,11 +1895,18 @@ def _sync_refresh_automotive_cache() -> None:
                                 })
                         except Exception:
                             pass
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Automotive cache refresh: per-vehicle alerts failed: {e}")
 
-    except Exception:
-        pass
+        # Only mark this mtime as handled once every section above has run
+        # without an uncaught exception escaping to here — if fleet-summary
+        # itself threw before reaching this line, the guard stays at its old
+        # value and the next 3s cycle retries the exact same data instead of
+        # silently freezing the cache forever (see per-vehicle blocks above
+        # for the narrower, already-isolated failure mode this doesn't cover).
+        _loop_dir_mtimes["gold"] = current_mtime
+    except Exception as e:
+        print(f"Automotive cache refresh failed, will retry next cycle: {e}")
 
 
 async def automotive_live_loop() -> None:

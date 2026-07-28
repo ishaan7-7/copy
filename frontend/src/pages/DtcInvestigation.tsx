@@ -177,6 +177,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
   const sensorKeys = MODULE_SENSOR_KEYS[selectedModule] || [];
 
   useEffect(() => {
+    setSelectedDtcCode("");
     setSelectedSensor("");
     setLoadEvidence(false);
   }, [selectedModule]);
@@ -290,11 +291,8 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
     const detail = dtcMasterFlat[selectedDtcCode];
     if (!detail) return;
     const features: string[] = detail.features || [];
-    const validSensors = features.filter((f: string) =>
-      MODULE_SENSOR_KEYS[selectedModule]?.includes(f)
-    );
-    if (validSensors.length > 0) {
-      setSelectedSensor(validSensors[0]);
+    if (features.length > 0) {
+      setSelectedSensor(features[0]);
       if (peakTs) setLoadEvidence(true);
     }
   }, [selectedDtcCode, dtcMasterQuery.dataUpdatedAt]);
@@ -314,6 +312,11 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
   const selectedDtcDetail: any = selectedDtcCode
     ? dtcMasterFlat[selectedDtcCode]
     : null;
+
+  const dropdownSensorKeys = useMemo(
+    () => Array.from(new Set([...sensorKeys, ...((selectedDtcDetail?.features as string[]) || [])])),
+    [sensorKeys, selectedDtcDetail]
+  );
 
   const candidateRuns = useMemo((): any[] => {
     const allRuns: any[] = vehicleHistoryQuery.data?.runs || [];
@@ -554,7 +557,12 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
             <InputLabel sx={{ fontSize: "10px" }}>Vehicle</InputLabel>
             <Select
               value={selectedVehicle}
-              onChange={(e) => setSelectedVehicle(e.target.value)}
+              onChange={(e) => {
+                setSelectedVehicle(e.target.value);
+                setSelectedDtcCode("");
+                setSelectedSensor("");
+                setLoadEvidence(false);
+              }}
               label="Vehicle"
               MenuProps={{
                 PaperProps: {
@@ -1639,10 +1647,8 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
                           size="small"
                           label={f.replace(/_/g, " ")}
                           onClick={() => {
-                            if (sensorKeys.includes(f)) {
-                              setSelectedSensor(f);
-                              setLoadEvidence(true);
-                            }
+                            setSelectedSensor(f);
+                            setLoadEvidence(true);
                           }}
                           sx={{
                             borderRadius: "4px",
@@ -1763,7 +1769,7 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
                 }}
                 sx={{ "& .MuiSelect-select": { fontFamily: "monospace" } }}
               >
-                {sensorKeys.map((k) => (
+                {dropdownSensorKeys.map((k) => (
                   <MenuItem key={k} value={k} sx={{ fontFamily: "monospace", fontSize: "10px" }}>
                     {k.replace(/_/g, " ").toUpperCase()}
                   </MenuItem>
