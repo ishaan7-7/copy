@@ -145,6 +145,15 @@ const MAINTENANCE_TIERS: {
   { key: "over_1_month", label: "> 1 Month", maxHealth: Infinity, color: "#06b6d4", action: "healthy vehicles — group into routine monthly maintenance cycle" },
 ];
 
+// Grabs the first real sentence out of a longer detail string, for use in
+// short-form summaries. Requires the char right before the punctuation to be
+// lowercase/digit/paren so single-capital abbreviations (e.g. "R. Sharma")
+// don't get mistaken for a sentence boundary.
+function firstSentence(text: string): string {
+  const m = text.match(/^.*?[a-z0-9)][.!?](?=\s|$)/);
+  return m ? m[0] : text;
+}
+
 function maintenanceTierForHealth(health: number) {
   return MAINTENANCE_TIERS.find((t) => health < t.maxHealth) ?? MAINTENANCE_TIERS[MAINTENANCE_TIERS.length - 1];
 }
@@ -9521,7 +9530,11 @@ export default function CockpitView({
                   display: "flex",
                   flexDirection: "column",
                   border: `1px solid ${alpha("#06b6d4", 0.28)}`,
-                  background: isDark
+                  background: aiSummaryExpanded
+                    ? isDark
+                      ? "#0f172a"
+                      : "#ffffff"
+                    : isDark
                     ? `linear-gradient(145deg, ${alpha(
                         "#06b6d4",
                         0.12
@@ -9605,17 +9618,19 @@ export default function CockpitView({
                     pr: 0.35,
                   }}
                 >
-                  <Typography
-                    sx={{
-                      fontSize: 13.5,
-                      lineHeight: 1.55,
-                      color: "text.secondary",
-                      flexShrink: 0,
-                      mb: 0.3,
-                    }}
-                  >
-                    {aiExecutiveStory}
-                  </Typography>
+                  {aiSummaryExpanded && (
+                    <Typography
+                      sx={{
+                        fontSize: 13.5,
+                        lineHeight: 1.55,
+                        color: "text.secondary",
+                        flexShrink: 0,
+                        mb: 0.3,
+                      }}
+                    >
+                      {aiExecutiveStory}
+                    </Typography>
+                  )}
                   {aiSummaryExpanded
                     ? aiExecutiveInsights.map((insight) => (
                         <Box
@@ -9698,7 +9713,7 @@ export default function CockpitView({
                             alignItems: "flex-start",
                             gap: 0.9,
                             px: 0.15,
-                            py: 0.4,
+                            py: 0.5,
                           }}
                         >
                           <Box
@@ -9713,13 +9728,14 @@ export default function CockpitView({
                               flexShrink: 0,
                             }}
                           />
-                          <Typography sx={{ minWidth: 0, flex: 1, fontSize: 12.5, lineHeight: 1.4 }}>
+                          <Typography sx={{ minWidth: 0, flex: 1, fontSize: 12.5, lineHeight: 1.5 }}>
                             <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
                               {insight.label}:
                             </Box>{" "}
                             <Box component="span" sx={{ fontWeight: 900, color: insight.color }}>
-                              {insight.value}
-                            </Box>
+                              {insight.value}.
+                            </Box>{" "}
+                            {firstSentence(insight.detail)}
                           </Typography>
                         </Box>
                       ))}
