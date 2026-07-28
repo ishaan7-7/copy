@@ -4377,6 +4377,27 @@ export default function CockpitView({
       : `Overall health ${Math.round(getLiveHealth(priorityVehicle))}%`
     : "No immediate-care issue detected";
 
+  // The live fleet-wide alerts feed (openAlerts, above) only ever has data
+  // for vehicles that are actively streaming — a parked/in-service vehicle
+  // showing "no open alert" there is silent, not clean. Both rows below that
+  // name a specific vehicle fall back to that vehicle's own historical
+  // record when it isn't active, the same pattern already used by the chat
+  // assistant's equivalent topics.
+  const { data: worstVehicleHistAlerts } = useQuery({
+    queryKey: ["vehicle-hist-alerts", lowestHealthVehicle?.vehicle_id],
+    queryFn: () =>
+      axios.get(`${PIPELINE_API}/api/automotive/vehicle/${lowestHealthVehicle!.vehicle_id}/alerts`).then((r) => r.data),
+    enabled: !!lowestHealthVehicle?.vehicle_id && lowestHealthVehicle.status !== "active",
+    staleTime: 60000,
+  });
+  const { data: priorityVehicleHistAlerts } = useQuery({
+    queryKey: ["vehicle-hist-alerts", priorityVehicle?.vehicle_id],
+    queryFn: () =>
+      axios.get(`${PIPELINE_API}/api/automotive/vehicle/${priorityVehicle!.vehicle_id}/alerts`).then((r) => r.data),
+    enabled: !!priorityVehicle?.vehicle_id && priorityVehicle.status !== "active",
+    staleTime: 60000,
+  });
+
   // Cross-referenced context reused by more than one row below, so a fact
   // discovered once (e.g. the underperforming vehicle's own weakest module)
   // can echo consistently wherever it's relevant, the same "read together"
@@ -4385,6 +4406,18 @@ export default function CockpitView({
   const worstVehicleAlert = lowestHealthVehicle
     ? openAlerts.find((a: any) => String(a.source_id) === lowestHealthVehicle.vehicle_id)
     : undefined;
+  const worstVehicleHistClosed: any[] = (worstVehicleHistAlerts?.alerts ?? []).filter(
+    (a: any) => String(a.status).toUpperCase() === "CLOSED"
+  );
+  const worstVehicleLastClosed = [...worstVehicleHistClosed].sort(
+    (a, b) => new Date(b.peak_anomaly_ts ?? 0).getTime() - new Date(a.peak_anomaly_ts ?? 0).getTime()
+  )[0];
+  const priorityVehicleHistClosed: any[] = (priorityVehicleHistAlerts?.alerts ?? []).filter(
+    (a: any) => String(a.status).toUpperCase() === "CLOSED"
+  );
+  const priorityVehicleLastClosed = [...priorityVehicleHistClosed].sort(
+    (a, b) => new Date(b.peak_anomaly_ts ?? 0).getTime() - new Date(a.peak_anomaly_ts ?? 0).getTime()
+  )[0];
   const bestVehicleModule = extremeModuleFor(highestHealthVehicle?.vehicle_id, "strongest");
   const coachingVehicleHealth = lowestDriverVehicle ? getLiveHealth(lowestDriverVehicle) : null;
   const fastestVehicleHealth = fastestVehicle ? getLiveHealth(fastestVehicle) : null;
@@ -4434,6 +4467,8 @@ export default function CockpitView({
           }${
             worstVehicleAlert
               ? ` It also carries a live open alert on ${String(worstVehicleAlert.module || "").toLowerCase()} at a ${Math.round(Number(worstVehicleAlert.max_composite_score || 0) * 100)}% anomaly score.`
+              : worstVehicleLastClosed
+              ? ` It's currently off the road (${lowestHealthVehicle.status === "in_service" ? "in the workshop" : "parked"}), so there's no live alert to check — but its own history shows a resolved ${String(worstVehicleLastClosed.module || "").toLowerCase()} alert as recently as ${String(worstVehicleLastClosed.peak_anomaly_ts || "").slice(0, 10)}, worth confirming that's actually fixed.`
               : ""
           }`
         : "Awaiting vehicle-health data",
@@ -4450,7 +4485,11 @@ export default function CockpitView({
       detail: priorityVehicle
         ? `${priorityVehicle.vehicle_id}: ${priorityIssue}${
             priorityInWithinWeek ? " — already flagged in the <1-week maintenance window" : ""
-          }. ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold, out of ${executiveMetrics.maintenanceForecast} total flagged for maintenance across the whole forecast.`
+          }.${
+            !priorityAlert && priorityVehicle.status !== "active" && priorityVehicleLastClosed
+              ? ` It's currently off the road, so this reflects its last-known state rather than a live reading — its history shows a resolved ${String(priorityVehicleLastClosed.module || "").toLowerCase()} alert on ${String(priorityVehicleLastClosed.peak_anomaly_ts || "").slice(0, 10)}.`
+              : ""
+          } ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold, out of ${executiveMetrics.maintenanceForecast} total flagged for maintenance across the whole forecast.`
         : priorityIssue,
       action: priorityVehicle
         ? `Action: move ${priorityVehicle.vehicle_id} to inspection now; sequence the remaining ${maintenanceVehicleBuckets.within_1_week.length} vehicle${maintenanceVehicleBuckets.within_1_week.length === 1 ? "" : "s"} due within a week right behind it.`

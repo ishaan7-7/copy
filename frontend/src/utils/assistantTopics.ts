@@ -252,16 +252,30 @@ const monitoringCockpit: TopicEntry[] = [
     key: "workshop-queue",
     label: "Workshop service queue",
     match: (q: string) => q.includes("workshop") || q.includes("service queue"),
-    fetches: () => [{ key: "alerts", url: `${PIPELINE_API}/api/alerts/metrics` }],
+    fetches: (ctx) => {
+      const inService = (ctx.fleetPositions ?? []).filter((v) => v.status === "in_service");
+      const specs: FetchSpec[] = [{ key: "alerts", url: `${PIPELINE_API}/api/alerts/metrics` }];
+      // Every vehicle in this queue is, by definition, off the road — the
+      // live fleet-wide alerts feed has nothing to say about vehicles that
+      // aren't streaming, so "0 have a live alert" would otherwise silently
+      // read as "these are all fine," which is wrong: they're in the
+      // workshop for a documented reason sitting in their own historical
+      // record.
+      for (const v of inService) {
+        specs.push({ key: `hist_${v.vehicle_id}`, url: `${PIPELINE_API}/api/automotive/vehicle/${v.vehicle_id}/alerts` });
+      }
+      return specs;
+    },
     respond: (data, ctx) => {
       const positions = ctx.fleetPositions ?? [];
       const inService = [...positions].filter((v) => v.status === "in_service").sort((a, b) => liveHealthOf(a) - liveHealthOf(b));
       if (!inService.length) return "No vehicles are currently in the workshop — the whole fleet is either active or parked.";
       const openAlerts: any[] = data.alerts?.open_alerts ?? [];
-      const withAlerts = inService.filter((v) => openAlerts.some((a) => String(a.source_id) === v.vehicle_id)).length;
+      const withLiveAlerts = inService.filter((v) => openAlerts.some((a) => String(a.source_id) === v.vehicle_id)).length;
+      const withHistory = inService.filter((v) => ((data[`hist_${v.vehicle_id}`]?.alerts ?? []) as any[]).length > 0).length;
       const worst = inService[0];
       const names = inService.slice(0, 5).map((v) => `${v.vehicle_id} (${Math.round(liveHealthOf(v))}%)`).join(", ");
-      return `${inService.length} vehicle${inService.length === 1 ? " is" : "s are"} in the workshop right now: ${names}${inService.length > 5 ? ", …" : ""}. ${worst.vehicle_id} is the lowest-health vehicle in the queue at ${Math.round(liveHealthOf(worst))}% — that's the one to prioritize for turnaround. ${withAlerts} of them ${withAlerts === 1 ? "has" : "have"} an open alert tied to the fault that likely put them there.`;
+      return `${inService.length} vehicle${inService.length === 1 ? " is" : "s are"} in the workshop right now: ${names}${inService.length > 5 ? ", …" : ""}. ${worst.vehicle_id} is the lowest-health vehicle in the queue at ${Math.round(liveHealthOf(worst))}% — that's the one to prioritize for turnaround. ${withLiveAlerts} of them ${withLiveAlerts === 1 ? "has" : "have"} a live alert open right now, and ${withHistory} of the ${inService.length} have a real fault on record in their own history — none of these vehicles are here by accident, being off the road is not the same as being clean.`;
     },
   },
   {

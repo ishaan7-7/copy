@@ -261,15 +261,46 @@ export default function FleetChatAssistant({
   const [messages, setMessages] = useState<Message[]>(initialChatState.messages);
   const [historyAnchorEl, setHistoryAnchorEl] = useState<HTMLElement | null>(null);
   const pageTopics = useMemo(() => topicsFor(pageKey, assistantRole), [pageKey, assistantRole]);
+  // `fleetPositions` (fleet_sim_server) is a static, hand-authored seed value
+  // that never changes at runtime — CockpitView.tsx already treats it as a
+  // fallback only, preferring the live gold-computed health score
+  // (`useGoldStream`) whenever a vehicle is actively streaming. The chatbot
+  // previously read `fleetPositions.health` directly, so its numbers could
+  // silently disagree with every other page for the same active vehicle at
+  // the same moment. Merging gold data in here — once, at the context
+  // boundary — fixes every topic that reads `ctx.fleetPositions` without
+  // touching their individual logic.
+  const goldHealthMap = useMemo(() => {
+    const map = new Map<string, (typeof vehicles)[number]>();
+    for (const v of vehicles) map.set(v.vehicle_id, v);
+    return map;
+  }, [vehicles]);
+  const resolvedFleetPositions = useMemo(() => {
+    if (!fleetPositions) return fleetPositions;
+    return fleetPositions.map((p) => {
+      const vehicleId = String(p.vehicle_id ?? p["id"] ?? "");
+      const gold = goldHealthMap.get(vehicleId);
+      if (!gold) return p;
+      return {
+        ...p,
+        health: gold.health_score,
+        engine_contrib: gold.engine_contrib,
+        transmission_contrib: gold.transmission_contrib,
+        battery_contrib: gold.battery_contrib,
+        body_contrib: gold.body_contrib,
+        tyre_contrib: gold.tyre_contrib,
+      };
+    });
+  }, [fleetPositions, goldHealthMap]);
   const topicCtx: TopicContext = useMemo(
     () => ({
       selectedVehicle: pageSelectedVehicle,
       selectedModule: pageSelectedModule,
-      fleetPositions,
+      fleetPositions: resolvedFleetPositions,
       fleetSummary,
       connected,
     }),
-    [pageSelectedVehicle, pageSelectedModule, fleetPositions, fleetSummary, connected]
+    [pageSelectedVehicle, pageSelectedModule, resolvedFleetPositions, fleetSummary, connected]
   );
   const resolvedTopics = useMemo(() => {
     if (pageTopics.length) {
