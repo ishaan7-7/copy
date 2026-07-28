@@ -2223,122 +2223,8 @@ export default function AutomotiveDive({
 
             {isHistorical ? (
             <>
-            {/* ── HISTORICAL: RECORDED ALERTS (full width) ── */}
-            {selectedVehicle && (() => {
-              const _hAll: any[] = (histAlertsQuery.data as any[]) ?? [];
-              const _hOpen = _hAll.filter((a: any) => a.status === "OPEN");
-              const _hClosed = _hAll.filter((a: any) => a.status !== "OPEN");
-              const _hRows = histAlertsTab === 0 ? _hAll : histAlertsTab === 1 ? _hOpen : _hClosed;
-              return (
-                <Paper sx={{ width: "100%", borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: 360 }}>
-                  <Box sx={{ px: 2, pt: 1.5, pb: 0, background: darkMode ? `linear-gradient(135deg, ${alpha("#1e3a5f", 0.6)}, ${alpha("#0c1628", 0.8)})` : `linear-gradient(135deg, ${alpha("#eff6ff", 1)}, ${alpha("#f8fafc", 1)})`, borderBottom: `1px solid ${darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1)}`, flexShrink: 0 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                      <Box sx={{ width: 3, height: 16, borderRadius: 2, bgcolor: "#ef4444" }} />
-                      <WarningAmberRoundedIcon sx={{ fontSize: 14, color: "#ef4444" }} />
-                      <Typography sx={{ fontSize: "12px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Recorded Alerts</Typography>
-                      <Box sx={{ display: "flex", gap: 0.75, ml: 1 }}>
-                        {[
-                          { label: `${_hAll.length} Total`, color: darkMode ? "#94a3b8" : "#475569", bg: darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 0.8) },
-                          { label: `${_hOpen.length} Open`, color: "#f59e0b", bg: alpha("#f59e0b", darkMode ? 0.14 : 0.08) },
-                          { label: `${_hClosed.length} Closed`, color: "#22c55e", bg: alpha("#22c55e", darkMode ? 0.12 : 0.07) },
-                        ].map(({ label, color, bg }) => (
-                          <Box key={label} sx={{ px: 1, py: "3px", borderRadius: 1.5, bgcolor: bg, border: `1px solid ${alpha(color, 0.28)}` }}>
-                            <Typography sx={{ fontSize: "10px", fontWeight: 700, color }}>{label}</Typography>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Box>
-                    <Tabs value={histAlertsTab} onChange={(_e, v) => setHistAlertsTab(v)} sx={{ minHeight: 30, "& .MuiTabs-indicator": { height: 2, borderRadius: "2px 2px 0 0", bgcolor: darkMode ? "#38bdf8" : "#0284c7" }, "& .MuiTab-root": { minHeight: 30, fontSize: "11px", fontWeight: 600, textTransform: "none", px: 1.5, color: darkMode ? "#64748b" : "#94a3b8", "&.Mui-selected": { color: darkMode ? "#38bdf8" : "#0284c7", fontWeight: 700 } } }}>
-                      <Tab label="All" />
-                      <Tab label="Open" />
-                      <Tab label="Closed" />
-                    </Tabs>
-                  </Box>
-                  {histAlertsQuery.isLoading ? (
-                    <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                      <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>Loading alerts…</Typography>
-                    </Box>
-                  ) : _hRows.length === 0 ? (
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75, py: 4 }}>
-                      <CheckCircleRoundedIcon sx={{ fontSize: 20, color: "#22c55e", opacity: 0.7 }} />
-                      <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>No alerts in this category</Typography>
-                    </Box>
-                  ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1.5, overflow: "auto", flex: 1 }}>
-                      {_hRows.map((a: any, i: number) => {
-                        const _isOpen = a.status === "OPEN";
-                        const _ac = _isOpen ? "#f59e0b" : "#22c55e";
-                        const _al = _isOpen ? "Open" : "Resolved";
-                        const scoreNum = Number(a.max_composite_score ?? 0);
-                        const scoreColor = scoreNum >= 0.8 ? "#ef4444" : scoreNum >= 0.5 ? "#f59e0b" : "#22c55e";
-                        const scoreBg = scoreNum >= 0.8 ? alpha("#ef4444", darkMode ? 0.14 : 0.08) : scoreNum >= 0.5 ? alpha("#f59e0b", darkMode ? 0.14 : 0.08) : alpha("#22c55e", darkMode ? 0.14 : 0.08);
-                        const modColor = (MODULE_COLORS as Record<string, string>)[a.module?.toLowerCase()] || (darkMode ? "#7dd3fc" : "#0369a1");
-                        let _hFeatures: { label: string; value: number }[] = [];
-                        if (a.top_10_features) {
-                          try {
-                            const _parsed = JSON.parse(a.top_10_features) as Record<string, number>;
-                            const _total = Object.values(_parsed).reduce((s, v) => s + Math.abs(v), 0);
-                            _hFeatures = Object.entries(_parsed).slice(0, 5).map(([k, v]) => ({ label: formatFeatureKey(k), value: _total > 0 ? Math.round((Math.abs(v) / _total) * 100) : 0 }));
-                          } catch { _hFeatures = []; }
-                        }
-                        return (
-                          <Box key={a.alert_id || i} sx={{ display: "flex", borderRadius: 2, overflow: "hidden", border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#1e293b", 0.5) : "#fafbfc", "&:hover": { boxShadow: darkMode ? `0 4px 20px ${alpha("#000", 0.3)}` : `0 4px 16px ${alpha("#0f172a", 0.08)}` } }}>
-                            <Box sx={{ width: 4, flexShrink: 0, bgcolor: _ac }} />
-                            <Box sx={{ flex: 1, p: 1.25, display: "flex", gap: 1.5, alignItems: "flex-start", minWidth: 0 }}>
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75, flexWrap: "wrap" }}>
-                                  <Box sx={{ px: 0.85, py: "2px", borderRadius: "5px", fontSize: "9px", fontWeight: 800, letterSpacing: 0.5, bgcolor: _isOpen ? alpha("#f59e0b", darkMode ? 0.18 : 0.1) : alpha("#22c55e", darkMode ? 0.14 : 0.08), color: _ac, border: `1px solid ${alpha(_ac, 0.3)}` }}>{_al.toUpperCase()}</Box>
-                                  <Box sx={{ px: 0.85, py: "2px", borderRadius: "5px", fontSize: "9px", fontWeight: 800, letterSpacing: 0.5, bgcolor: alpha(modColor, darkMode ? 0.16 : 0.1), color: modColor, border: `1px solid ${alpha(modColor, 0.28)}` }}>{String(a.module || "").toUpperCase()}</Box>
-                                </Box>
-                                <Box sx={{ display: "flex", gap: 2.5, mb: _hFeatures.length > 0 ? 0.75 : 0 }}>
-                                  <Box>
-                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Peak</Typography>
-                                    <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#cbd5e1" : "#334155" }}>{String(a.peak_anomaly_ts || "").slice(0, 19)}</Typography>
-                                  </Box>
-                                  {a.alert_start_ts && (
-                                    <Box>
-                                      <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Started</Typography>
-                                      <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#94a3b8" : "#64748b" }}>{String(a.alert_start_ts).slice(0, 19)}</Typography>
-                                    </Box>
-                                  )}
-                                </Box>
-                                {_hFeatures.length > 0 && (
-                                  <Box sx={{ minWidth: 0 }}>
-                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "3px", textTransform: "uppercase", letterSpacing: 0.4 }}>Top anomaly drivers</Typography>
-                                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", overflow: "hidden" }}>
-                                      {_hFeatures.map((f, fi) => (
-                                        <Box key={fi} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 0.85, py: "2px", borderRadius: "5px", maxWidth: "100%", bgcolor: darkMode ? alpha("#1e293b", 0.9) : alpha("#f1f5f9", 1), border: `1px solid ${darkMode ? alpha("#475569", 0.35) : alpha("#cbd5e1", 1)}` }}>
-                                          <Typography sx={{ fontSize: "9px", fontWeight: 500, color: darkMode ? "#94a3b8" : "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 90 }}>{f.label}</Typography>
-                                          <Typography sx={{ fontSize: "9px", fontWeight: 800, color: darkMode ? "#e2e8f0" : "#0f172a", fontVariantNumeric: "tabular-nums", fontFamily: "monospace", flexShrink: 0 }}>{f.value}%</Typography>
-                                        </Box>
-                                      ))}
-                                    </Box>
-                                  </Box>
-                                )}
-                              </Box>
-                              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.75, flexShrink: 0 }}>
-                                <Box sx={{ px: 1, py: 0.4, borderRadius: 1.5, bgcolor: scoreBg, border: `1px solid ${alpha(scoreColor, 0.25)}`, textAlign: "center" }}>
-                                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: scoreColor, textTransform: "uppercase", letterSpacing: 0.5, lineHeight: 1.2 }}>Score</Typography>
-                                  <Typography sx={{ fontSize: "14px", fontWeight: 800, color: scoreColor, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{scoreNum.toFixed(3)}</Typography>
-                                </Box>
-                                <Button size="small" endIcon={<OpenInNewRoundedIcon sx={{ fontSize: "11px !important" }} />}
-                                  onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle ?? "")}&module=${encodeURIComponent(a.module)}&peak_ts=${encodeURIComponent(a.peak_anomaly_ts)}`)}
-                                  sx={{ fontSize: "10px", fontWeight: 700, height: 26, px: 1.25, borderRadius: "6px", bgcolor: darkMode ? alpha("#38bdf8", 0.1) : alpha("#0284c7", 0.07), color: darkMode ? "#38bdf8" : "#0369a1", border: `1px solid ${darkMode ? alpha("#38bdf8", 0.22) : alpha("#0284c7", 0.18)}`, "&:hover": { bgcolor: darkMode ? alpha("#38bdf8", 0.18) : alpha("#0284c7", 0.13) } }}>
-                                  Investigate
-                                </Button>
-                              </Box>
-                            </Box>
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  )}
-                </Paper>
-              );
-            })()}
-
             {/* ── ROW 1: Health Trend / Sim Card / Top Anomaly Drivers ── */}
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, alignItems: "stretch" }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "3fr 2fr 2fr", gap: 1, alignItems: "stretch" }}>
 
               <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexShrink: 0 }}>
@@ -2495,8 +2381,51 @@ export default function AutomotiveDive({
               </Paper>
             </Box>
 
-            {/* ── ROW 2: Driver Behavior / Trip History / Fault Codes ── */}
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, alignItems: "stretch" }}>
+            {/* ── ROW 2: Fault Codes / Driver Behavior / Trip History ── */}
+            <Box sx={{ display: "grid", gridTemplateColumns: "3fr 2fr 2fr", gap: 1, alignItems: "stretch" }}>
+
+              <Paper sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8, mb: 1, flexShrink: 0 }}>Fault Codes (DTCs)</Typography>
+                {histDtcsQuery.isLoading ? (<CircularProgress size={20} />) : (
+                  <Box sx={{ overflow: "auto", flex: 1, minHeight: 0 }}>
+                    {((histDtcsQuery.data as any[]) ?? []).length === 0 ? (
+                      <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No fault codes recorded</Typography>
+                    ) : (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+                        <thead><tr>{["Module", "Code", "Severity", "Description", ""].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
+                        <tbody>
+                          {((histDtcsQuery.data as any[]) ?? []).map((dtc: any, i: number) => {
+                            const _sevRaw = String(dtc.severity || "").toLowerCase();
+                            const _sevColor = _sevRaw === "critical" ? "#ef4444" : "#f59e0b";
+                            const _sevLabel = _sevRaw === "critical" ? "Critical" : "Non-Critical";
+                            const matchingAlert = ((histAlertsQuery.data as any[]) ?? []).find((a: any) => a.module === dtc.module && a.peak_anomaly_ts);
+                            return (
+                              <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
+                                <td style={{ padding: "5px 8px", color: (MODULE_COLORS as any)[dtc.module] || (darkMode ? "#94a3b8" : "#64748b"), fontWeight: 700, textTransform: "capitalize" }}>{dtc.module}</td>
+                                <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{dtc.dtc_code ?? dtc.code}</td>
+                                <td style={{ padding: "5px 8px" }}>
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px", borderRadius: 10, fontSize: "8.5px", fontWeight: 700, letterSpacing: "0.03em", background: `${_sevColor}1a`, color: _sevColor, border: `1px solid ${_sevColor}33` }}>
+                                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: _sevColor, flexShrink: 0, display: "inline-block" }} />
+                                    {_sevLabel}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "5px 8px", color: darkMode ? "#94a3b8" : "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }} title={dtc.description}>{dtc.description}</td>
+                                <td style={{ padding: "5px 8px" }}>
+                                  {matchingAlert && (
+                                    <button onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle ?? "")}&module=${encodeURIComponent(dtc.module)}&peak_ts=${encodeURIComponent(matchingAlert.peak_anomaly_ts)}`)} style={{ fontSize: "9px", fontWeight: 700, cursor: "pointer", padding: "2px 6px", borderRadius: 4, border: `1px solid ${alpha("#3b82f6", 0.4)}`, color: "#3b82f6", background: alpha("#3b82f6", 0.08) }}>
+                                      Investigate →
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </Box>
+                )}
+              </Paper>
 
               <Paper sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75, flexShrink: 0 }}>
@@ -2595,50 +2524,121 @@ export default function AutomotiveDive({
                   </Box>
                 )}
               </Paper>
-
-              <Paper sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8, mb: 1, flexShrink: 0 }}>Fault Codes (DTCs)</Typography>
-                {histDtcsQuery.isLoading ? (<CircularProgress size={20} />) : (
-                  <Box sx={{ overflow: "auto", flex: 1, minHeight: 0 }}>
-                    {((histDtcsQuery.data as any[]) ?? []).length === 0 ? (
-                      <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No fault codes recorded</Typography>
-                    ) : (
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
-                        <thead><tr>{["Module", "Code", "Severity", "Description", ""].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
-                        <tbody>
-                          {((histDtcsQuery.data as any[]) ?? []).map((dtc: any, i: number) => {
-                            const _sevRaw = String(dtc.severity || "").toLowerCase();
-                            const _sevColor = _sevRaw === "critical" ? "#ef4444" : "#f59e0b";
-                            const _sevLabel = _sevRaw === "critical" ? "Critical" : "Non-Critical";
-                            const matchingAlert = ((histAlertsQuery.data as any[]) ?? []).find((a: any) => a.module === dtc.module && a.peak_anomaly_ts);
-                            return (
-                              <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
-                                <td style={{ padding: "5px 8px", color: (MODULE_COLORS as any)[dtc.module] || (darkMode ? "#94a3b8" : "#64748b"), fontWeight: 700, textTransform: "capitalize" }}>{dtc.module}</td>
-                                <td style={{ padding: "5px 8px", fontFamily: "monospace", fontWeight: 700 }}>{dtc.dtc_code ?? dtc.code}</td>
-                                <td style={{ padding: "5px 8px" }}>
-                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px", borderRadius: 10, fontSize: "8.5px", fontWeight: 700, letterSpacing: "0.03em", background: `${_sevColor}1a`, color: _sevColor, border: `1px solid ${_sevColor}33` }}>
-                                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: _sevColor, flexShrink: 0, display: "inline-block" }} />
-                                    {_sevLabel}
-                                  </span>
-                                </td>
-                                <td style={{ padding: "5px 8px", color: darkMode ? "#94a3b8" : "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }} title={dtc.description}>{dtc.description}</td>
-                                <td style={{ padding: "5px 8px" }}>
-                                  {matchingAlert && (
-                                    <button onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle ?? "")}&module=${encodeURIComponent(dtc.module)}&peak_ts=${encodeURIComponent(matchingAlert.peak_anomaly_ts)}`)} style={{ fontSize: "9px", fontWeight: 700, cursor: "pointer", padding: "2px 6px", borderRadius: 4, border: `1px solid ${alpha("#3b82f6", 0.4)}`, color: "#3b82f6", background: alpha("#3b82f6", 0.08) }}>
-                                      Investigate →
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </Box>
-                )}
-              </Paper>
             </Box>
+
+            {/* ── HISTORICAL: RECORDED ALERTS (full width) ── */}
+            {selectedVehicle && (() => {
+              const _hAll: any[] = (histAlertsQuery.data as any[]) ?? [];
+              const _hOpen = _hAll.filter((a: any) => a.status === "OPEN");
+              const _hClosed = _hAll.filter((a: any) => a.status !== "OPEN");
+              const _hRows = histAlertsTab === 0 ? _hAll : histAlertsTab === 1 ? _hOpen : _hClosed;
+              return (
+                <Paper sx={{ width: "100%", borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: 600 }}>
+                  <Box sx={{ px: 2, pt: 1.5, pb: 0, background: darkMode ? `linear-gradient(135deg, ${alpha("#1e3a5f", 0.6)}, ${alpha("#0c1628", 0.8)})` : `linear-gradient(135deg, ${alpha("#eff6ff", 1)}, ${alpha("#f8fafc", 1)})`, borderBottom: `1px solid ${darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1)}`, flexShrink: 0 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                      <Box sx={{ width: 3, height: 16, borderRadius: 2, bgcolor: "#ef4444" }} />
+                      <WarningAmberRoundedIcon sx={{ fontSize: 14, color: "#ef4444" }} />
+                      <Typography sx={{ fontSize: "12px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Recorded Alerts</Typography>
+                      <Box sx={{ display: "flex", gap: 0.75, ml: 1 }}>
+                        {[
+                          { label: `${_hAll.length} Total`, color: darkMode ? "#94a3b8" : "#475569", bg: darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 0.8) },
+                          { label: `${_hOpen.length} Open`, color: "#f59e0b", bg: alpha("#f59e0b", darkMode ? 0.14 : 0.08) },
+                          { label: `${_hClosed.length} Closed`, color: "#22c55e", bg: alpha("#22c55e", darkMode ? 0.12 : 0.07) },
+                        ].map(({ label, color, bg }) => (
+                          <Box key={label} sx={{ px: 1, py: "3px", borderRadius: 1.5, bgcolor: bg, border: `1px solid ${alpha(color, 0.28)}` }}>
+                            <Typography sx={{ fontSize: "10px", fontWeight: 700, color }}>{label}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                    <Tabs value={histAlertsTab} onChange={(_e, v) => setHistAlertsTab(v)} sx={{ minHeight: 30, "& .MuiTabs-indicator": { height: 2, borderRadius: "2px 2px 0 0", bgcolor: darkMode ? "#38bdf8" : "#0284c7" }, "& .MuiTab-root": { minHeight: 30, fontSize: "11px", fontWeight: 600, textTransform: "none", px: 1.5, color: darkMode ? "#64748b" : "#94a3b8", "&.Mui-selected": { color: darkMode ? "#38bdf8" : "#0284c7", fontWeight: 700 } } }}>
+                      <Tab label="All" />
+                      <Tab label="Open" />
+                      <Tab label="Closed" />
+                    </Tabs>
+                  </Box>
+                  {histAlertsQuery.isLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                      <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>Loading alerts…</Typography>
+                    </Box>
+                  ) : _hRows.length === 0 ? (
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75, py: 4 }}>
+                      <CheckCircleRoundedIcon sx={{ fontSize: 20, color: "#22c55e", opacity: 0.7 }} />
+                      <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>No alerts in this category</Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1.5, overflow: "auto", flex: 1 }}>
+                      {_hRows.map((a: any, i: number) => {
+                        const _isOpen = a.status === "OPEN";
+                        const _ac = _isOpen ? "#f59e0b" : "#22c55e";
+                        const _al = _isOpen ? "Open" : "Resolved";
+                        const scoreNum = Number(a.max_composite_score ?? 0);
+                        const scoreColor = scoreNum >= 0.8 ? "#ef4444" : scoreNum >= 0.5 ? "#f59e0b" : "#22c55e";
+                        const scoreBg = scoreNum >= 0.8 ? alpha("#ef4444", darkMode ? 0.14 : 0.08) : scoreNum >= 0.5 ? alpha("#f59e0b", darkMode ? 0.14 : 0.08) : alpha("#22c55e", darkMode ? 0.14 : 0.08);
+                        const modColor = (MODULE_COLORS as Record<string, string>)[a.module?.toLowerCase()] || (darkMode ? "#7dd3fc" : "#0369a1");
+                        let _hFeatures: { label: string; value: number }[] = [];
+                        if (a.top_10_features) {
+                          try {
+                            const _parsed = JSON.parse(a.top_10_features) as Record<string, number>;
+                            const _total = Object.values(_parsed).reduce((s, v) => s + Math.abs(v), 0);
+                            _hFeatures = Object.entries(_parsed).slice(0, 5).map(([k, v]) => ({ label: formatFeatureKey(k), value: _total > 0 ? Math.round((Math.abs(v) / _total) * 100) : 0 }));
+                          } catch { _hFeatures = []; }
+                        }
+                        return (
+                          <Box key={a.alert_id || i} sx={{ display: "flex", borderRadius: 2, overflow: "hidden", border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#1e293b", 0.5) : "#fafbfc", "&:hover": { boxShadow: darkMode ? `0 4px 20px ${alpha("#000", 0.3)}` : `0 4px 16px ${alpha("#0f172a", 0.08)}` } }}>
+                            <Box sx={{ width: 4, flexShrink: 0, bgcolor: _ac }} />
+                            <Box sx={{ flex: 1, p: 1.25, display: "flex", gap: 1.5, alignItems: "flex-start", minWidth: 0 }}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75, flexWrap: "wrap" }}>
+                                  <Box sx={{ px: 0.85, py: "2px", borderRadius: "5px", fontSize: "9px", fontWeight: 800, letterSpacing: 0.5, bgcolor: _isOpen ? alpha("#f59e0b", darkMode ? 0.18 : 0.1) : alpha("#22c55e", darkMode ? 0.14 : 0.08), color: _ac, border: `1px solid ${alpha(_ac, 0.3)}` }}>{_al.toUpperCase()}</Box>
+                                  <Box sx={{ px: 0.85, py: "2px", borderRadius: "5px", fontSize: "9px", fontWeight: 800, letterSpacing: 0.5, bgcolor: alpha(modColor, darkMode ? 0.16 : 0.1), color: modColor, border: `1px solid ${alpha(modColor, 0.28)}` }}>{String(a.module || "").toUpperCase()}</Box>
+                                </Box>
+                                <Box sx={{ display: "flex", gap: 2.5, mb: _hFeatures.length > 0 ? 0.75 : 0 }}>
+                                  <Box>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Peak</Typography>
+                                    <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#cbd5e1" : "#334155" }}>{String(a.peak_anomaly_ts || "").slice(0, 19)}</Typography>
+                                  </Box>
+                                  {a.alert_start_ts && (
+                                    <Box>
+                                      <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Started</Typography>
+                                      <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#94a3b8" : "#64748b" }}>{String(a.alert_start_ts).slice(0, 19)}</Typography>
+                                    </Box>
+                                  )}
+                                </Box>
+                                {_hFeatures.length > 0 && (
+                                  <Box sx={{ minWidth: 0 }}>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "3px", textTransform: "uppercase", letterSpacing: 0.4 }}>Top anomaly drivers</Typography>
+                                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", overflow: "hidden" }}>
+                                      {_hFeatures.map((f, fi) => (
+                                        <Box key={fi} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 0.85, py: "2px", borderRadius: "5px", maxWidth: "100%", bgcolor: darkMode ? alpha("#1e293b", 0.9) : alpha("#f1f5f9", 1), border: `1px solid ${darkMode ? alpha("#475569", 0.35) : alpha("#cbd5e1", 1)}` }}>
+                                          <Typography sx={{ fontSize: "9px", fontWeight: 500, color: darkMode ? "#94a3b8" : "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 90 }}>{f.label}</Typography>
+                                          <Typography sx={{ fontSize: "9px", fontWeight: 800, color: darkMode ? "#e2e8f0" : "#0f172a", fontVariantNumeric: "tabular-nums", fontFamily: "monospace", flexShrink: 0 }}>{f.value}%</Typography>
+                                        </Box>
+                                      ))}
+                                    </Box>
+                                  </Box>
+                                )}
+                              </Box>
+                              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.75, flexShrink: 0 }}>
+                                <Box sx={{ px: 1, py: 0.4, borderRadius: 1.5, bgcolor: scoreBg, border: `1px solid ${alpha(scoreColor, 0.25)}`, textAlign: "center" }}>
+                                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: scoreColor, textTransform: "uppercase", letterSpacing: 0.5, lineHeight: 1.2 }}>Score</Typography>
+                                  <Typography sx={{ fontSize: "14px", fontWeight: 800, color: scoreColor, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{scoreNum.toFixed(3)}</Typography>
+                                </Box>
+                                <Button size="small" endIcon={<OpenInNewRoundedIcon sx={{ fontSize: "11px !important" }} />}
+                                  onClick={() => navigate(`/dtc?vehicle=${encodeURIComponent(selectedVehicle ?? "")}&module=${encodeURIComponent(a.module)}&peak_ts=${encodeURIComponent(a.peak_anomaly_ts)}`)}
+                                  sx={{ fontSize: "10px", fontWeight: 700, height: 26, px: 1.25, borderRadius: "6px", bgcolor: darkMode ? alpha("#38bdf8", 0.1) : alpha("#0284c7", 0.07), color: darkMode ? "#38bdf8" : "#0369a1", border: `1px solid ${darkMode ? alpha("#38bdf8", 0.22) : alpha("#0284c7", 0.18)}`, "&:hover": { bgcolor: darkMode ? alpha("#38bdf8", 0.18) : alpha("#0284c7", 0.13) } }}>
+                                  Investigate
+                                </Button>
+                              </Box>
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                </Paper>
+              );
+            })()}
 
             {/* ── MODULE DEEP DIVE CARDS ── */}
             <Box sx={{ display: "flex", gap: 1 }}>
