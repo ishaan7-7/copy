@@ -529,8 +529,7 @@ function formatFeatureKey(k: string): string {
     .filter((w) => w.length > 1 || /\d/.test(w))
     .slice(0, 4)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ")
-    .slice(0, 22);
+    .join(" ");
 }
 
 function getSensorIcon(key: string, color: string, size = "11px"): React.ReactElement {
@@ -2352,10 +2351,9 @@ export default function AutomotiveDive({
                     {Array.from({ length: 5 }).map((_, i) => (
                       <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1), flexShrink: 0 }} />
-                        <Box sx={{ width: 56, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.5) : alpha("#e2e8f0", 0.9), flexShrink: 0 }} />
                         <Box sx={{ flex: 1, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6) }} />
-                        <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 0.8), flexShrink: 0 }} />
-                        <Box sx={{ width: 44, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
+                        <Box sx={{ width: 60, height: 6, borderRadius: 3, bgcolor: darkMode ? alpha("#334155", 0.4) : alpha("#e2e8f0", 0.8), flexShrink: 0 }} />
+                        <Box sx={{ width: 34, height: 9, borderRadius: 1, bgcolor: darkMode ? alpha("#334155", 0.3) : alpha("#e2e8f0", 0.6), flexShrink: 0 }} />
                       </Box>
                     ))}
                   </Box>
@@ -2365,15 +2363,16 @@ export default function AutomotiveDive({
                       const modColor = (MODULE_COLORS as Record<string, string>)[d.module] || (darkMode ? "#7dd3fc" : "#0369a1");
                       const barPct = histMaxDriverScore > 0 ? (d.score / histMaxDriverScore) * 100 : 0;
                       return (
-                        <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: modColor, flexShrink: 0 }} />
-                          <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#94a3b8" : "#64748b", width: 56, flexShrink: 0, textTransform: "uppercase", letterSpacing: 0.3 }}>{d.module}</Typography>
-                          <Typography sx={{ fontSize: "10px", flex: 1, color: darkMode ? "#cbd5e1" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatFeatureKey(d.feature)}</Typography>
-                          <Box sx={{ width: 90, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.15), flexShrink: 0, position: "relative", overflow: "hidden" }}>
-                            <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg, ${alpha(modColor, 0.5)}, ${modColor})`, borderRadius: 3 }} />
+                        <MuiTooltip key={i} title={`${d.module.toUpperCase()} · raw anomaly magnitude: ${fmtDriverScore(d.score)}`} arrow placement="top">
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "default" }}>
+                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: modColor, flexShrink: 0 }} />
+                            <Typography sx={{ fontSize: "10px", flex: 1, color: darkMode ? "#cbd5e1" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatFeatureKey(d.feature)}</Typography>
+                            <Box sx={{ width: 60, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.15), flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                              <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg, ${alpha(modColor, 0.5)}, ${modColor})`, borderRadius: 3 }} />
+                            </Box>
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, fontFamily: "monospace", width: 34, textAlign: "right", color: modColor, flexShrink: 0, overflow: "hidden" }}>{Math.round(barPct)}%</Typography>
                           </Box>
-                          <Typography sx={{ fontSize: "9px", fontFamily: "monospace", width: 44, textAlign: "right", color: darkMode ? "#64748b" : "#94a3b8", flexShrink: 0, overflow: "hidden" }}>{fmtDriverScore(d.score)}</Typography>
-                        </Box>
+                        </MuiTooltip>
                       );
                     })}
                   </Box>
@@ -2533,7 +2532,7 @@ export default function AutomotiveDive({
               const _hClosed = _hAll.filter((a: any) => a.status !== "OPEN");
               const _hRows = histAlertsTab === 0 ? _hAll : histAlertsTab === 1 ? _hOpen : _hClosed;
               return (
-                <Paper sx={{ width: "100%", borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: 600 }}>
+                <Paper sx={{ width: "100%", borderRadius: 2, border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#0f172a", 0.6) : "#fafbfc", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: 780 }}>
                   <Box sx={{ px: 2, pt: 1.5, pb: 0, background: darkMode ? `linear-gradient(135deg, ${alpha("#1e3a5f", 0.6)}, ${alpha("#0c1628", 0.8)})` : `linear-gradient(135deg, ${alpha("#eff6ff", 1)}, ${alpha("#f8fafc", 1)})`, borderBottom: `1px solid ${darkMode ? alpha("#334155", 0.6) : alpha("#e2e8f0", 1)}`, flexShrink: 0 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                       <Box sx={{ width: 3, height: 16, borderRadius: 2, bgcolor: "#ef4444" }} />
@@ -2567,7 +2566,7 @@ export default function AutomotiveDive({
                       <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>No alerts in this category</Typography>
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1.5, overflow: "auto", flex: 1 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, p: 1.5, overflow: "auto", flex: 1 }}>
                       {_hRows.map((a: any, i: number) => {
                         const _isOpen = a.status === "OPEN";
                         const _ac = _isOpen ? "#f59e0b" : "#22c55e";
@@ -2587,7 +2586,7 @@ export default function AutomotiveDive({
                         return (
                           <Box key={a.alert_id || i} sx={{ display: "flex", borderRadius: 2, overflow: "hidden", border: `1px solid ${darkMode ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: darkMode ? alpha("#1e293b", 0.5) : "#fafbfc", "&:hover": { boxShadow: darkMode ? `0 4px 20px ${alpha("#000", 0.3)}` : `0 4px 16px ${alpha("#0f172a", 0.08)}` } }}>
                             <Box sx={{ width: 4, flexShrink: 0, bgcolor: _ac }} />
-                            <Box sx={{ flex: 1, p: 1.25, display: "flex", gap: 1.5, alignItems: "flex-start", minWidth: 0 }}>
+                            <Box sx={{ flex: 1, p: 1.5, display: "flex", gap: 1.5, alignItems: "flex-start", minWidth: 0 }}>
                               <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75, flexWrap: "wrap" }}>
                                   <Box sx={{ px: 0.85, py: "2px", borderRadius: "5px", fontSize: "9px", fontWeight: 800, letterSpacing: 0.5, bgcolor: _isOpen ? alpha("#f59e0b", darkMode ? 0.18 : 0.1) : alpha("#22c55e", darkMode ? 0.14 : 0.08), color: _ac, border: `1px solid ${alpha(_ac, 0.3)}` }}>{_al.toUpperCase()}</Box>
@@ -2595,23 +2594,23 @@ export default function AutomotiveDive({
                                 </Box>
                                 <Box sx={{ display: "flex", gap: 2.5, mb: _hFeatures.length > 0 ? 0.75 : 0 }}>
                                   <Box>
-                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Peak</Typography>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#94a3b8" : "#64748b", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Peak</Typography>
                                     <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#cbd5e1" : "#334155" }}>{String(a.peak_anomaly_ts || "").slice(0, 19)}</Typography>
                                   </Box>
                                   {a.alert_start_ts && (
                                     <Box>
-                                      <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Started</Typography>
+                                      <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#94a3b8" : "#64748b", mb: "1px", textTransform: "uppercase", letterSpacing: 0.4 }}>Started</Typography>
                                       <Typography sx={{ fontSize: "11px", fontFamily: "monospace", color: darkMode ? "#94a3b8" : "#64748b" }}>{String(a.alert_start_ts).slice(0, 19)}</Typography>
                                     </Box>
                                   )}
                                 </Box>
                                 {_hFeatures.length > 0 && (
                                   <Box sx={{ minWidth: 0 }}>
-                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#475569" : "#94a3b8", mb: "3px", textTransform: "uppercase", letterSpacing: 0.4 }}>Top anomaly drivers</Typography>
+                                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#94a3b8" : "#64748b", mb: "3px", textTransform: "uppercase", letterSpacing: 0.4 }}>Top anomaly drivers</Typography>
                                     <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", overflow: "hidden" }}>
                                       {_hFeatures.map((f, fi) => (
                                         <Box key={fi} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 0.85, py: "2px", borderRadius: "5px", maxWidth: "100%", bgcolor: darkMode ? alpha("#1e293b", 0.9) : alpha("#f1f5f9", 1), border: `1px solid ${darkMode ? alpha("#475569", 0.35) : alpha("#cbd5e1", 1)}` }}>
-                                          <Typography sx={{ fontSize: "9px", fontWeight: 500, color: darkMode ? "#94a3b8" : "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 90 }}>{f.label}</Typography>
+                                          <Typography sx={{ fontSize: "9px", fontWeight: 600, color: darkMode ? "#cbd5e1" : "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 90 }}>{f.label}</Typography>
                                           <Typography sx={{ fontSize: "9px", fontWeight: 800, color: darkMode ? "#e2e8f0" : "#0f172a", fontVariantNumeric: "tabular-nums", fontFamily: "monospace", flexShrink: 0 }}>{f.value}%</Typography>
                                         </Box>
                                       ))}
