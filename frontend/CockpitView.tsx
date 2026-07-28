@@ -4480,6 +4480,10 @@ export default function CockpitView({
               : worstVehicleLastClosed
               ? ` It's currently off the road (${lowestHealthVehicle.status === "in_service" ? "in the workshop" : "parked"}), so there's no live alert to check — but its own history shows a resolved ${String(worstVehicleLastClosed.module || "").toLowerCase()} alert as recently as ${String(worstVehicleLastClosed.peak_anomaly_ts || "").slice(0, 10)}, worth confirming that's actually fixed.`
               : ""
+          }${
+            lowestDriverVehicle && lowestDriverVehicle.vehicle_id === lowestHealthVehicle.vehicle_id
+              ? ` This is also the fleet's lowest-scoring driver assignment — mechanical wear and driving behavior may both be contributing here, not just one or the other.`
+              : ""
           }`
         : "Awaiting vehicle-health data",
       action: lowestHealthVehicle
@@ -4491,7 +4495,7 @@ export default function CockpitView({
     },
     {
       label: "Immediate maintenance",
-      value: `${immediateCareVehicles.length} critical · ${executiveMetrics.maintenanceForecast} due`,
+      value: `${immediateCareVehicles.length} critical · ${executiveMetrics.maintenanceForecast} flagged`,
       detail: priorityVehicle
         ? `${priorityVehicle.vehicle_id}: ${priorityIssue}${
             priorityInWithinWeek ? " — already flagged in the <1-week maintenance window" : ""
@@ -4499,7 +4503,7 @@ export default function CockpitView({
             !priorityAlert && priorityVehicle.status !== "active" && priorityVehicleLastClosed
               ? ` It's currently off the road, so this reflects its last-known state rather than a live reading — its history shows a resolved ${String(priorityVehicleLastClosed.module || "").toLowerCase()} alert on ${String(priorityVehicleLastClosed.peak_anomaly_ts || "").slice(0, 10)}.`
               : ""
-          } ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold, out of ${executiveMetrics.maintenanceForecast} total flagged for maintenance across the whole forecast.`
+          } ${immediateCareVehicles.length} vehicle${immediateCareVehicles.length === 1 ? "" : "s"} fleet-wide currently sit below the 50% health threshold. The ${executiveMetrics.maintenanceForecast} "flagged" figure is broader than that: it's ${serviceCount} vehicle${serviceCount === 1 ? "" : "s"} already in the workshop plus ${executiveMetrics.predictedFailures} predicted at-risk (every critical vehicle, plus roughly a third of warning-tier ones) — a forecast, not a live count.`
         : priorityIssue,
       action: priorityVehicle
         ? `Action: move ${priorityVehicle.vehicle_id} to inspection now; sequence the remaining ${maintenanceVehicleBuckets.within_1_week.length} vehicle${maintenanceVehicleBuckets.within_1_week.length === 1 ? "" : "s"} due within a week right behind it.`
@@ -4524,6 +4528,10 @@ export default function CockpitView({
             coachingVehicleHealth !== null && coachingVehicleHealth < 60
               ? ` This vehicle's own health is also weak at ${Math.round(coachingVehicleHealth)}% — harsh driving and mechanical wear may be compounding each other here.`
               : ""
+          }${
+            maintenanceVehicleBuckets.within_1_week.some((v) => v.vehicle_id === lowestDriverVehicle.vehicle_id)
+              ? ` It's also already in the fleet's <1-week maintenance queue, so this isn't a driving-only concern.`
+              : ""
           }`
         : "Awaiting driver-score data",
       action: lowestDriverVehicle
@@ -4547,6 +4555,10 @@ export default function CockpitView({
                     : ", so running at pace isn't compounding an existing risk"
                 }.`
               : ""
+          }${
+            fastestVehicle && Number.isFinite(Number(fastestVehicle.driver_score)) && executiveMetrics.avgDriver !== null && Number(fastestVehicle.driver_score) < executiveMetrics.avgDriver - 10
+              ? ` Its driver score is ${Math.round(Number(fastestVehicle.driver_score))}/100, meaningfully below the fleet average — speed and driving style may be linked here.`
+              : ""
           }`
         : "Awaiting live-speed data",
       action:
@@ -4565,6 +4577,10 @@ export default function CockpitView({
       detail: highestHealthVehicle
         ? `${highestHealthVehicle.status}, ${highestHealthVehicle.type} — ${Math.max(0, Math.round(getLiveHealth(highestHealthVehicle) - healthScoreValue))} pts above the fleet average.${
             bestVehicleModule ? ` Its strongest module is ${bestVehicleModule.mod} at ${bestVehicleModule.v.toFixed(1)}%.` : ""
+          }${
+            topDriverVehicle && topDriverVehicle.vehicle_id === highestHealthVehicle.vehicle_id
+              ? ` It's also driven by ${topDriverVehicle.driver}, the fleet's top-scoring driver — strong vehicle health and strong driving are lining up on the same asset here.`
+              : ""
           }`
         : "Awaiting vehicle-health data",
       action:
@@ -9621,7 +9637,7 @@ export default function CockpitView({
                   {aiSummaryExpanded && (
                     <Typography
                       sx={{
-                        fontSize: 13.5,
+                        fontSize: 11.5,
                         lineHeight: 1.55,
                         color: "text.secondary",
                         flexShrink: 0,
@@ -9665,7 +9681,7 @@ export default function CockpitView({
                               <Typography
                                 sx={{
                                   minWidth: 0,
-                                  fontSize: 12.5,
+                                  fontSize: 11.5,
                                   fontWeight: 900,
                                   color: isDark ? "#f8fafc" : "#0f172a",
                                 }}
@@ -9674,7 +9690,7 @@ export default function CockpitView({
                               </Typography>
                               <Typography
                                 sx={{
-                                  fontSize: 13.5,
+                                  fontSize: 11.5,
                                   lineHeight: 1.2,
                                   fontWeight: 900,
                                   color: insight.color,
@@ -9687,13 +9703,13 @@ export default function CockpitView({
                                 {insight.value}
                               </Typography>
                             </Stack>
-                            <Typography sx={{ mt: 0.35, fontSize: 12.5, lineHeight: 1.5, color: "text.secondary" }}>
+                            <Typography sx={{ mt: 0.35, fontSize: 11.5, lineHeight: 1.5, color: "text.secondary" }}>
                               {insight.detail}
                             </Typography>
                             <Typography
                               sx={{
                                 mt: 0.3,
-                                fontSize: 12.5,
+                                fontSize: 11.5,
                                 lineHeight: 1.5,
                                 fontWeight: 750,
                                 color: isDark ? "#dbeafe" : "#334155",
@@ -9728,15 +9744,28 @@ export default function CockpitView({
                               flexShrink: 0,
                             }}
                           />
-                          <Typography sx={{ minWidth: 0, flex: 1, fontSize: 12.5, lineHeight: 1.5 }}>
-                            <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
-                              {insight.label}:
-                            </Box>{" "}
-                            <Box component="span" sx={{ fontWeight: 900, color: insight.color }}>
-                              {insight.value}.
-                            </Box>{" "}
-                            {firstSentence(insight.detail)}
-                          </Typography>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography sx={{ fontSize: 11.5, lineHeight: 1.5 }}>
+                              <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                                {insight.label}:
+                              </Box>{" "}
+                              <Box component="span" sx={{ fontWeight: 900, color: insight.color }}>
+                                {insight.value}.
+                              </Box>{" "}
+                              {firstSentence(insight.detail)}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                mt: 0.2,
+                                fontSize: 11.5,
+                                lineHeight: 1.4,
+                                fontWeight: 750,
+                                color: isDark ? "#dbeafe" : "#334155",
+                              }}
+                            >
+                              {insight.action}
+                            </Typography>
+                          </Box>
                         </Box>
                       ))}
                 </Box>
