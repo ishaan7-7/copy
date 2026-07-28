@@ -63,7 +63,7 @@ import {
   Brush,
 } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useStore } from "../store";
 import { liveInterval, useRefetchOnActivate } from "../hooks/useApi";
@@ -570,7 +570,15 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   const abortRef = useRef<AbortController | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const tab = searchParams.get("alertsTab");
+    if (tab === "open" || tab === "critical" || tab === "warning" || tab === "resolved") {
+      setAlertsFeedTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (location.hash !== "#alerts-feed") return;
@@ -1781,9 +1789,10 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
                     onClick={() => setAlertsFeedTab(tab.key)}
                     sx={{
                       height: 18, fontSize: "9px", fontWeight: 700,
-                      bgcolor: alertsFeedTab === tab.key ? alpha(tab.color, 0.2) : alpha(tab.color, 0.08),
-                      color: tab.color,
-                      border: `1px solid ${alertsFeedTab === tab.key ? tab.color : "transparent"}`,
+                      bgcolor: alertsFeedTab === tab.key ? tab.color : alpha(tab.color, 0.08),
+                      color: alertsFeedTab === tab.key ? "#fff" : tab.color,
+                      border: `1.5px solid ${tab.color}`,
+                      boxShadow: alertsFeedTab === tab.key ? `0 0 0 2px ${alpha(tab.color, 0.25)}` : "none",
                       "& .MuiChip-label": { px: 0.75 },
                     }}
                   />
