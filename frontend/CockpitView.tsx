@@ -2010,7 +2010,7 @@ function RecentAlerts({
               size="small"
               variant="outlined"
               sx={{ fontSize: "8px", py: "1px", px: "6px" }}
-              onClick={() => { if (!disableExternalNav) navigate("/fleet-health#alerts-feed"); }}
+              onClick={() => { if (!disableExternalNav) navigate("/fleet-health?alertsTab=open#alerts-feed"); }}
             >
               View All
             </Button>
@@ -2130,7 +2130,7 @@ function RecentAlerts({
       )}
       {!loading && total > displayed.length && displayed.length > 0 && (
         <Box
-          onClick={() => { if (!disableExternalNav) navigate("/fleet-health#alerts-feed"); }}
+          onClick={() => { if (!disableExternalNav) navigate("/fleet-health?alertsTab=open#alerts-feed"); }}
           sx={{
             mt: 0.3,
             textAlign: "center",
@@ -4426,18 +4426,21 @@ export default function CockpitView({
       value: criticalAlertCount,
       color: "#ef4444",
       reason: `${criticalAlertCount} open alerts with anomaly score ≥ 0.8 require immediate triage.`,
+      alertsTab: "critical",
     },
     {
       label: "Warning Alerts",
       value: warningAlertCount,
       color: "#f59e0b",
       reason: `${warningAlertCount} open alerts with anomaly score 0.5–0.8 have risk signals that can escalate.`,
+      alertsTab: "warning",
     },
     {
       label: "Resolved Today",
       value: 0,
       color: "#3b82f6",
       reason: "Resolved-alert history is not yet tracked by the alerts backend.",
+      alertsTab: "resolved",
     },
   ];
 
@@ -5276,7 +5279,7 @@ export default function CockpitView({
             color="#ef4444"
             trend="down"
             iconLogo={true}
-            onClick={disableExternalNav ? undefined : () => navigate("/fleet-health#alerts-feed")}
+            onClick={disableExternalNav ? undefined : () => navigate("/fleet-health?alertsTab=open#alerts-feed")}
           />
         </Box>
 
@@ -5940,6 +5943,14 @@ export default function CockpitView({
                                   placement="top"
                                 >
                                   <Box
+                                    onClick={
+                                      disableExternalNav
+                                        ? undefined
+                                        : (e) => {
+                                            e.stopPropagation();
+                                            navigate(`/fleet-health?alertsTab=${(row as any).alertsTab}#alerts-feed`);
+                                          }
+                                    }
                                     sx={{
                                       display: "grid",
                                       gridTemplateColumns: "24px 1fr auto",
@@ -5948,6 +5959,8 @@ export default function CockpitView({
                                       px: 0.65,
                                       py: 0.55,
                                       borderRadius: 1,
+                                      cursor: disableExternalNav ? "default" : "pointer",
+                                      transition: "border-color 0.15s, transform 0.15s",
                                       bgcolor: alpha(
                                         row.color,
                                         isDark ? 0.13 : 0.08
@@ -5956,6 +5969,12 @@ export default function CockpitView({
                                         row.color,
                                         0.12
                                       )}`,
+                                      ...(!disableExternalNav && {
+                                        "&:hover": {
+                                          borderColor: alpha(row.color, 0.5),
+                                          transform: "translateY(-1px)",
+                                        },
+                                      }),
                                     }}
                                   >
                                     <Box
