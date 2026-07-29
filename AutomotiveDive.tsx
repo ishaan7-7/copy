@@ -861,8 +861,31 @@ export default function AutomotiveDive({
       axios.post(`${API}/api/alerts/resolve/${encodeURIComponent(alert.alert_id)}`, null, {
         params: { source_id: selectedVehicle, module: alert.module },
       }),
+    // Optimistic: get_vehicle_alerts's own live cache only refreshes on its
+    // background loop's cadence, which can lag far more than a few seconds
+    // on a device with a large accumulated alert backlog — without this the
+    // Resolve button looked like it did nothing until that cache caught up.
+    // Patch this vehicle's query locally first so the row flips to Resolved
+    // immediately; other pages reading the same alert reconcile with the
+    // real server state via their own poll intervals shortly after.
+    onMutate: async (alert: any) => {
+      const key = ["autoVehicleAlerts", selectedVehicle];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<any>(key);
+      if (previous) {
+        const moved = (previous.open ?? []).find((a: any) => a.alert_id === alert.alert_id);
+        queryClient.setQueryData(key, {
+          ...previous,
+          open: (previous.open ?? []).filter((a: any) => a.alert_id !== alert.alert_id),
+          closed: moved ? [{ ...moved, status: "CLOSED" }, ...(previous.closed ?? [])] : previous.closed,
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _alert, context) => {
+      if (context?.previous) queryClient.setQueryData(["autoVehicleAlerts", selectedVehicle], context.previous);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["autoVehicleAlerts"] });
       queryClient.invalidateQueries({ queryKey: ["histAlerts"] });
       queryClient.invalidateQueries({ queryKey: ["alertsMetrics"] });
     },
