@@ -220,10 +220,6 @@ interface BatchResult {
   leftAfterCap: number;
 }
 
-function normPeakTs(ts: string): string {
-  return String(ts || "").slice(0, 16).replace(" ", "T");
-}
-
 function alertSeverity(score: number): "CRITICAL" | "WARNING" | "LOW" {
   if (score >= 0.8) return "CRITICAL";
   if (score >= 0.5) return "WARNING";
@@ -842,30 +838,25 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
 
   useEffect(() => { setAlertsPage(0); }, [alertsFeedTab, alertsSearch]);
 
-  const dtcHistoryRuns: any[] = dtcHistQuery.data?.runs ?? [];
-  const analyzedKeySet = useMemo(
-    () => new Set(dtcHistoryRuns.map((r: any) => `${r.source_id}|${r.module}|${normPeakTs(r.peak_ts)}`)),
-    [dtcHistQuery.data]
-  );
-
   const alertCoverage = useMemo(() => {
-    // Count each open alert individually — matching what the Alerts Feed
-    // table itself displays. Previously this deduped down to one alert per
-    // (vehicle, module) pair, which silently discarded any older alert
-    // sharing that pair (e.g. stale unanalyzed alerts sitting behind a
-    // newer, already-analyzed one for the same vehicle+module), making
-    // "remaining to analyze" wildly undercount vs. the feed's own
-    // "Unanalyzed" total.
-    const analyzed = openAlerts.filter((a: any) =>
-      analyzedKeySet.has(`${a.source_id}|${a.module}|${normPeakTs(a.peak_anomaly_ts)}`)
-    ).length;
+    // Count each open alert individually using the backend-computed
+    // `analyzed` field already on every AlertEntry (alerts_service/api.py's
+    // own dtc_history.json lookup, refreshed every 5s server-side and
+    // polled every 20s here — the same freshness the Alerts Feed table's
+    // own "Unanalyzed" column already relies on). Previously this recomputed
+    // "analyzed" independently client-side from a separate dtcHistQuery
+    // that only refreshes every 120s, so right after running a batch (or
+    // as new alerts arrived) this count and the feed's own count could
+    // disagree for up to two minutes even though both ultimately read the
+    // same underlying data.
+    const analyzed = openAlerts.filter((a: any) => a.analyzed).length;
     return { analyzed, total: openAlerts.length, remaining: openAlerts.length - analyzed };
-  }, [openAlerts, analyzedKeySet]);
+  }, [openAlerts]);
 
   const handleLoadLatest = async () => {
     if (batchRunning) return;
     const toAnalyze = openAlerts
-      .filter((a: any) => !analyzedKeySet.has(`${a.source_id}|${a.module}|${normPeakTs(a.peak_anomaly_ts)}`))
+      .filter((a: any) => !a.analyzed)
       .sort((a, b) => (b.max_composite_score ?? 0) - (a.max_composite_score ?? 0));
 
     const queued = toAnalyze.slice(0, BATCH_CAP);
@@ -1637,6 +1628,25 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
             accent={accentAmber}
             right={
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {alertCoverage.total > 0 && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                    <Chip
+                      label={`${alertCoverage.remaining} Unanalyzed`}
+                      size="small"
+                      sx={{
+                        height: 18, fontSize: "9px", fontWeight: 700,
+                        bgcolor: alertCoverage.remaining > 0 ? alpha(accentAmber, 0.12) : alpha("#22c55e", 0.12),
+                        color: alertCoverage.remaining > 0 ? accentAmber : "#22c55e",
+                        "& .MuiChip-label": { px: 0.75 },
+                      }}
+                    />
+                    <Chip
+                      label={`${alertCoverage.analyzed} / ${alertCoverage.total} Analyzed`}
+                      size="small"
+                      sx={{ height: 18, fontSize: "9px", fontWeight: 700, bgcolor: alpha("#38bdf8", 0.12), color: "#38bdf8", "& .MuiChip-label": { px: 0.75 } }}
+                    />
+                  </Box>
+                )}
                 <Button
                   size="small"
                   disabled={batchRunning || alertCoverage.remaining === 0}
@@ -1712,7 +1722,10 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
             </Box>
           )}
           {!batchRunning && batchResult && (
-            <Box sx={{ mb: 1.5, display: "flex", gap: 1 }}>
+            <Box sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography sx={{ fontSize: "9px", fontWeight: 700, color: isDark ? "#64748b" : "#94a3b8", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                Last run:
+              </Typography>
               <Chip
                 label={`${batchResult.analyzed} analyzed`}
                 size="small"
