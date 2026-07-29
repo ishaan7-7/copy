@@ -91,6 +91,15 @@ def _sync_update_alerts():
             resolved_mtime = os.path.getmtime(alert_resolutions.RESOLVED_ALERTS_FILE)
             if resolved_mtime > current_mtime:
                 current_mtime = resolved_mtime
+        # Running a DTC analysis only touches DTC_HISTORY_FILE — it never
+        # writes a new alerts parquet or resolves anything — so without
+        # this, "analyzed" status changes were invisible to this guard and
+        # the cache's a.analyzed field stayed stale until some unrelated
+        # alert/resolve event happened to bump one of the mtimes above.
+        if os.path.exists(DTC_HISTORY_FILE):
+            dtc_mtime = os.path.getmtime(DTC_HISTORY_FILE)
+            if dtc_mtime > current_mtime:
+                current_mtime = dtc_mtime
 
         if current_mtime > 0 and current_mtime <= _last_alerts_mtime:
             return
