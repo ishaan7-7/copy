@@ -10007,7 +10007,10 @@ export default function CockpitView({
                           </Box>
                         </Box>
                       ))
-                    : aiExecutiveInsights.slice(0, 6).map((insight) => (
+                    : aiExecutiveInsights
+                        .filter((insight) => insight.label !== "Driver requiring coaching")
+                        .slice(0, 6)
+                        .map((insight) => (
                         <Box
                           key={insight.label}
                           sx={{
@@ -10041,17 +10044,19 @@ export default function CockpitView({
                               </Box>{" "}
                               {firstSentence(insight.detail)}
                             </Typography>
-                            <Typography
-                              sx={{
-                                mt: 0.2,
-                                fontSize: 10.5,
-                                lineHeight: 1.4,
-                                fontWeight: 750,
-                                color: isDark ? "#dbeafe" : "#334155",
-                              }}
-                            >
-                              {insight.action}
-                            </Typography>
+                            {insight.label !== "Fleet condition" && (
+                              <Typography
+                                sx={{
+                                  mt: 0.2,
+                                  fontSize: 10.5,
+                                  lineHeight: 1.4,
+                                  fontWeight: 750,
+                                  color: isDark ? "#dbeafe" : "#334155",
+                                }}
+                              >
+                                {insight.action}
+                              </Typography>
+                            )}
                           </Box>
                         </Box>
                       ))}
