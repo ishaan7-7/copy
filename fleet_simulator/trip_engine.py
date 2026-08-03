@@ -131,6 +131,9 @@ class TripEngine:
     def _route_key_for(self, v: dict) -> str:
         return v["route"] if self.region == "india" else v["route_us"]
 
+    def _driver_for(self, v: dict) -> str:
+        return v["driver"] if self.region == "india" else v.get("driver_us", v["driver"])
+
     def _build_route_ranks(self) -> None:
         self._route_vehicle_count = defaultdict(int)
         self._route_vehicle_rank = {}
@@ -487,7 +490,7 @@ class TripEngine:
                     "speed": round(st.current_speed, 1),
                     "health": v["health"],
                     "engine_health": round(v.get("module_health", {}).get("engine", v["health"]), 1),
-                    "driver": v["driver"],
+                    "driver": self._driver_for(v),
                     "driver_score": round(st.behavior.score, 1),
                     "road_type": pt.road_type,
                     "route_name": st.route.name,
@@ -504,7 +507,7 @@ class TripEngine:
                     "speed": 0,
                     "health": v["health"],
                     "engine_health": round(v.get("module_health", {}).get("engine", v["health"]), 1),
-                    "driver": v["driver"],
+                    "driver": self._driver_for(v),
                     "driver_score": 100.0,
                     "road_type": "",
                     "route_name": v.get("city", ""),
@@ -523,7 +526,7 @@ class TripEngine:
             "status": v["status"],
             "health": v["health"],
             "composite": v.get("composite", 0),
-            "driver": v["driver"],
+            "driver": self._driver_for(v),
             "module_health": v.get("module_health", {}),
             "city": v.get("city", ""),
         }
