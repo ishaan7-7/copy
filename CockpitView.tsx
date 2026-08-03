@@ -3521,7 +3521,7 @@ export default function CockpitView({
       (v) => v.status === "active" && v.engine_health != null
     );
     if (!active.length) return 0;
-    return Math.round(
+    return Math.round( 
       active.reduce((s, v) => s + (v.engine_health ?? 0), 0) / active.length
     );
   }, [positions]);
@@ -5555,7 +5555,7 @@ export default function CockpitView({
                       <Box
                         sx={{
                           position: "absolute",
-                          top: 10,
+                          bottom: 10,
                           right: 10,
                           zIndex: 1001,
                           display: "flex",
@@ -6613,48 +6613,9 @@ export default function CockpitView({
                 <Typography sx={{ fontSize: 14, fontWeight: 800 }}>
                   Fleet Map
                 </Typography>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Tooltip title="Switch dashboard region" arrow>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        borderRadius: "999px",
-                        overflow: "hidden",
-                        opacity: 0.85,
-                        bgcolor: isDark ? "rgba(15,23,42,0.8)" : "rgba(241,245,249,0.9)",
-                        border: `1px solid ${isDark ? "rgba(148,163,184,0.3)" : "rgba(148,163,184,0.45)"}`,
-                        "&:hover": { opacity: 1 },
-                      }}
-                    >
-                      {(["india", "america"] as Region[]).map((r) => (
-                        <Box
-                          key={r}
-                          onClick={() => {
-                            if (r !== region && !regionMutation.isPending) regionMutation.mutate(r);
-                          }}
-                          sx={{
-                            px: 1,
-                            py: 0.25,
-                            fontSize: 8.5,
-                            fontWeight: 800,
-                            letterSpacing: 0.3,
-                            lineHeight: 1.6,
-                            cursor: regionMutation.isPending ? "wait" : "pointer",
-                            userSelect: "none",
-                            color: region === r ? "#fff" : isDark ? "#94a3b8" : "#64748b",
-                            bgcolor: region === r ? "#3b82f6" : "transparent",
-                            transition: "background-color 0.15s, color 0.15s",
-                          }}
-                        >
-                          {r === "india" ? "IN" : "US"}
-                        </Box>
-                      ))}
-                    </Box>
-                  </Tooltip>
-                  <IconButton size="small" onClick={() => setOpenFleetMap(false)}>
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
+                <IconButton size="small" onClick={() => setOpenFleetMap(false)}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
               </Box>
               <DialogContent
                 sx={{
@@ -6793,6 +6754,48 @@ export default function CockpitView({
                     </>
                   )}
                 </MapContainer>
+                <Tooltip title="Switch dashboard region" arrow>
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      bottom: 18,
+                      right: 18,
+                      zIndex: 1001,
+                      display: "flex",
+                      borderRadius: "999px",
+                      overflow: "hidden",
+                      opacity: 0.85,
+                      bgcolor: isDark ? "rgba(15,23,42,0.8)" : "rgba(255,255,255,0.9)",
+                      border: `1px solid ${isDark ? "rgba(148,163,184,0.3)" : "rgba(148,163,184,0.45)"}`,
+                      boxShadow: `0 2px 6px ${alpha("#000", isDark ? 0.3 : 0.15)}`,
+                      "&:hover": { opacity: 1 },
+                    }}
+                  >
+                    {(["india", "america"] as Region[]).map((r) => (
+                      <Box
+                        key={r}
+                        onClick={() => {
+                          if (r !== region && !regionMutation.isPending) regionMutation.mutate(r);
+                        }}
+                        sx={{
+                          px: 1,
+                          py: 0.25,
+                          fontSize: 8.5,
+                          fontWeight: 800,
+                          letterSpacing: 0.3,
+                          lineHeight: 1.6,
+                          cursor: regionMutation.isPending ? "wait" : "pointer",
+                          userSelect: "none",
+                          color: region === r ? "#fff" : isDark ? "#94a3b8" : "#64748b",
+                          bgcolor: region === r ? "#3b82f6" : "transparent",
+                          transition: "background-color 0.15s, color 0.15s",
+                        }}
+                      >
+                        {r === "india" ? "IN" : "US"}
+                      </Box>
+                    ))}
+                  </Box>
+                </Tooltip>
                 <Paper
                   elevation={0}
                   sx={{

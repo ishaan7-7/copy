@@ -158,6 +158,18 @@ async def fleet_positions():
         if vid in _computed:
             ls = _computed[vid].get("last_state", {})
             ds = _computed[vid].get("driver_summary", {})
+            # fleet_config only ever carries one static parked/in_service
+            # position (India) — for non-active vehicles the real position is
+            # last_state.json, which precompute_history.py generates per
+            # region. Overriding lat/lng/route_name (not just driver_score)
+            # is what keeps a parked US vehicle from rendering at its old
+            # Indian coordinates, off the visible US map entirely.
+            if ls.get("lat") is not None:
+                pos["lat"] = ls["lat"]
+            if ls.get("lng") is not None:
+                pos["lng"] = ls["lng"]
+            if ls.get("route_name"):
+                pos["route_name"] = ls["route_name"]
             pos["driver_score"] = ds.get("score", ls.get("driver_score", 100.0))
     return positions
 

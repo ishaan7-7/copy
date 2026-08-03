@@ -12,6 +12,16 @@ from behavior_engine import (
 )
 
 
+# precompute_history.py's independent event model (_BRAKE_PER_KM etc.) generates
+# harsh events at a combined rate of roughly 0.13-0.28 per km. This simulator's
+# own event-injection formula (0.1 * driver_aggression * distance_km) only
+# produced ~0.03-0.13 per km before this scale factor — driver_score.py's
+# shared formula was calibrated against precompute's rate, so without this the
+# live fleet under-generated events and every active vehicle's score sat
+# near 100 regardless of the scoring formula itself. 3.5x brings the two
+# independently-authored event models back into rate parity.
+EVENT_RATE_SCALE = 3.5
+
 U_CRUISE_MIN, U_CRUISE_MAX = 16.0, 36.0
 U_CRUISE_DUR  = (45, 240)
 U_RAMP_DUR    = (10, 25)
@@ -195,93 +205,114 @@ class TripEngine:
 
     def _backfill_trip_history(self, state: VehicleState):
         pts = state.route.points
-        end_idx = state.position_index
+        n_pts = len(pts)
+        if n_pts < 2:
+            return
         agg = state.driver_aggression
 
-        sample_step = max(1, end_idx // 600)
+        # A fresh live vehicle otherwise starts every score at 100 and only
+        # reaches a realistic steady-state rate after real playback time —
+        # backfilling just the single partial pass up to position_index (a
+        # few tens of km on a short route) wasn't enough distance for the
+        # harsh-event rate to converge, so nearly every vehicle showed a
+        # near-100 score right after startup/region-switch regardless of the
+        # scoring formula. Simulating a proper multi-trip-scale history here
+        # (matching the ~450-3000km used to calibrate precompute_history.py's
+        # historical vehicles) makes cold start already reflect the same
+        # realistic spread instead of only converging after hours of runtime.
+        target_km = random.uniform(500.0, 1500.0)
+        max_outer_loops = 20
+
+        sample_step = max(1, n_pts // 600)
         prev_speed = pts[0].speed_target_kmh
         ticks_since = 10
+        running_km = 0.0
+        outer_loops = 0
 
-        for i in range(0, end_idx, sample_step):
-            pt = pts[i]
-            speed = pt.speed_target_kmh + random.gauss(0, 4)
-            speed = max(0.0, speed)
-            cum_km = pt.cumulative_km
+        while state.behavior.total_distance_km < target_km and outer_loops < max_outer_loops:
+            outer_loops += 1
+            for i in range(0, n_pts, sample_step):
+                if state.behavior.total_distance_km >= target_km:
+                    break
+                pt = pts[i]
+                speed = pt.speed_target_kmh + random.gauss(0, 4)
+                speed = max(0.0, speed)
 
-            if i > 0:
-                prev_pt = pts[max(0, i - sample_step)]
-                seg_dist_m = _haversine_km(prev_pt.lat, prev_pt.lng, pt.lat, pt.lng) * 1000
-            else:
-                seg_dist_m = 50.0
-
-            seg_dist_km = seg_dist_m / 1000.0
-            delta_speed = speed - prev_speed
-            base_acc_x = (delta_speed / 3.6) / (1.0 * 9.81) + random.gauss(0, 0.02)
-            base_acc_y = random.gauss(0, 0.04)
-
-            ticks_since += 1
-            event_chance = 0.1 * agg * seg_dist_km
-            if pt.road_type == "urban":
-                event_chance *= 2.0
-            elif pt.road_type == "primary":
-                event_chance *= 1.4
-            if ticks_since < 10:
-                event_chance *= 0.05
-
-            acc_x = base_acc_x
-            acc_y = base_acc_y
-            event_fired = False
-            evt_type = ""
-
-            if random.random() < event_chance:
-                ticks_since = 0
-                roll = random.random()
-                if roll < 0.40:
-                    acc_x = random.uniform(-0.55, -0.36) * (0.7 + 0.6 * agg)
-                    evt_type = "braking"
-                elif roll < 0.70:
-                    acc_x = random.uniform(0.26, 0.45) * (0.7 + 0.6 * agg)
-                    evt_type = "accel"
+                if i > 0:
+                    prev_pt = pts[max(0, i - sample_step)]
+                    seg_dist_m = _haversine_km(prev_pt.lat, prev_pt.lng, pt.lat, pt.lng) * 1000
                 else:
-                    sign = random.choice([-1, 1])
-                    threshold = 0.25 if pt.road_type == "highway" else 0.45
-                    acc_y = sign * random.uniform(threshold + 0.02, threshold + 0.25) * (0.7 + 0.6 * agg)
-                    evt_type = "cornering"
+                    seg_dist_m = 50.0
 
-                events = detect_events(acc_x, acc_y, speed, pt.road_type, delta_speed)
-                if any(events.values()):
-                    event_fired = True
-                    state.event_markers.append({
-                        "lat": round(pt.lat + random.gauss(0, 0.00005), 6),
-                        "lng": round(pt.lng + random.gauss(0, 0.00005), 6),
-                        "type": evt_type,
-                        "acc_x": round(acc_x, 3),
-                        "acc_y": round(acc_y, 3),
-                        "speed": round(speed, 1),
-                        "distance_km": round(cum_km, 2),
-                    })
+                seg_dist_km = seg_dist_m / 1000.0
+                running_km += seg_dist_km
+                delta_speed = speed - prev_speed
+                base_acc_x = (delta_speed / 3.6) / (1.0 * 9.81) + random.gauss(0, 0.02)
+                base_acc_y = random.gauss(0, 0.04)
 
-            acc_x = max(-1.5, min(1.5, acc_x))
-            acc_y = max(-1.5, min(1.5, acc_y))
+                ticks_since += 1
+                event_chance = EVENT_RATE_SCALE * 0.1 * agg * seg_dist_km
+                if pt.road_type == "urban":
+                    event_chance *= 2.0
+                elif pt.road_type == "primary":
+                    event_chance *= 1.4
+                if ticks_since < 10:
+                    event_chance *= 0.05
 
-            evt_dict = {
-                "harsh_braking": event_fired and evt_type == "braking",
-                "harsh_accel":   event_fired and evt_type == "accel",
-                "harsh_cornering": event_fired and evt_type == "cornering",
-            } if event_fired else {"harsh_braking": False, "harsh_accel": False, "harsh_cornering": False}
+                acc_x = base_acc_x
+                acc_y = base_acc_y
+                event_fired = False
+                evt_type = ""
 
-            update_behavior(
-                state.behavior, evt_dict, seg_dist_m,
-                cum_km, speed, pt.road_type, acc_x, acc_y,
-            )
+                if random.random() < event_chance:
+                    ticks_since = 0
+                    roll = random.random()
+                    if roll < 0.40:
+                        acc_x = random.uniform(-0.55, -0.36) * (0.7 + 0.6 * agg)
+                        evt_type = "braking"
+                    elif roll < 0.70:
+                        acc_x = random.uniform(0.26, 0.45) * (0.7 + 0.6 * agg)
+                        evt_type = "accel"
+                    else:
+                        sign = random.choice([-1, 1])
+                        threshold = 0.25 if pt.road_type == "highway" else 0.45
+                        acc_y = sign * random.uniform(threshold + 0.02, threshold + 0.25) * (0.7 + 0.6 * agg)
+                        evt_type = "cornering"
 
-            prev_speed = speed
+                    events = detect_events(acc_x, acc_y, speed, pt.road_type, delta_speed)
+                    if any(events.values()):
+                        event_fired = True
+                        state.event_markers.append({
+                            "lat": round(pt.lat + random.gauss(0, 0.00005), 6),
+                            "lng": round(pt.lng + random.gauss(0, 0.00005), 6),
+                            "type": evt_type,
+                            "acc_x": round(acc_x, 3),
+                            "acc_y": round(acc_y, 3),
+                            "speed": round(speed, 1),
+                            "distance_km": round(running_km, 2),
+                        })
+
+                acc_x = max(-1.5, min(1.5, acc_x))
+                acc_y = max(-1.5, min(1.5, acc_y))
+
+                evt_dict = {
+                    "harsh_braking": event_fired and evt_type == "braking",
+                    "harsh_accel":   event_fired and evt_type == "accel",
+                    "harsh_cornering": event_fired and evt_type == "cornering",
+                } if event_fired else {"harsh_braking": False, "harsh_accel": False, "harsh_cornering": False}
+
+                update_behavior(
+                    state.behavior, evt_dict, seg_dist_m,
+                    running_km, speed, pt.road_type, acc_x, acc_y,
+                )
+
+                prev_speed = speed
 
     def _inject_driving_perturbation(self, state: VehicleState, road_type: str, distance_km: float) -> tuple[float, float]:
         agg = state.driver_aggression
         state.ticks_since_event += 1
 
-        base_event_chance = 0.1 * agg * distance_km
+        base_event_chance = EVENT_RATE_SCALE * 0.1 * agg * distance_km
         if road_type == "urban":
             base_event_chance *= 2.0
         elif road_type == "primary":
