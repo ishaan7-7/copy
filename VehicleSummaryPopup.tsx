@@ -187,7 +187,9 @@ export default function VehicleSummaryPopup({
           return { ...(prev ?? {}), runs: [newRun, ...filtered] };
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["vehDtcHistoryPopup", vehicleId] });
+      // No invalidateQueries here — same reasoning as FleetAlertsPopup: an
+      // immediate refetch risks racing the write and clobbering the patch
+      // above; the existing 15s poll reconciles with the server later.
     } catch {
       // Swallow — row stays unanalyzed, button re-enables for retry
     } finally {
@@ -222,8 +224,12 @@ export default function VehicleSummaryPopup({
       const inMod = topDrivers.filter((d) => d.module === mod).sort((a, b) => b.score - a.score);
       return inMod[0] ?? null;
     }).filter(Boolean) as any[];
-    const maxScore = Math.max(...best.map((d) => d.score), 1);
-    return best.map((d) => ({ ...d, pct: maxScore > 0 ? (d.score / maxScore) * 100 : 0 }));
+    // Raw anomaly magnitude can differ by orders of magnitude across
+    // modules, so a linear ratio against the max routinely rounded the
+    // smaller two down to a visually-dead 0%. log1p compresses that range
+    // so all three read as meaningfully non-zero, with a floor as a backstop.
+    const maxLog = Math.max(...best.map((d) => Math.log1p(d.score)), 1e-6);
+    return best.map((d) => ({ ...d, pct: maxLog > 0 ? Math.max(4, (Math.log1p(d.score) / maxLog) * 100) : 0 }));
   }, [topDrivers]);
 
   const healthChartData = useMemo(() => {
@@ -378,10 +384,16 @@ export default function VehicleSummaryPopup({
           </Box>
         ) : (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            {/* ROW 1: 3 columns */}
-            <Box sx={{ display: "flex", gap: 1, alignItems: "stretch", height: 460 }}>
+            {/* ROW 1: 3 columns — deliberately no explicit height here. With
+                alignItems:"stretch" (default) and no height on this row or
+                its column children, the row auto-sizes to the tallest
+                column's natural content height and the other two stretch to
+                match exactly that — the standard equal-height-columns flex
+                trick. A hardcoded height here previously left a lot of dead
+                space below the shorter columns' content. */}
+            <Box sx={{ display: "flex", gap: 1, alignItems: "stretch" }}>
               {/* Col A: Health Trend + Top Anomaly Drivers */}
-              <Box sx={{ flex: "0 0 36%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0, height: "100%" }}>
+              <Box sx={{ flex: "0 0 36%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0 }}>
                 <Box sx={{ ...cardSx, flexShrink: 0 }}>
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
@@ -469,7 +481,7 @@ export default function VehicleSummaryPopup({
               </Box>
 
               {/* Col B: Service Info + Active Trip + Driver Behavior merged */}
-              <Box sx={{ flex: "0 0 32%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0, height: "100%" }}>
+              <Box sx={{ flex: "0 0 32%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0 }}>
                 <Box sx={{ ...cardSx, flex: 1, display: "flex", flexDirection: "column", gap: 1.25, minHeight: 0, overflow: "auto" }}>
                   {sectionLabel("#f59e0b", "Service, Trip & Driver", <BuildRoundedIcon sx={{ fontSize: 12, color: "#f59e0b" }} />)}
 
@@ -554,7 +566,7 @@ export default function VehicleSummaryPopup({
               </Box>
 
               {/* Col C: Module Health + Recent DTC */}
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0, height: "100%" }}>
+              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0 }}>
                 <Box sx={{ ...cardSx, flexShrink: 0 }}>
                   {sectionLabel("#38bdf8", "Module Health", <FavoriteRoundedIcon sx={{ fontSize: 12, color: "#38bdf8" }} />)}
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 0.65 }}>
@@ -586,7 +598,7 @@ export default function VehicleSummaryPopup({
                       <Typography sx={{ fontSize: 11, color: "text.secondary" }}>No DTC present</Typography>
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, minHeight: 0, overflow: "auto" }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, minHeight: 0, maxHeight: 200, overflow: "auto" }}>
                       {dtcTriggers.map((t: any, i: number) => {
                         const isCrit = t.severity === "CRITICAL";
                         const sevColor = isCrit ? "#ef4444" : "#f59e0b";
@@ -641,7 +653,7 @@ export default function VehicleSummaryPopup({
                   <Typography sx={{ fontSize: 11, color: "text.secondary" }}>No alerts for this vehicle</Typography>
                 </Box>
               ) : (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9, p: 1.5, pt: 0, maxHeight: 260, overflow: "auto" }}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9, p: 1.5, pt: 0, maxHeight: 420, overflow: "auto" }}>
                   {allVehicleAlerts.map((a: any, i: number) => {
                     const isOpenAlert = a.status === "OPEN";
                     const isAnalyzed = dtcRunMap[`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`] != null;
