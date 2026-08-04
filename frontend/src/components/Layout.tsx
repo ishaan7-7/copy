@@ -28,6 +28,7 @@ import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import { useStore } from "../store";
 import exlLogo from "../images/exl-logo.png";
 import CockpitView from "../pages/CockpitView";
+import CockpitViewExecutive from "../pages/CockpitView_Executive";
 import FleetHealth from "../pages/FleetHealth";
 import AutomotiveDive from "../pages/AutomotiveDive";
 import DtcInvestigation from "../pages/DtcInvestigation";
@@ -541,7 +542,11 @@ export default function Layout() {
       >
         {visited("/") && (
           <Box data-app-page-scroll="" sx={{ ...hide(isCockpit), height: "100%", minHeight: 0, overflow: "auto" }}>
-            <CockpitView isActive={isCockpit} disableExternalNav={currentRole === "executive"} />
+            {currentRole === "executive" ? (
+              <CockpitViewExecutive isActive={isCockpit} />
+            ) : (
+              <CockpitView isActive={isCockpit} />
+            )}
           </Box>
         )}
         {visited("/fleet-health") && (
