@@ -194,10 +194,26 @@ def _select_dtcs(
     return dtcs
 
 
+# Mirrors alerts_service/src/alert_engine.py's _MODULE_ACCEPT_PROBABILITY —
+# real fleets don't get bombarded with body/tyre alerts at the same rate as
+# engine/transmission ones, so a critical DTC on those modules only becomes
+# a visible alert some of the time, keeping the historical mix consistent
+# with what the live alert engine now produces.
+_MODULE_ALERT_ACCEPT_PROBABILITY = {
+    "engine": 1.0,
+    "transmission": 0.9,
+    "battery": 0.55,
+    "body": 0.12,
+    "tyre": 0.12,
+}
+
+
 def _select_alerts(vehicle_id: str, dtcs: list[dict], rng: np.random.Generator) -> list[dict]:
     alerts: list[dict] = []
     for dtc in dtcs:
         if dtc["severity"] != "critical":
+            continue
+        if rng.random() >= _MODULE_ALERT_ACCEPT_PROBABILITY.get(dtc["module"], 1.0):
             continue
         dtc_start = pd.Timestamp(dtc["first_seen_ts"])
         dtc_end = pd.Timestamp(dtc["last_seen_ts"])
