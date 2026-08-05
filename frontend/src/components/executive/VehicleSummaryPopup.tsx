@@ -8,6 +8,8 @@ import {
   Stack,
   Button,
   CircularProgress,
+  ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -21,6 +23,7 @@ import {
   Tooltip as RTooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Brush,
 } from "recharts";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -66,6 +69,17 @@ function findSensor(sensors: any[], key: string) {
   return sensors.find((s: any) => s.key === key) ?? null;
 }
 
+function formatXTick(val: string | number, mode: "timestamp" | "mileage"): string {
+  if (mode === "mileage") {
+    const km = Math.round(Number(val));
+    return km >= 1000 ? `${(km / 1000).toFixed(1)}k` : `${km}`;
+  }
+  const s = String(val);
+  if (s.includes("T")) return s.slice(5, 16).replace("T", " ");
+  if (s.length >= 16) return s.slice(5, 16);
+  return s;
+}
+
 export default function VehicleSummaryPopup({
   open,
   onClose,
@@ -80,6 +94,7 @@ export default function VehicleSummaryPopup({
   const region = useStore((s) => s.region);
   const queryClient = useQueryClient();
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [xAxisMode, setXAxisMode] = useState<"timestamp" | "mileage">("timestamp");
 
   const enabled = open && !!vehicleId;
 
@@ -148,12 +163,33 @@ export default function VehicleSummaryPopup({
   const handleInvestigate = async (alert: any) => {
     setAnalyzingId(alert.alert_id);
     try {
-      await axios.get(`${API}/api/dtc/analyze`, {
+      const { data } = await axios.get(`${API}/api/dtc/analyze`, {
         params: { source_id: vehicleId, module: alert.module, peak_ts: alert.peak_anomaly_ts },
         timeout: 70000,
       });
-      await queryClient.invalidateQueries({ queryKey: ["vehDtcHistoryPopup", vehicleId] });
-      await queryClient.refetchQueries({ queryKey: ["vehDtcHistoryPopup", vehicleId] });
+      // Patch the analyze response straight into the dtc-history cache
+      // instead of relying on a refetch landing after the write — same fix
+      // as FleetAlertsPopup, so the row updates on the first click.
+      if (data?.success) {
+        const norm = (ts: string) => String(ts || "").slice(0, 16).replace(" ", "T");
+        queryClient.setQueryData<any>(["vehDtcHistoryPopup", vehicleId], (prev: any) => {
+          const runs: any[] = prev?.runs ?? [];
+          const filtered = runs.filter(
+            (r: any) => !(r.module === alert.module && norm(r.peak_ts) === norm(alert.peak_anomaly_ts))
+          );
+          const newRun = {
+            source_id: vehicleId,
+            module: alert.module,
+            peak_ts: alert.peak_anomaly_ts,
+            run_ts: new Date().toISOString(),
+            triggers: data.triggers ?? [],
+          };
+          return { ...(prev ?? {}), runs: [newRun, ...filtered] };
+        });
+      }
+      // No invalidateQueries here — same reasoning as FleetAlertsPopup: an
+      // immediate refetch risks racing the write and clobbering the patch
+      // above; the existing 15s poll reconciles with the server later.
     } catch {
       // Swallow — row stays unanalyzed, button re-enables for retry
     } finally {
@@ -180,23 +216,31 @@ export default function VehicleSummaryPopup({
   const topDrivers: any[] = (summaryData?.top_anomaly_drivers ?? []).filter((d: any) =>
     TOP_DRIVER_MODULES.includes(d.module)
   );
-  const groupedTopDrivers = useMemo(() => {
-    const groups = new Map<string, any[]>();
-    for (const d of topDrivers) {
-      if (!groups.has(d.module)) groups.set(d.module, []);
-      groups.get(d.module)!.push(d);
-    }
-    return TOP_DRIVER_MODULES.filter((m) => groups.has(m)).map((module) => {
-      const drivers = groups.get(module)!;
-      return { module, maxScore: Math.max(...drivers.map((d) => d.score), 1), drivers };
-    });
+  // One driver per module (its highest-scoring feature), scaled against the
+  // other two modules' top score — so at most one row ever reads 100%,
+  // instead of every module's own top driver saturating its own bar.
+  const topDriversFlat = useMemo(() => {
+    const best = TOP_DRIVER_MODULES.map((mod) => {
+      const inMod = topDrivers.filter((d) => d.module === mod).sort((a, b) => b.score - a.score);
+      return inMod[0] ?? null;
+    }).filter(Boolean) as any[];
+    // Raw anomaly magnitude can differ by orders of magnitude across
+    // modules, so a linear ratio against the max routinely rounded the
+    // smaller two down to a visually-dead 0%. log1p compresses that range
+    // so all three read as meaningfully non-zero, with a floor as a backstop.
+    const maxLog = Math.max(...best.map((d) => Math.log1p(d.score)), 1e-6);
+    return best.map((d) => ({ ...d, pct: maxLog > 0 ? Math.max(4, (Math.log1p(d.score) / maxLog) * 100) : 0 }));
   }, [topDrivers]);
 
   const healthChartData = useMemo(() => {
     const raw: any[] = healthHistQuery.data?.data ?? [];
     const factor = Math.max(1, Math.floor(raw.length / 150));
     const sampled = factor === 1 ? raw : raw.filter((_: any, i: number) => i % factor === 0);
-    return sampled.map((r: any) => ({ ts: r.ts || String(r.timestamp || "").slice(5, 16), health: r.health }));
+    return sampled.map((r: any) => ({
+      ts: r.ts || String(r.timestamp || "").slice(5, 16),
+      mileage: r.mileage ?? 0,
+      health: r.health,
+    }));
   }, [healthHistQuery.data]);
 
   const vehicleOpenAlerts: any[] = alertsQuery.data?.open ?? [];
@@ -340,53 +384,94 @@ export default function VehicleSummaryPopup({
           </Box>
         ) : (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            {/* ROW 1: 3 columns */}
+            {/* ROW 1: 3 columns — deliberately no explicit height here. With
+                alignItems:"stretch" (default) and no height on this row or
+                its column children, the row auto-sizes to the tallest
+                column's natural content height and the other two stretch to
+                match exactly that — the standard equal-height-columns flex
+                trick. A hardcoded height here previously left a lot of dead
+                space below the shorter columns' content. */}
             <Box sx={{ display: "flex", gap: 1, alignItems: "stretch" }}>
               {/* Col A: Health Trend + Top Anomaly Drivers */}
-              <Box sx={{ flex: "0 0 36%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                <Box sx={cardSx}>
-                  {sectionLabel("#3b82f6", "Health Trend")}
-                  <ResponsiveContainer width="100%" height={130}>
+              <Box sx={{ flex: "0 0 36%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0 }}>
+                <Box sx={{ ...cardSx, flexShrink: 0 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                      <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#3b82f6" }} />
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: isDark ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                        Health Trend
+                      </Typography>
+                    </Box>
+                    <ToggleButtonGroup
+                      value={xAxisMode}
+                      exclusive
+                      onChange={(_e, val) => val && setXAxisMode(val)}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        "& .MuiToggleButton-root": {
+                          px: 0.75,
+                          py: 0,
+                          minHeight: 20,
+                          borderRadius: 1,
+                          fontSize: 8,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                        },
+                      }}
+                    >
+                      <ToggleButton value="timestamp">Time</ToggleButton>
+                      <ToggleButton value="mileage">Mileage</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+                  <ResponsiveContainer width="100%" height={150}>
                     <LineChart data={healthChartData} margin={{ top: 4, right: 10, left: -25, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? alpha("#334155", 0.5) : "#e2e8f0"} />
-                      <XAxis dataKey="ts" tick={{ fontSize: 8, fill: isDark ? "#64748b" : "#94a3b8" }} axisLine={false} tickLine={false} minTickGap={40} />
+                      <XAxis
+                        dataKey={xAxisMode === "mileage" ? "mileage" : "ts"}
+                        tick={{ fontSize: 8, fill: isDark ? "#64748b" : "#94a3b8" }}
+                        axisLine={false}
+                        tickLine={false}
+                        minTickGap={40}
+                        tickFormatter={(v) => formatXTick(v, xAxisMode)}
+                      />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 8, fill: isDark ? "#64748b" : "#94a3b8" }} axisLine={false} tickLine={false} />
                       <RTooltip formatter={(v: any) => [`${Number(v).toFixed(1)}%`, "Health"]} contentStyle={{ fontSize: 10, borderRadius: 8, background: isDark ? "#0f172a" : "#fff", border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}` }} />
                       <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="4 4" />
                       <ReferenceLine y={80} stroke="#eab308" strokeDasharray="4 4" />
                       <Line type="monotone" dataKey="health" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                      <Brush
+                        dataKey={xAxisMode === "mileage" ? "mileage" : "ts"}
+                        height={16}
+                        stroke={isDark ? alpha("#7dd3fc", 0.5) : alpha("#3b82f6", 0.5)}
+                        fill={isDark ? alpha("#0d2137", 0.85) : alpha("#e2eaf4", 0.9)}
+                        travellerWidth={6}
+                        tickFormatter={(v) => formatXTick(v, xAxisMode)}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </Box>
 
                 <Box sx={{ ...cardSx, flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
                   {sectionLabel("#ef4444", "Top Anomaly Drivers")}
-                  {groupedTopDrivers.length === 0 ? (
+                  {topDriversFlat.length === 0 ? (
                     <Typography sx={{ fontSize: 10, color: "text.secondary", textAlign: "center", py: 2 }}>No anomaly data</Typography>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9 }}>
-                      {groupedTopDrivers.map((group) => {
-                        const modColor = MODULE_COLORS[group.module] || "#0369a1";
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, minHeight: 0, overflow: "auto" }}>
+                      {topDriversFlat.map((d: any, i: number) => {
+                        const modColor = MODULE_COLORS[d.module] || "#0369a1";
                         return (
                           <Box
-                            key={group.module}
-                            sx={{ borderRadius: 1.5, bgcolor: alpha(modColor, isDark ? 0.1 : 0.06), border: `1px solid ${alpha(modColor, 0.22)}`, borderLeft: `3px solid ${modColor}`, p: 0.6, display: "flex", flexDirection: "column", gap: 0.4 }}
+                            key={i}
+                            sx={{ display: "flex", alignItems: "center", gap: 0.9, borderRadius: 1.5, bgcolor: alpha(modColor, isDark ? 0.1 : 0.06), border: `1px solid ${alpha(modColor, 0.22)}`, borderLeft: `3px solid ${modColor}`, p: 0.75 }}
                           >
-                            <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: modColor, textTransform: "uppercase", letterSpacing: 0.5 }}>{group.module}</Typography>
-                            {group.drivers.map((d: any, i: number) => {
-                              const barPct = group.maxScore > 0 ? (d.score / group.maxScore) * 100 : 0;
-                              return (
-                                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.9 }}>
-                                  <Typography sx={{ fontSize: 10, fontWeight: 600, flex: 1, color: isDark ? "#e2e8f0" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {formatFeatureKey(d.feature)}
-                                  </Typography>
-                                  <Box sx={{ width: 60, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.18), flexShrink: 0, position: "relative", overflow: "hidden" }}>
-                                    <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${barPct}%`, bgcolor: modColor, borderRadius: 3 }} />
-                                  </Box>
-                                  <Typography sx={{ fontSize: 9.5, fontWeight: 700, fontFamily: "monospace", width: 32, textAlign: "right", color: modColor, flexShrink: 0 }}>{Math.round(barPct)}%</Typography>
-                                </Box>
-                              );
-                            })}
+                            <Typography sx={{ fontSize: 10, fontWeight: 600, flex: 1, color: isDark ? "#e2e8f0" : "#1e293b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {formatFeatureKey(d.feature)}
+                            </Typography>
+                            <Box sx={{ width: 60, height: 6, borderRadius: 3, bgcolor: alpha(modColor, 0.18), flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                              <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${d.pct}%`, bgcolor: modColor, borderRadius: 3 }} />
+                            </Box>
+                            <Typography sx={{ fontSize: 9.5, fontWeight: 700, fontFamily: "monospace", width: 32, textAlign: "right", color: modColor, flexShrink: 0 }}>{Math.round(d.pct)}%</Typography>
                           </Box>
                         );
                       })}
@@ -396,8 +481,8 @@ export default function VehicleSummaryPopup({
               </Box>
 
               {/* Col B: Service Info + Active Trip + Driver Behavior merged */}
-              <Box sx={{ flex: "0 0 32%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                <Box sx={{ ...cardSx, flex: 1, display: "flex", flexDirection: "column", gap: 1.25 }}>
+              <Box sx={{ flex: "0 0 32%", display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0 }}>
+                <Box sx={{ ...cardSx, flex: 1, display: "flex", flexDirection: "column", gap: 1.25, minHeight: 0, overflow: "auto" }}>
                   {sectionLabel("#f59e0b", "Service, Trip & Driver", <BuildRoundedIcon sx={{ fontSize: 12, color: "#f59e0b" }} />)}
 
                   <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
@@ -443,8 +528,8 @@ export default function VehicleSummaryPopup({
                     </Box>
                   )}
 
-                  <Box sx={{ pt: 1, borderTop: `1px solid ${isDark ? alpha("#334155", 0.5) : alpha("#e2e8f0", 1)}`, flex: 1, display: "flex", flexDirection: "column" }}>
-                    <Stack direction="row" alignItems="center" spacing={0.6} sx={{ mb: 0.6 }}>
+                  <Box sx={{ pt: 1, borderTop: `1px solid ${isDark ? alpha("#334155", 0.5) : alpha("#e2e8f0", 1)}`, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                    <Stack direction="row" alignItems="center" spacing={0.6} sx={{ mb: 0.6, flexShrink: 0 }}>
                       <PersonRoundedIcon sx={{ fontSize: 11, color: "#38bdf8" }} />
                       <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: "#38bdf8", textTransform: "uppercase", letterSpacing: 0.5 }}>Driver Behavior</Typography>
                     </Stack>
@@ -481,8 +566,8 @@ export default function VehicleSummaryPopup({
               </Box>
 
               {/* Col C: Module Health + Recent DTC */}
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                <Box sx={cardSx}>
+              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1, minWidth: 0, minHeight: 0 }}>
+                <Box sx={{ ...cardSx, flexShrink: 0 }}>
                   {sectionLabel("#38bdf8", "Module Health", <FavoriteRoundedIcon sx={{ fontSize: 12, color: "#38bdf8" }} />)}
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 0.65 }}>
                     {["engine", "transmission", "battery", "tyre", "body"].map((mod) => {
@@ -505,7 +590,7 @@ export default function VehicleSummaryPopup({
                   </Box>
                 </Box>
 
-                <Box sx={{ ...cardSx, flex: 1 }}>
+                <Box sx={{ ...cardSx, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                   {sectionLabel("#ef4444", "Recent DTC", <ErrorRoundedIcon sx={{ fontSize: 12, color: "#ef4444" }} />)}
                   {dtcTriggers.length === 0 ? (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75, py: 2.5 }}>
@@ -513,8 +598,8 @@ export default function VehicleSummaryPopup({
                       <Typography sx={{ fontSize: 11, color: "text.secondary" }}>No DTC present</Typography>
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-                      {dtcTriggers.slice(0, 3).map((t: any, i: number) => {
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, minHeight: 0, maxHeight: 200, overflow: "auto" }}>
+                      {dtcTriggers.map((t: any, i: number) => {
                         const isCrit = t.severity === "CRITICAL";
                         const sevColor = isCrit ? "#ef4444" : "#f59e0b";
                         const details = t.code ? getDtcDetails(t.code) : null;
@@ -568,7 +653,7 @@ export default function VehicleSummaryPopup({
                   <Typography sx={{ fontSize: 11, color: "text.secondary" }}>No alerts for this vehicle</Typography>
                 </Box>
               ) : (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9, p: 1.5, pt: 0, maxHeight: 300, overflow: "auto" }}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9, p: 1.5, pt: 0, maxHeight: 420, overflow: "auto" }}>
                   {allVehicleAlerts.map((a: any, i: number) => {
                     const isOpenAlert = a.status === "OPEN";
                     const isAnalyzed = dtcRunMap[`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`] != null;

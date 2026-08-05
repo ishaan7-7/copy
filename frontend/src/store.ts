@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 const DTC_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -79,38 +80,51 @@ interface AppState {
   clearDtcCache: () => void;
 }
 
-export const useStore = create<AppState>((set) => ({
-  activeTab: 0,
-  autoRefresh: true,
-  darkMode: false,
-  selectedModule: 'engine',
-  selectedVehicle: null,
-  region: 'india',
-  setActiveTab: (tab) => set({ activeTab: tab }),
-  toggleAutoRefresh: () => set((state) => ({ autoRefresh: !state.autoRefresh })),
-  toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
-  setSelectedModule: (module) => set({ selectedModule: module }),
-  setSelectedVehicle: (vehicleId) => set({ selectedVehicle: vehicleId }),
-  setRegion: (region) => set({ region }),
+export const useStore = create<AppState>()(
+  persist(
+    (set) => ({
+      activeTab: 0,
+      autoRefresh: true,
+      darkMode: false,
+      selectedModule: 'engine',
+      selectedVehicle: null,
+      region: 'america',
+      setActiveTab: (tab) => set({ activeTab: tab }),
+      toggleAutoRefresh: () => set((state) => ({ autoRefresh: !state.autoRefresh })),
+      toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
+      setSelectedModule: (module) => set({ selectedModule: module }),
+      setSelectedVehicle: (vehicleId) => set({ selectedVehicle: vehicleId }),
+      setRegion: (region) => set({ region }),
 
-  dtcCache: {},
-  alertCandidates: [],
-  alertPool: [],
-  alertTotal: 0,
+      dtcCache: {},
+      alertCandidates: [],
+      alertPool: [],
+      alertTotal: 0,
 
-  setDtcResult: (source_id, module, peak_ts, triggers) =>
-    set((state) => {
-      const key = `${source_id}|${module}|${peak_ts}`;
-      const newCache = { ...state.dtcCache, [key]: { triggers, cachedAt: Date.now() } };
-      return { dtcCache: newCache, alertPool: buildPool(state.alertCandidates, newCache) };
+      setDtcResult: (source_id, module, peak_ts, triggers) =>
+        set((state) => {
+          const key = `${source_id}|${module}|${peak_ts}`;
+          const newCache = { ...state.dtcCache, [key]: { triggers, cachedAt: Date.now() } };
+          return { dtcCache: newCache, alertPool: buildPool(state.alertCandidates, newCache) };
+        }),
+
+      setAlertCandidates: (candidates, total) =>
+        set((state) => ({
+          alertCandidates: candidates,
+          alertTotal: total,
+          alertPool: buildPool(candidates, state.dtcCache),
+        })),
+
+      clearDtcCache: () => set({ dtcCache: {}, alertPool: [] }),
     }),
-
-  setAlertCandidates: (candidates, total) =>
-    set((state) => ({
-      alertCandidates: candidates,
-      alertTotal: total,
-      alertPool: buildPool(candidates, state.dtcCache),
-    })),
-
-  clearDtcCache: () => set({ dtcCache: {}, alertPool: [] }),
-}));
+    {
+      name: 'telemetrix-app-store',
+      // Only the region survives a refresh — it's the one piece of state
+      // that also lives on the backend (the fleet simulator's active
+      // region), so losing it client-side while the backend keeps whatever
+      // it had is exactly what produced the toggle/map mismatch after a
+      // refresh or revisit. Everything else here is per-session UI state.
+      partialize: (state) => ({ region: state.region }),
+    }
+  )
+);

@@ -3029,6 +3029,45 @@ export default function CockpitView({
       queryClient.invalidateQueries({ queryKey: ["fleet-last-trip"] });
     },
   });
+
+  // The fleet simulator's active region is a single shared value in the
+  // backend's memory — a page refresh or revisit never resets it, and never
+  // switches it either. Without this, refreshing the page (or navigating
+  // away and back) left the region toggle showing whatever this session's
+  // persisted choice was while the backend (and therefore every vehicle
+  // position/route on the map) quietly stayed on whatever region it was
+  // last switched to, making the map look empty since its markers fell
+  // outside the other region's map bounds.
+  //
+  // This must key off isActive, not run once on mount: Layout.tsx keeps
+  // already-visited pages mounted (just hidden) when you navigate to a
+  // different page, so a plain mount-only effect never re-fired on
+  // "navigate away and back" — only a genuine remount (switching between
+  // the Executive and Monitoring roles swaps in a different component)
+  // triggered it. isActive flips true on every one of those return visits,
+  // so reconciling here covers all of them.
+  useEffect(() => {
+    if (!isActive) return;
+    let cancelled = false;
+    axios
+      .get(`${FLEET_API}/region`)
+      .then(({ data }) => {
+        if (!cancelled && data?.region && data.region !== region) {
+          regionMutation.mutate(region);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately keyed on isActive alone — this reconciles a possibly-
+    // stale backend against the persisted region whenever this page becomes
+    // the visible one, it must not re-fire every time the toggle itself
+    // changes region (that path already invalidates the relevant queries
+    // via regionMutation's own onSuccess).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
   const { vehicles: sseVehicles, ringBuffer } = useGoldStream();
   const wasActiveRef = useRef(false);
 
@@ -5401,6 +5440,14 @@ export default function CockpitView({
                       position: "relative",
                       minHeight: 0,
                       height: "100%",
+                      // Deepens state/country border lines (and other basemap
+                      // linework) in light mode only — dark mode's own invert
+                      // filter chain below is untouched.
+                      ...(!isDark && {
+                        "& .leaflet-tile-pane": {
+                          filter: "contrast(1.2) saturate(1.05)",
+                        },
+                      }),
                       ...(isDark && {
                         "& .leaflet-tile-pane": {
                           filter:
@@ -5429,8 +5476,8 @@ export default function CockpitView({
                     }}
                   >
                     <MapContainer
-                      center={[22.9937, 78.9629]}
-                      zoom={4}
+                      center={REGION_MAP_CENTER[region]}
+                      zoom={REGION_MAP_ZOOM[region]}
                       minZoom={2}
                       maxBounds={bounds}
                       maxBoundsViscosity={1.0}
@@ -6622,6 +6669,11 @@ export default function CockpitView({
                   p: 0,
                   height: "82vh",
                   position: "relative",
+                  ...(!isDark && {
+                    "& .leaflet-tile-pane": {
+                      filter: "contrast(1.2) saturate(1.05)",
+                    },
+                  }),
                   ...(isDark && {
                     "& .leaflet-tile-pane": {
                       filter:
@@ -6639,7 +6691,7 @@ export default function CockpitView({
                 }}
               >
                 <MapContainer
-                  center={[22.9937, 78.9629]}
+                  center={REGION_MAP_CENTER[region]}
                   zoom={5}
                   minZoom={2}
                   maxBounds={bounds}

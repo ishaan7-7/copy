@@ -117,12 +117,29 @@ export default function FleetAlertsPopup({
   const handleInvestigate = async (alert: any) => {
     setAnalyzingId(alert.alert_id);
     try {
-      await axios.get(`${PIPELINE_API}/api/dtc/analyze`, {
+      const { data } = await axios.get(`${PIPELINE_API}/api/dtc/analyze`, {
         params: { source_id: alert.source_id, module: alert.module, peak_ts: alert.peak_anomaly_ts },
         timeout: 70000,
       });
-      await queryClient.invalidateQueries({ queryKey: ["alertsMetrics"] });
-      await queryClient.refetchQueries({ queryKey: ["alertsMetrics"] });
+      // /api/alerts/metrics is a plain in-memory cache refreshed by a 5s
+      // background loop on the alerts service — refetching it right after
+      // analyze almost always lands inside that gap and returns the alert
+      // still unanalyzed, making the button look like it did nothing until
+      // a second click. The analyze response already carries the triggers,
+      // so patch them into the cache directly instead of waiting on the loop.
+      // Deliberately no invalidateQueries here — that would immediately
+      // refetch this same still-stale endpoint and clobber the patch below
+      // with the pre-analysis data; the existing 20s poll reconciles later.
+      if (data?.success) {
+        queryClient.setQueryData<any>(["alertsMetrics"], (prev: any) => {
+          if (!prev) return prev;
+          const patch = (list: any[]) =>
+            (list ?? []).map((a: any) =>
+              a.alert_id === alert.alert_id ? { ...a, analyzed: true, dtc_triggers: data.triggers ?? [] } : a
+            );
+          return { ...prev, open_alerts: patch(prev.open_alerts), closed_alerts: patch(prev.closed_alerts) };
+        });
+      }
     } catch {
       // Swallow — the row just stays unanalyzed and the button re-enables
       // so the user can retry, no need for a toast in this dense a view.

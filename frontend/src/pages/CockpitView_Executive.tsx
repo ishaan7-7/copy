@@ -262,6 +262,7 @@ interface TripData {
   progress_pct: number;
   distance_completed_km: number;
   distance_total_km: number;
+  has_reversed?: boolean;
   events: {
     lat: number;
     lng: number;
@@ -3035,6 +3036,45 @@ export default function CockpitViewExecutive({
       queryClient.invalidateQueries({ queryKey: ["fleet-last-trip"] });
     },
   });
+
+  // The fleet simulator's active region is a single shared value in the
+  // backend's memory — a page refresh or revisit never resets it, and never
+  // switches it either. Without this, refreshing the page (or navigating
+  // away and back) left the region toggle showing whatever this session's
+  // persisted choice was while the backend (and therefore every vehicle
+  // position/route on the map) quietly stayed on whatever region it was
+  // last switched to, making the map look empty since its markers fell
+  // outside the other region's map bounds.
+  //
+  // This must key off isActive, not run once on mount: Layout.tsx keeps
+  // already-visited pages mounted (just hidden) when you navigate to a
+  // different page, so a plain mount-only effect never re-fired on
+  // "navigate away and back" — only a genuine remount (switching between
+  // the Executive and Monitoring roles swaps in a different component)
+  // triggered it. isActive flips true on every one of those return visits,
+  // so reconciling here covers all of them.
+  useEffect(() => {
+    if (!isActive) return;
+    let cancelled = false;
+    axios
+      .get(`${FLEET_API}/region`)
+      .then(({ data }) => {
+        if (!cancelled && data?.region && data.region !== region) {
+          regionMutation.mutate(region);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately keyed on isActive alone — this reconciles a possibly-
+    // stale backend against the persisted region whenever this page becomes
+    // the visible one, it must not re-fire every time the toggle itself
+    // changes region (that path already invalidates the relevant queries
+    // via regionMutation's own onSuccess).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
   const { vehicles: sseVehicles, ringBuffer } = useGoldStream();
   const wasActiveRef = useRef(false);
 
@@ -3863,15 +3903,27 @@ export default function CockpitViewExecutive({
   // vehicles, tripData can still hold the PREVIOUS vehicle's route while the
   // new fetch is in flight, which would draw the wrong vehicle's
   // completed/remaining route and events on the map.
+  //
+  // Routes are simulated back-and-forth (the vehicle bounces off either
+  // endpoint and reverses), not one-way. route[0..completed_index] is only
+  // "already driven" while the vehicle is still on its very first forward
+  // pass — once it has bounced at least once (has_reversed), it has by
+  // definition already covered the entire route, so the whole thing renders
+  // solid instead of splitting off a "remaining" tail. Without this, the
+  // stretch the vehicle drove during its first pass got permanently
+  // relabeled "not yet covered" the moment it turned around, which is what
+  // put event markers from that earlier pass on a dotted/unvisited-looking
+  // line.
   const completedRoute = useMemo(() => {
     if (!tripData || isTripDataPlaceholder) return [];
-    return tripData.route
-      .slice(0, tripData.completed_index + 1)
-      .map((p) => [p.lat, p.lng] as [number, number]);
+    const points = tripData.has_reversed
+      ? tripData.route
+      : tripData.route.slice(0, tripData.completed_index + 1);
+    return points.map((p) => [p.lat, p.lng] as [number, number]);
   }, [tripData, isTripDataPlaceholder]);
 
   const remainingRoute = useMemo(() => {
-    if (!tripData || isTripDataPlaceholder) return [];
+    if (!tripData || isTripDataPlaceholder || tripData.has_reversed) return [];
     return tripData.route
       .slice(tripData.completed_index)
       .map((p) => [p.lat, p.lng] as [number, number]);
@@ -5208,7 +5260,7 @@ export default function CockpitViewExecutive({
           <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
             <Grid
               container
-              spacing={1}
+              spacing={1.5}
               sx={{
                 height: "28vh",
                 minHeight: 300,
@@ -5216,7 +5268,7 @@ export default function CockpitViewExecutive({
               }}
             >
               {/* MAP */}
-              <Grid item xs={12} sm={5} sx={{ minHeight: 0, height: "100%" }}>
+              <Grid item xs={12} sm={7} sx={{ minHeight: 0, height: "100%", order: 2 }}>
                 <Paper
                   sx={{
                     height: "100%",
@@ -5230,6 +5282,14 @@ export default function CockpitViewExecutive({
                       position: "relative",
                       minHeight: 0,
                       height: "100%",
+                      // Deepens state/country border lines (and other basemap
+                      // linework) in light mode only — dark mode's own invert
+                      // filter chain below is untouched.
+                      ...(!isDark && {
+                        "& .leaflet-tile-pane": {
+                          filter: "contrast(1.2) saturate(1.05)",
+                        },
+                      }),
                       ...(isDark && {
                         "& .leaflet-tile-pane": {
                           filter:
@@ -5258,8 +5318,8 @@ export default function CockpitViewExecutive({
                     }}
                   >
                     <MapContainer
-                      center={[22.9937, 78.9629]}
-                      zoom={4}
+                      center={REGION_MAP_CENTER[region]}
+                      zoom={REGION_MAP_ZOOM[region]}
                       minZoom={2}
                       maxBounds={bounds}
                       maxBoundsViscosity={1.0}
@@ -5604,10 +5664,10 @@ export default function CockpitViewExecutive({
               <Grid
                 item
                 xs={12}
-                sm={7}
-                md={7}
-                lg={7}
-                sx={{ minHeight: 0, height: "100%" }}
+                sm={5}
+                md={5}
+                lg={5}
+                sx={{ minHeight: 0, height: "100%", order: 1 }}
               >
               {aiSummaryExpanded && (
                 <Box
@@ -5624,10 +5684,15 @@ export default function CockpitViewExecutive({
               <Card
                 sx={{
                   p: 1,
+                  height: "100%",
                   minHeight: 0,
                   overflow: "hidden",
                   display: "flex",
                   flexDirection: "column",
+                  borderRadius: 2,
+                  boxShadow: isDark
+                    ? `0 10px 28px ${alpha("#000", 0.2)}`
+                    : `0 10px 28px ${alpha("#0f172a", 0.07)}`,
                   border: `1px solid ${alpha("#06b6d4", 0.28)}`,
                   background: aiSummaryExpanded
                     ? isDark
@@ -5709,9 +5774,10 @@ export default function CockpitViewExecutive({
                   sx={{
                     flex: 1,
                     minHeight: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 0.85,
+                    display: aiSummaryExpanded ? "flex" : "grid",
+                    flexDirection: aiSummaryExpanded ? "column" : undefined,
+                    gridTemplateColumns: aiSummaryExpanded ? undefined : "repeat(2, minmax(0, 1fr))",
+                    gap: aiSummaryExpanded ? 0.85 : 0,
                     overflowY: "auto",
                     overflowX: "hidden",
                     pr: 0.35,
@@ -5813,9 +5879,17 @@ export default function CockpitViewExecutive({
                             minWidth: 0,
                             display: "flex",
                             alignItems: "flex-start",
-                            gap: 0.9,
-                            px: 0.15,
-                            py: 0.5,
+                            gap: 0.75,
+                            px: 0.8,
+                            py: 0.65,
+                            borderBottom: `1px solid ${
+                              isDark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.18)"
+                            }`,
+                            "&:nth-of-type(odd)": {
+                              borderRight: `1px solid ${
+                                isDark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.18)"
+                              }`,
+                            },
                           }}
                         >
                           <Box
@@ -5840,22 +5914,32 @@ export default function CockpitViewExecutive({
                               </Box>{" "}
                               {firstSentence(insight.detail)}
                             </Typography>
-                            {insight.label !== "Fleet condition" && (
-                              <Typography
-                                sx={{
-                                  mt: 0.2,
-                                  fontSize: 10.5,
-                                  lineHeight: 1.4,
-                                  fontWeight: 750,
-                                  color: isDark ? "#dbeafe" : "#334155",
-                                }}
-                              >
-                                {insight.action}
-                              </Typography>
-                            )}
                           </Box>
                         </Box>
                       ))}
+                  {!aiSummaryExpanded && (
+                    <Box
+                      sx={{
+                        gridColumn: "1 / -1",
+                        mx: 0.8,
+                        mt: 0.7,
+                        px: 1,
+                        py: 0.65,
+                        borderRadius: 1.25,
+                        border: `1px solid ${
+                          isDark ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.24)"
+                        }`,
+                        bgcolor: isDark ? alpha("#0f172a", 0.55) : alpha("#ffffff", 0.72),
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 9.5, lineHeight: 1.35, color: "text.secondary" }}>
+                        <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                          Recommended action:
+                        </Box>{" "}
+                        {aiExecutiveInsights[0]?.action.replace(/^Action:\s*/i, "")}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Card>
               </Grid>
@@ -6332,6 +6416,11 @@ export default function CockpitViewExecutive({
                   p: 0,
                   height: "82vh",
                   position: "relative",
+                  ...(!isDark && {
+                    "& .leaflet-tile-pane": {
+                      filter: "contrast(1.2) saturate(1.05)",
+                    },
+                  }),
                   ...(isDark && {
                     "& .leaflet-tile-pane": {
                       filter:
@@ -6349,7 +6438,7 @@ export default function CockpitViewExecutive({
                 }}
               >
                 <MapContainer
-                  center={[22.9937, 78.9629]}
+                  center={REGION_MAP_CENTER[region]}
                   zoom={5}
                   minZoom={2}
                   maxBounds={bounds}
@@ -8676,16 +8765,16 @@ export default function CockpitViewExecutive({
         sx={{
           display: "grid",
           // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
-          gap: "var(--app-gap)",
+          gap: 1,
           alignItems: "stretch",
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
-          mt: 0,
+          mt: 0.75,
         }}
       >
         <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
-          <Grid container spacing={0.5} sx={{ height: "100%", my: 0 }}>
+          <Grid container spacing={1.5} sx={{ height: "100%", my: 0 }}>
             {false && (
               <Grid
                 item
@@ -9606,19 +9695,25 @@ export default function CockpitViewExecutive({
                 height: "100%",
                 display: "grid",
                 gridTemplateRows: "1fr",
-                gap: 0.75,
+                gap: 1.5,
               }}
             >
                 <Box
                   sx={{
                     display: "grid",
-                    gap: 0.75,
+                    gap: 1.5,
                     width: "100%",
                     height: "100%",
                     minHeight: 0,
                     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                     gridTemplateRows: "repeat(2, minmax(0, 1fr))",
                     gridAutoRows: "minmax(0, 1fr)",
+                    "& > .MuiCard-root": {
+                      borderRadius: 2,
+                      boxShadow: isDark
+                        ? `0 8px 22px ${alpha("#000", 0.18)}`
+                        : `0 8px 22px ${alpha("#0f172a", 0.06)}`,
+                    },
                   }}
                 >
                   {/* Cell 1: Fleet Health Score */}
