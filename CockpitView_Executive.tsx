@@ -4799,17 +4799,46 @@ export default function CockpitViewExecutive({
     .filter((v): v is NonNullable<typeof v> => v != null && v.overBy > 0)
     .sort((a, b) => b.overBy - a.overBy);
 
-  // Overheating caution: reuses the same top_10_features anomaly-attribution
-  // data already carried on every open alert (no bronze/DTC round-trip
-  // needed) — an engine/transmission alert whose single biggest driver is a
-  // temperature sensor is a reasonable proxy for "this is a heat problem."
-  // When more than one vehicle qualifies per module, only the most severe
-  // (highest composite score) is named, per module.
+  // Overheating caution. Ground truth first: contracts/DTC_master.json has
+  // exactly one genuine over-temperature DTC per module —
+  //   engine: P0217 "Engine Coolant Over Temperature" (critical/Thermal)
+  //   transmission: P0218 "Transmission Fluid Over Temperature" (critical/Hydraulic)
+  // Two lookalikes were deliberately excluded: P0128 is also "Thermal" for
+  // engine but describes the coolant running too COLD (opposite condition —
+  // no slow-down caution applies), and P0741 (transmission TCC stuck off)
+  // mentions "higher transmission temps" as a side-effect but its root fault
+  // is mechanical, not thermal, so it isn't a reliable overheating signal.
+  // If a matching DTC has actually been triggered by analysis on an open
+  // alert, that's used (and named in the sentence) over the fallback below.
+  // Only once an alert hasn't been analyzed yet do we fall back to the same
+  // top_10_features anomaly-attribution proxy as before (biggest driver of
+  // the alert is a temperature sensor). Multiple qualifying vehicles per
+  // module keep only the most severe (highest composite score).
+  const OVERHEAT_DTC_BY_MODULE = {
+    engine: "P0217",
+    transmission: "P0218",
+  } as const;
   const isTempFeatureKey = (key: string) =>
     ["temperature", "temp", "coolant", "thermal"].some((hint) => key.toLowerCase().includes(hint));
-  const overheatAlertFor = (mod: "engine" | "transmission") => {
-    const candidates = openAlerts
-      .filter((a: any) => String(a.module || "").toLowerCase() === mod)
+  const overheatCautionFor = (mod: keyof typeof OVERHEAT_DTC_BY_MODULE) => {
+    const code = OVERHEAT_DTC_BY_MODULE[mod];
+    const moduleAlerts = openAlerts.filter((a: any) => String(a.module || "").toLowerCase() === mod);
+
+    const dtcConfirmed = moduleAlerts
+      .filter((a: any) => Array.isArray(a.dtc_triggers) && a.dtc_triggers.some((t: any) => t.code === code))
+      .sort((a: any, b: any) => Number(b.max_composite_score || 0) - Number(a.max_composite_score || 0))[0];
+    if (dtcConfirmed) {
+      const vehicleId = String(dtcConfirmed.source_id);
+      return {
+        vehicleId,
+        sentence:
+          mod === "engine"
+            ? `${vehicleId} has a confirmed engine coolant over-temperature fault (${code}) — reduce speed and engine load immediately to avoid seizure risk`
+            : `${vehicleId} has a confirmed transmission fluid over-temperature fault (${code}) — reduce speed and load immediately to prevent permanent transmission damage`,
+      };
+    }
+
+    const inferred = moduleAlerts
       .map((a: any) => {
         let topFeature: string | null = null;
         let topScore = 0;
@@ -4829,11 +4858,18 @@ export default function CockpitViewExecutive({
         return { alert: a, topFeature };
       })
       .filter((x: any) => x.topFeature && isTempFeatureKey(x.topFeature))
-      .sort((x: any, y: any) => Number(y.alert.max_composite_score || 0) - Number(x.alert.max_composite_score || 0));
-    return candidates[0]?.alert ?? null;
+      .sort((x: any, y: any) => Number(y.alert.max_composite_score || 0) - Number(x.alert.max_composite_score || 0))[0];
+    if (inferred) {
+      const vehicleId = String(inferred.alert.source_id);
+      return {
+        vehicleId,
+        sentence: `${vehicleId} is showing early signs of ${mod} overheating (anomaly pattern, not yet DTC-confirmed) — reduce speed and load until inspected`,
+      };
+    }
+    return null;
   };
-  const engineOverheatAlert = overheatAlertFor("engine");
-  const transmissionOverheatAlert = overheatAlertFor("transmission");
+  const engineOverheatCaution = overheatCautionFor("engine");
+  const transmissionOverheatCaution = overheatCautionFor("transmission");
 
   const aiExecutiveInsights = [
     {
@@ -4981,15 +5017,10 @@ export default function CockpitViewExecutive({
           ? ` by ${fastestVehicle.vehicle_id}, driven by ${fastestVehicle.driver || "an unassigned driver"}`
           : ""
       }.${
-        engineOverheatAlert || transmissionOverheatAlert
-          ? ` Caution: ${[
-              engineOverheatAlert ? `${engineOverheatAlert.source_id} is showing signs of engine overheating` : null,
-              transmissionOverheatAlert
-                ? `${transmissionOverheatAlert.source_id} is showing signs of transmission overheating`
-                : null,
-            ]
+        engineOverheatCaution || transmissionOverheatCaution
+          ? ` Caution: ${[engineOverheatCaution?.sentence, transmissionOverheatCaution?.sentence]
               .filter(Boolean)
-              .join(" and ")} — reduce speed and load until inspected.`
+              .join("; ")}.`
           : ""
       }`,
       action:
