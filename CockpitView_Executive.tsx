@@ -3036,6 +3036,36 @@ export default function CockpitViewExecutive({
       queryClient.invalidateQueries({ queryKey: ["fleet-last-trip"] });
     },
   });
+
+  // The fleet simulator's active region is a single shared value in the
+  // backend's memory — a page refresh or revisit never resets it, and never
+  // switches it either. Without this, refreshing the page left the region
+  // toggle showing whatever this session's persisted choice was while the
+  // backend (and therefore every vehicle position/route on the map) quietly
+  // stayed on whatever region it was last switched to, making the map look
+  // empty since its markers fell outside the other region's map bounds.
+  // Reconcile once on mount: the user's last explicit choice (persisted
+  // client-side) wins, and the backend is switched to match it.
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get(`${FLEET_API}/region`)
+      .then(({ data }) => {
+        if (!cancelled && data?.region && data.region !== region) {
+          regionMutation.mutate(region);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately run once on mount only — this reconciles a possibly-stale
+    // backend against the persisted region, it must not re-fire every time
+    // the toggle itself changes region (that path already invalidates the
+    // relevant queries via regionMutation's own onSuccess).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { vehicles: sseVehicles, ringBuffer } = useGoldStream();
   const wasActiveRef = useRef(false);
 
@@ -5221,7 +5251,7 @@ export default function CockpitViewExecutive({
           <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
             <Grid
               container
-              spacing={1}
+              spacing={1.5}
               sx={{
                 height: "28vh",
                 minHeight: 300,
@@ -5229,7 +5259,7 @@ export default function CockpitViewExecutive({
               }}
             >
               {/* MAP */}
-              <Grid item xs={12} sm={5} sx={{ minHeight: 0, height: "100%" }}>
+              <Grid item xs={12} sm={7} sx={{ minHeight: 0, height: "100%", order: 2 }}>
                 <Paper
                   sx={{
                     height: "100%",
@@ -5617,10 +5647,10 @@ export default function CockpitViewExecutive({
               <Grid
                 item
                 xs={12}
-                sm={7}
-                md={7}
-                lg={7}
-                sx={{ minHeight: 0, height: "100%" }}
+                sm={5}
+                md={5}
+                lg={5}
+                sx={{ minHeight: 0, height: "100%", order: 1 }}
               >
               {aiSummaryExpanded && (
                 <Box
@@ -5637,10 +5667,15 @@ export default function CockpitViewExecutive({
               <Card
                 sx={{
                   p: 1,
+                  height: "100%",
                   minHeight: 0,
                   overflow: "hidden",
                   display: "flex",
                   flexDirection: "column",
+                  borderRadius: 2,
+                  boxShadow: isDark
+                    ? `0 10px 28px ${alpha("#000", 0.2)}`
+                    : `0 10px 28px ${alpha("#0f172a", 0.07)}`,
                   border: `1px solid ${alpha("#06b6d4", 0.28)}`,
                   background: aiSummaryExpanded
                     ? isDark
@@ -5722,9 +5757,10 @@ export default function CockpitViewExecutive({
                   sx={{
                     flex: 1,
                     minHeight: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 0.85,
+                    display: aiSummaryExpanded ? "flex" : "grid",
+                    flexDirection: aiSummaryExpanded ? "column" : undefined,
+                    gridTemplateColumns: aiSummaryExpanded ? undefined : "repeat(2, minmax(0, 1fr))",
+                    gap: aiSummaryExpanded ? 0.85 : 0,
                     overflowY: "auto",
                     overflowX: "hidden",
                     pr: 0.35,
@@ -5826,9 +5862,17 @@ export default function CockpitViewExecutive({
                             minWidth: 0,
                             display: "flex",
                             alignItems: "flex-start",
-                            gap: 0.9,
-                            px: 0.15,
-                            py: 0.5,
+                            gap: 0.75,
+                            px: 0.8,
+                            py: 0.65,
+                            borderBottom: `1px solid ${
+                              isDark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.18)"
+                            }`,
+                            "&:nth-of-type(odd)": {
+                              borderRight: `1px solid ${
+                                isDark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.18)"
+                              }`,
+                            },
                           }}
                         >
                           <Box
@@ -5853,22 +5897,32 @@ export default function CockpitViewExecutive({
                               </Box>{" "}
                               {firstSentence(insight.detail)}
                             </Typography>
-                            {insight.label !== "Fleet condition" && (
-                              <Typography
-                                sx={{
-                                  mt: 0.2,
-                                  fontSize: 10.5,
-                                  lineHeight: 1.4,
-                                  fontWeight: 750,
-                                  color: isDark ? "#dbeafe" : "#334155",
-                                }}
-                              >
-                                {insight.action}
-                              </Typography>
-                            )}
                           </Box>
                         </Box>
                       ))}
+                  {!aiSummaryExpanded && (
+                    <Box
+                      sx={{
+                        gridColumn: "1 / -1",
+                        mx: 0.8,
+                        mt: 0.7,
+                        px: 1,
+                        py: 0.65,
+                        borderRadius: 1.25,
+                        border: `1px solid ${
+                          isDark ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.24)"
+                        }`,
+                        bgcolor: isDark ? alpha("#0f172a", 0.55) : alpha("#ffffff", 0.72),
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 9.5, lineHeight: 1.35, color: "text.secondary" }}>
+                        <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                          Recommended action:
+                        </Box>{" "}
+                        {aiExecutiveInsights[0]?.action.replace(/^Action:\s*/i, "")}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Card>
               </Grid>
@@ -8689,16 +8743,16 @@ export default function CockpitViewExecutive({
         sx={{
           display: "grid",
           // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
-          gap: "var(--app-gap)",
+          gap: 1,
           alignItems: "stretch",
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
-          mt: 0,
+          mt: 0.75,
         }}
       >
         <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
-          <Grid container spacing={0.5} sx={{ height: "100%", my: 0 }}>
+          <Grid container spacing={1.5} sx={{ height: "100%", my: 0 }}>
             {false && (
               <Grid
                 item
@@ -9619,19 +9673,25 @@ export default function CockpitViewExecutive({
                 height: "100%",
                 display: "grid",
                 gridTemplateRows: "1fr",
-                gap: 0.75,
+                gap: 1.5,
               }}
             >
                 <Box
                   sx={{
                     display: "grid",
-                    gap: 0.75,
+                    gap: 1.5,
                     width: "100%",
                     height: "100%",
                     minHeight: 0,
                     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                     gridTemplateRows: "repeat(2, minmax(0, 1fr))",
                     gridAutoRows: "minmax(0, 1fr)",
+                    "& > .MuiCard-root": {
+                      borderRadius: 2,
+                      boxShadow: isDark
+                        ? `0 8px 22px ${alpha("#000", 0.18)}`
+                        : `0 8px 22px ${alpha("#0f172a", 0.06)}`,
+                    },
                   }}
                 >
                   {/* Cell 1: Fleet Health Score */}
