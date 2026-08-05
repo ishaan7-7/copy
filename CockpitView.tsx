@@ -74,7 +74,6 @@ import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import GpsFixedOutlinedIcon from "@mui/icons-material/GpsFixedOutlined";
 import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
-import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import LocalGasStationOutlinedIcon from "@mui/icons-material/LocalGasStationOutlined";
 import AirportShuttleOutlinedIcon from "@mui/icons-material/AirportShuttleOutlined";
@@ -113,8 +112,6 @@ import DraggableLib from "react-draggable";
 // react-draggable type definitions require all props; cast to avoid noise since defaults handle them at runtime
 const Draggable = DraggableLib as unknown as React.ComponentType<{ children: React.ReactElement; handle?: string; cancel?: string }>;
 import { useStore, Region } from "../store";
-import FleetAlertsPopup from "../components/executive/FleetAlertsPopup";
-import VehicleSummaryPopup from "../components/executive/VehicleSummaryPopup";
 import { formatDistance, formatSpeed, convertDistance, convertSpeed, distanceUnitLabel, speedUnitLabel } from "../utils/units";
 import { useGoldStream } from "../contexts/GoldStreamContext";
 const FLEET_API = "http://127.0.0.1:8009/api/fleet";
@@ -262,7 +259,6 @@ interface TripData {
   progress_pct: number;
   distance_completed_km: number;
   distance_total_km: number;
-  has_reversed?: boolean;
   events: {
     lat: number;
     lng: number;
@@ -2919,10 +2915,12 @@ const FLEET_TABLE_COLUMNS = [
 
 type FleetTableColId = (typeof FLEET_TABLE_COLUMNS)[number]["id"];
 
-export default function CockpitViewExecutive({
+export default function CockpitView({
   isActive = true,
+  disableExternalNav = false,
 }: {
   isActive?: boolean;
+  disableExternalNav?: boolean;
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -2940,11 +2938,6 @@ export default function CockpitViewExecutive({
   const [tableExpanded, setTableExpanded] = useState(false);
   const [aiSummaryExpanded, setAiSummaryExpanded] = useState(false);
   const [openMaintenanceForecast, setOpenMaintenanceForecast] = useState(false);
-  const [openHealthScorePopup, setOpenHealthScorePopup] = useState(false);
-  const [openDriverScorePopup, setOpenDriverScorePopup] = useState(false);
-  const [alertsPopupOpen, setAlertsPopupOpen] = useState(false);
-  const [alertsPopupFilter, setAlertsPopupFilter] = useState<"all" | "critical" | "warning" | "resolved">("all");
-  const [vehicleSummaryPopupId, setVehicleSummaryPopupId] = useState<string | null>(null);
   const [showWorstPerformers, setShowWorstPerformers] = useState(false);
   const [worstPerformerSort, setWorstPerformerSort] = useState<
     "overall" | "health" | "driver"
@@ -3078,21 +3071,7 @@ export default function CockpitViewExecutive({
   const { vehicles: sseVehicles, ringBuffer } = useGoldStream();
   const wasActiveRef = useRef(false);
 
-  // Vehicle-popover drag is applied imperatively (ref + direct style writes,
-  // rAF-throttled) rather than through React state — this component re-
-  // renders a lot of state on every change, so driving the drag transform
-  // through setState fired jank on every pixel of mouse movement. Nothing
-  // else reads the drag offset, so there's no need for it to live in state.
-  const popoverPaperRef = useRef<HTMLDivElement | null>(null);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
-  const dragRafRef = useRef<number | null>(null);
-  const pendingDragPos = useRef<{ x: number; y: number } | null>(null);
-  const applyDragTransform = useCallback((x: number, y: number) => {
-    dragOffsetRef.current = { x, y };
-    if (popoverPaperRef.current) {
-      popoverPaperRef.current.style.transform = `translate(${x}px, ${y}px)`;
-    }
-  }, []);
+  const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
 
   const [orderBy, setOrderBy] = useState("vehicle_id");
   const [order, setOrder] = useState<"asc" | "desc">("asc");
@@ -3178,36 +3157,25 @@ export default function CockpitViewExecutive({
   const dragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
 
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    dragging.current = true;
-    start.current = {
-      x: e.clientX - dragOffsetRef.current.x,
-      y: e.clientY - dragOffsetRef.current.y,
-    };
-    document.body.style.cursor = "grabbing";
-  }, []);
-
-  // rAF-throttled: the raw mousemove rate can outpace the display's refresh
-  // rate, so this only ever commits the most recent pointer position once
-  // per frame instead of writing to the DOM on every single event.
-  const handleDragMove = useCallback(
-    (e: MouseEvent) => {
-      if (!dragging.current) return;
-      pendingDragPos.current = {
-        x: e.clientX - start.current.x,
-        y: e.clientY - start.current.y,
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      dragging.current = true;
+      start.current = {
+        x: e.clientX - dragPos.x,
+        y: e.clientY - dragPos.y,
       };
-      if (dragRafRef.current == null) {
-        dragRafRef.current = requestAnimationFrame(() => {
-          dragRafRef.current = null;
-          if (pendingDragPos.current) {
-            applyDragTransform(pendingDragPos.current.x, pendingDragPos.current.y);
-          }
-        });
-      }
+      document.body.style.cursor = "grabbing";
     },
-    [applyDragTransform]
+    [dragPos]
   );
+
+  const handleDragMove = useCallback((e: MouseEvent) => {
+    if (!dragging.current) return;
+    setDragPos({
+      x: e.clientX - start.current.x,
+      y: e.clientY - start.current.y,
+    });
+  }, []);
 
   const handleDragEnd = useCallback(() => {
     dragging.current = false;
@@ -3221,20 +3189,19 @@ export default function CockpitViewExecutive({
     return () => {
       window.removeEventListener("mousemove", handleDragMove);
       window.removeEventListener("mouseup", handleDragEnd);
-      if (dragRafRef.current != null) cancelAnimationFrame(dragRafRef.current);
     };
   }, [handleDragMove, handleDragEnd]);
 
   const handleOpenVehicle = (event: React.MouseEvent<HTMLElement>, vehicle: string) => {
     setVehiclePopoverAnchor(event.currentTarget);
     setSelectedVehicle(vehicle);
-    applyDragTransform(0, 0);
+    setDragPos({ x: 0, y: 0 });
   };
 
   const handleCloseVehicle = () => {
     setVehiclePopoverAnchor(null);
     setSelectedVehicle(null);
-    applyDragTransform(0, 0);
+    setDragPos({ x: 0, y: 0 });
   };
 
   const { data: summary = {} as FleetSummary } = useQuery<FleetSummary>({
@@ -3929,27 +3896,15 @@ export default function CockpitViewExecutive({
   // vehicles, tripData can still hold the PREVIOUS vehicle's route while the
   // new fetch is in flight, which would draw the wrong vehicle's
   // completed/remaining route and events on the map.
-  //
-  // Routes are simulated back-and-forth (the vehicle bounces off either
-  // endpoint and reverses), not one-way. route[0..completed_index] is only
-  // "already driven" while the vehicle is still on its very first forward
-  // pass — once it has bounced at least once (has_reversed), it has by
-  // definition already covered the entire route, so the whole thing renders
-  // solid instead of splitting off a "remaining" tail. Without this, the
-  // stretch the vehicle drove during its first pass got permanently
-  // relabeled "not yet covered" the moment it turned around, which is what
-  // put event markers from that earlier pass on a dotted/unvisited-looking
-  // line.
   const completedRoute = useMemo(() => {
     if (!tripData || isTripDataPlaceholder) return [];
-    const points = tripData.has_reversed
-      ? tripData.route
-      : tripData.route.slice(0, tripData.completed_index + 1);
-    return points.map((p) => [p.lat, p.lng] as [number, number]);
+    return tripData.route
+      .slice(0, tripData.completed_index + 1)
+      .map((p) => [p.lat, p.lng] as [number, number]);
   }, [tripData, isTripDataPlaceholder]);
 
   const remainingRoute = useMemo(() => {
-    if (!tripData || isTripDataPlaceholder || tripData.has_reversed) return [];
+    if (!tripData || isTripDataPlaceholder) return [];
     return tripData.route
       .slice(tripData.completed_index)
       .map((p) => [p.lat, p.lng] as [number, number]);
@@ -4508,6 +4463,20 @@ export default function CockpitViewExecutive({
   const topAvailabilityColor = scoreTone(availabilityScore);
   const topUtilizationColor = scoreTone(utilizationScore);
   const topRiskColor = scoreTone(100 - riskScore);
+  const utilizationTrend = [
+    Math.max(0, utilizationScore - 18),
+    Math.max(0, utilizationScore - 7),
+    Math.max(0, utilizationScore - 12),
+    Math.min(100, utilizationScore + 4),
+    Math.max(0, utilizationScore - 2),
+    Math.max(0, utilizationScore - 16),
+    Math.max(0, utilizationScore - 11),
+    Math.max(0, utilizationScore - 15),
+    Math.min(100, utilizationScore + 8),
+    Math.min(100, utilizationScore + 4),
+    Math.max(0, utilizationScore - 6),
+    utilizationScore,
+  ];
   const availabilityRows = [
     { label: "Available", value: activeCount + parkedCount, color: "#22c55e" },
     { label: "Under Maintenance", value: serviceCount, color: "#f59e0b" },
@@ -4605,6 +4574,22 @@ export default function CockpitViewExecutive({
     reason: `${maintenanceTierRangeLabel(index)} — ${tier.action}.`,
   }));
 
+  const chartCards = [
+    {
+      label: "Alerts Summary",
+      value: `${alertTotal ?? 0}`,
+      hint: `${executiveMetrics.resolvedToday} resolved today`,
+      rows: alertChartRows,
+      info: `Current alert pressure is driven by ${criticalCount} critical and ${warningCount} warning vehicles. Prioritize poor-health vehicles first.`,
+    },
+    {
+      label: "Maintenance Forecast",
+      value: `${maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length}`,
+      hint: "need service within 2 weeks",
+      rows: maintenanceRows,
+      info: `Forecast derived from each vehicle's live health score. ${maintenanceVehicleBuckets.within_1_week.length} vehicles need immediate service (${maintenanceTierRangeLabel(0)}), ${maintenanceVehicleBuckets.weeks_1_2.length} within 2 weeks (${maintenanceTierRangeLabel(1)}). Click to see every vehicle in each window.`,
+    },
+  ];
 
   const topDriverVehicle = topPerformingRows[0];
   const MODULE_KEYS_FLEET = ["engine", "transmission", "battery", "body", "tyre"];
@@ -5355,6 +5340,153 @@ export default function CockpitViewExecutive({
           </Box>
         )}
 
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, 1fr)",
+              lg: "repeat(8, 1fr)",
+              xl: "repeat(8, 1fr)",
+            },
+            gap: "var(--app-gap)",
+            flexShrink: 0,
+          }}
+        >
+          <KpiCard
+            label="Total Fleet"
+            value={allPositions.length || summary.total}
+            delta="Registered Vehicles"
+            icon={<LocalShippingOutlinedIcon />}
+            color="#3b82f6"
+            iconLogo={false}
+            trend="down"
+            selected={statusFilter === "all"}
+            onClick={() => {
+              setStatusFilter("all");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
+          />
+          <KpiCard
+            label="Active Vehicles"
+            value={allPositions.length ? activeCount : summary.active}
+            delta="6 vs Yesterday"
+            icon={<HealthAndSafetyOutlinedIcon />}
+            color="#22c55e"
+            iconLogo={true}
+            trend="down"
+            selected={statusFilter === "active"}
+            onClick={() => {
+              setStatusFilter(statusFilter === "active" ? "all" : "active");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
+          />
+          <KpiCard
+            label="Parked"
+            value={allPositions.length ? parkedCount : summary.parked}
+            delta="6 vs Yesterday"
+            icon={<TimelineOutlinedIcon />}
+            color="#0ea5e9"
+            iconLogo={true}
+            trend="up"
+            selected={statusFilter === "parked"}
+            onClick={() => {
+              setStatusFilter(statusFilter === "parked" ? "all" : "parked");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
+          />
+          <KpiCard
+            label="Due for Service"
+            value={allPositions.length ? serviceCount : summary.in_service}
+            delta="Within 48 Hours"
+            icon={<SettingsOutlinedIcon />}
+            color="#8b5cf6"
+            iconLogo={false}
+            trend="up"
+            selected={statusFilter === "in_service"}
+            onClick={() => {
+              setStatusFilter(
+                statusFilter === "in_service" ? "all" : "in_service"
+              );
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
+          />
+          <KpiCard
+            label="Critical Vehicles"
+            value={criticalCount}
+            delta="1 vs yesterday"
+            icon={<ShieldOutlinedIcon />}
+            color="#ef4444"
+            trend="up"
+            iconLogo={true}
+            selected={statusFilter === "critical"}
+            onClick={() => {
+              setStatusFilter(statusFilter === "critical" ? "all" : "critical");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
+          />
+          <KpiCard
+            label="Warning Vehicles"
+            value={warningCount}
+            delta="2 vs yesterday"
+            icon={<WarningAmberOutlinedIcon />}
+            color="#f59e0b"
+            trend="down"
+            iconLogo={true}
+            selected={statusFilter === "warning"}
+            onClick={() => {
+              setStatusFilter(statusFilter === "warning" ? "all" : "warning");
+              setSelectedVehicle(null);
+              setPopoverPosition(null);
+              setVehiclePopoverAnchor(null);
+              setPage(0);
+            }}
+          />
+
+          <KpiCard
+            label="Avg Engine Health"
+            value={`${avgEngineHealth}%`}
+            delta="by 2% in 24 hours"
+            icon={<SpeedOutlinedIcon />}
+            color="#f97316"
+            trend="up"
+            iconLogo={true}
+            // iconLogo={false}
+          />
+
+          <KpiCard
+            label="Active Alerts"
+            value={alertTotal !== null ? String(alertTotal) : "—"}
+            delta={
+              alertTotal !== null
+                ? `${Math.max(
+                    1,
+                    Math.round(alertTotal * 0.18 + 1)
+                  )} fewer than yesterday`
+                : "fewer than yesterday"
+            }
+            icon={<ErrorOutlineOutlinedIcon />}
+            color="#ef4444"
+            trend="down"
+            iconLogo={true}
+            onClick={disableExternalNav ? undefined : () => navigate("/fleet-health?alertsTab=open#alerts-feed")}
+          />
+        </Box>
 
         <Box
           sx={{
@@ -5370,7 +5502,7 @@ export default function CockpitViewExecutive({
           <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
             <Grid
               container
-              spacing={1.5}
+              spacing={1}
               sx={{
                 height: "28vh",
                 minHeight: 300,
@@ -5378,7 +5510,7 @@ export default function CockpitViewExecutive({
               }}
             >
               {/* MAP */}
-              <Grid item xs={12} sm={7} sx={{ minHeight: 0, height: "100%", order: 2 }}>
+              <Grid item xs={12} sm={5} sx={{ minHeight: 0, height: "100%" }}>
                 <Paper
                   sx={{
                     height: "100%",
@@ -5774,284 +5906,656 @@ export default function CockpitViewExecutive({
               <Grid
                 item
                 xs={12}
-                sm={5}
-                md={5}
-                lg={5}
-                sx={{ minHeight: 0, height: "100%", order: 1 }}
+                sm={7}
+                md={7}
+                lg={7}
+                sx={{ minHeight: 0, height: "100%" }}
               >
-              {aiSummaryExpanded && (
-                <Box
-                  onClick={() => setAiSummaryExpanded(false)}
-                  sx={{
-                    position: "fixed",
-                    inset: 0,
-                    zIndex: 1299,
-                    bgcolor: alpha("#000", isDark ? 0.6 : 0.4),
-                    backdropFilter: "blur(2px)",
-                  }}
-                />
-              )}
-              <Card
-                sx={{
-                  p: 1,
-                  height: "100%",
-                  minHeight: 0,
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  borderRadius: 2,
-                  boxShadow: isDark
-                    ? `0 10px 28px ${alpha("#000", 0.2)}`
-                    : `0 10px 28px ${alpha("#0f172a", 0.07)}`,
-                  border: `1px solid ${alpha("#06b6d4", 0.28)}`,
-                  background: aiSummaryExpanded
-                    ? isDark
-                      ? "#0f172a"
-                      : "#ffffff"
-                    : isDark
-                    ? `linear-gradient(145deg, ${alpha(
-                        "#06b6d4",
-                        0.12
-                      )}, rgba(15,23,42,0.9))`
-                    : `linear-gradient(145deg, ${alpha(
-                        "#06b6d4",
-                        0.08
-                      )}, #ffffff)`,
-                  transition: "all 0.2s ease",
-                  ...(aiSummaryExpanded
-                    ? {
-                        position: "fixed",
-                        top: "4vh",
-                        left: "4vw",
-                        right: "4vw",
-                        bottom: "4vh",
-                        zIndex: 1300,
-                        boxShadow: `0 24px 60px ${alpha("#000", 0.4)}`,
-                      }
-                    : {}),
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, mb: 0.6 }}>
-                  <Box
-                    sx={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: "50%",
-                      display: "grid",
-                      placeItems: "center",
-                      color: "#8b5cf6",
-                      bgcolor: alpha("#8b5cf6", 0.14),
-                      border: `1px solid ${alpha("#8b5cf6", 0.25)}`,
-                    }}
-                  >
-                    <AutoAwesomeOutlinedIcon sx={{ fontSize: 14 }} />
-                  </Box>
-                  <Typography
-                    sx={{
-                      fontSize: 10.5,
-                      fontWeight: 900,
-                      color: isDark ? "#f8fafc" : "#0f172a",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    AI Executive Summary
-                  </Typography>
-                  <Box sx={{ flex: 1 }} />
-                  <Tooltip title={aiSummaryExpanded ? "Collapse summary" : "Click for detailed summary"} arrow>
-                    <IconButton
-                      size="small"
-                      onClick={() => setAiSummaryExpanded((v) => !v)}
-                      sx={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: "50%",
-                        flexShrink: 0,
-                        color: "#3b82f6",
-                        background: `radial-gradient(circle, ${alpha("#3b82f6", 0.3)} 0%, ${alpha("#06b6d4", 0.16)} 55%, transparent 80%)`,
-                        border: `1px solid ${alpha("#3b82f6", 0.28)}`,
-                        boxShadow: `0 0 10px ${alpha("#3b82f6", isDark ? 0.3 : 0.2)}`,
-                      }}
-                    >
-                      {aiSummaryExpanded ? (
-                        <CloseFullscreenOutlinedIcon sx={{ fontSize: 17 }} />
-                      ) : (
-                        <PsychologyOutlinedIcon sx={{ fontSize: 22 }} />
-                      )}
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
                 <Box
                   sx={{
-                    flex: 1,
+                    display: "grid",
+                    gap: 0.75,
+                    width: "100%",
+                    height: "100%",
                     minHeight: 0,
-                    display: aiSummaryExpanded ? "flex" : "grid",
-                    flexDirection: aiSummaryExpanded ? "column" : undefined,
-                    gridTemplateColumns: aiSummaryExpanded ? undefined : "repeat(2, minmax(0, 1fr))",
-                    gap: aiSummaryExpanded ? 0.85 : 0,
-                    overflowY: "auto",
-                    overflowX: "hidden",
-                    pr: 0.35,
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+                    gridAutoRows: "minmax(0, 1fr)",
                   }}
                 >
-                  {aiSummaryExpanded && (
-                    <Typography
-                      sx={{
-                        fontSize: 10.5,
-                        lineHeight: 1.55,
-                        color: "text.secondary",
-                        flexShrink: 0,
-                        mb: 0.3,
-                      }}
-                    >
-                      {aiExecutiveStory}
+                  <Card
+                    sx={{
+                      p: 1,
+                      minHeight: 0,
+                      height: "100%",
+                      display: "grid",
+                      gridTemplateRows: "auto 1fr auto",
+                      gap: 0.25,
+                      overflow: "hidden",
+                      border: `1px solid ${alpha(topHealthColor, 0.28)}`,
+                      background: isDark
+                        ? `linear-gradient(145deg, ${alpha(
+                            topHealthColor,
+                            0.14
+                          )}, rgba(15,23,42,0.92))`
+                        : `linear-gradient(145deg, ${alpha(
+                            topHealthColor,
+                            0.08
+                          )}, #ffffff)`,
+                    }}
+                  >
+                    <Typography sx={topCardTitleSx}>
+                      Fleet Health Score
                     </Typography>
-                  )}
-                  {aiSummaryExpanded
-                    ? aiExecutiveInsights.map((insight) => (
-                        <Box
-                          key={insight.label}
-                          sx={{
-                            minWidth: 0,
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: 0.9,
-                            px: 0.15,
-                            py: 0.85,
-                            borderBottom: `1px solid ${
-                              isDark ? "rgba(148,163,184,0.14)" : "rgba(148,163,184,0.22)"
-                            }`,
-                            "&:last-of-type": { borderBottom: "none" },
-                          }}
-                        >
-                          <Box
-                            aria-hidden="true"
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              mt: 0.5,
-                              borderRadius: "50%",
-                              bgcolor: insight.color,
-                              boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Stack direction="row" alignItems="baseline" flexWrap="wrap" spacing={0.75}>
-                              <Typography
-                                sx={{
-                                  minWidth: 0,
-                                  fontSize: 10.5,
-                                  fontWeight: 900,
-                                  color: isDark ? "#f8fafc" : "#0f172a",
-                                }}
-                              >
-                                {insight.label}:
-                              </Typography>
-                              <Typography
-                                sx={{
-                                  fontSize: 10.5,
-                                  lineHeight: 1.2,
-                                  fontWeight: 900,
-                                  color: insight.color,
-                                  px: 0.6,
-                                  py: 0.2,
-                                  borderRadius: 0.65,
-                                  bgcolor: alpha(insight.color, isDark ? 0.14 : 0.09),
-                                }}
-                              >
-                                {insight.value}
-                              </Typography>
-                            </Stack>
-                            <Typography sx={{ mt: 0.35, fontSize: 10.5, lineHeight: 1.5, color: "text.secondary" }}>
-                              {insight.detail}
-                            </Typography>
-                            <Typography
-                              sx={{
-                                mt: 0.3,
-                                fontSize: 10.5,
-                                lineHeight: 1.5,
-                                fontWeight: 750,
-                                color: isDark ? "#dbeafe" : "#334155",
-                              }}
-                            >
-                              {insight.action}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))
-                    : aiExecutiveInsights
-                        .filter((insight) => insight.label !== "Driver requiring coaching")
-                        .slice(0, 6)
-                        .map((insight) => (
-                        <Box
-                          key={insight.label}
-                          sx={{
-                            minWidth: 0,
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: 0.75,
-                            px: 0.8,
-                            py: 0.65,
-                            borderBottom: `1px solid ${
-                              isDark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.18)"
-                            }`,
-                            "&:nth-of-type(odd)": {
-                              borderRight: `1px solid ${
-                                isDark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.18)"
-                              }`,
-                            },
-                          }}
-                        >
-                          <Box
-                            aria-hidden="true"
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              mt: 0.5,
-                              borderRadius: "50%",
-                              bgcolor: insight.color,
-                              boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography sx={{ fontSize: 10.5, lineHeight: 1.5 }}>
-                              <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
-                                {insight.label}:
-                              </Box>{" "}
-                              <Box component="span" sx={{ fontWeight: 900, color: insight.color }}>
-                                {insight.value}.
-                              </Box>{" "}
-                              {firstSentence(insight.detail)}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                  {!aiSummaryExpanded && (
-                    <Box
-                      sx={{
-                        gridColumn: "1 / -1",
-                        mx: 0.8,
-                        mt: 0.7,
-                        px: 1,
-                        py: 0.65,
-                        borderRadius: 1.25,
-                        border: `1px solid ${
-                          isDark ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.24)"
-                        }`,
-                        bgcolor: isDark ? alpha("#0f172a", 0.55) : alpha("#ffffff", 0.72),
-                      }}
-                    >
-                      <Typography sx={{ fontSize: 9.5, lineHeight: 1.35, color: "text.secondary" }}>
-                        <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
-                          Recommended action:
-                        </Box>{" "}
-                        {aiExecutiveInsights[0]?.action.replace(/^Action:\s*/i, "")}
+                    <Box sx={{ minHeight: 0 }}>
+                      <HealthGauge
+                        value={healthScoreValue}
+                        color={topHealthColor}
+                        formatter="{value}"
+                      />
+                    </Box>
+                    <Box sx={{ textAlign: "center", mt: -1 }}>
+                      <Typography sx={topCardMetaSx}>/100</Typography>
+                      <Typography
+                        sx={{ ...topCardSubSx, color: topHealthColor }}
+                      >
+                        {scoreLabel(healthScoreValue)}
                       </Typography>
                     </Box>
-                  )}
+                  </Card>
+                  <Card
+                    sx={{
+                      p: 1,
+                      minHeight: 0,
+                      height: "100%",
+                      display: "grid",
+                      gridTemplateRows: "auto auto 1fr",
+                      alignItems: "start",
+                      gap: 0.55,
+                      overflow: "hidden",
+                      border: `1px solid ${alpha(topAvailabilityColor, 0.28)}`,
+                      background: isDark
+                        ? `linear-gradient(145deg, ${alpha(
+                            topAvailabilityColor,
+                            0.12
+                          )}, rgba(15,23,42,0.92))`
+                        : `linear-gradient(145deg, ${alpha(
+                            topAvailabilityColor,
+                            0.08
+                          )}, #ffffff)`,
+                    }}
+                  >
+                    <Typography sx={topCardTitleSx}>
+                      Fleet Availability
+                    </Typography>
+                    <Box sx={{ minHeight: 0 }}>
+                      <Typography
+                        sx={{ ...topCardValueSx, color: topAvailabilityColor }}
+                      >
+                        {availabilityScore}%
+                      </Typography>
+                      <Typography sx={{ ...topCardMetaSx, mt: 0.2 }}>
+                        {activeCount + parkedCount}/
+                        {executiveMetrics.total || 0} Vehicles
+                      </Typography>
+                    </Box>
+                    <Stack spacing={0.25} sx={{ minHeight: 0 }}>
+                      {availabilityRows.map((row) => (
+                        <Box
+                          key={row.label}
+                          sx={{
+                            display: "grid",
+                            gridTemplateColumns: "10px 1fr auto",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              bgcolor: row.color,
+                            }}
+                          />
+                          <Typography sx={topCardMetaSx} noWrap>
+                            {row.label}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              ...topCardMetaSx,
+                              color: isDark ? "#e2e8f0" : "#0f172a",
+                            }}
+                          >
+                            {row.value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Card>
+                  <Card
+                    sx={{
+                      p: 1,
+                      minHeight: 0,
+                      height: "100%",
+                      display: "grid",
+                      gridTemplateRows: "auto auto auto 1fr",
+                      alignItems: "start",
+                      gap: 0.4,
+                      overflow: "hidden",
+                      border: `1px solid ${alpha(topUtilizationColor, 0.28)}`,
+                      background: isDark
+                        ? `linear-gradient(145deg, ${alpha(
+                            topUtilizationColor,
+                            0.12
+                          )}, rgba(15,23,42,0.92))`
+                        : `linear-gradient(145deg, ${alpha(
+                            topUtilizationColor,
+                            0.08
+                          )}, #ffffff)`,
+                    }}
+                  >
+                    <Typography sx={topCardTitleSx}>
+                      Utilization Score
+                    </Typography>
+                    <Typography
+                      sx={{
+                        ...topCardValueSx,
+                        color: topUtilizationColor,
+                        textAlign: "center",
+                      }}
+                    >
+                      {utilizationScore}%
+                    </Typography>
+                    <Typography
+                      sx={{
+                        ...topCardSubSx,
+                        color: topUtilizationColor,
+                        textAlign: "center",
+                      }}
+                    >
+                      {activeCount} active now
+                    </Typography>
+                    <Box sx={{ alignSelf: "end", minHeight: 0 }}>
+                      <MiniSparkline
+                        values={utilizationTrend}
+                        color={topUtilizationColor}
+                      />
+                    </Box>
+                  </Card>
+                  {chartCards.map((card) => {
+                    const maxValue = Math.max(
+                      1,
+                      ...card.rows.map((row) => row.value)
+                    );
+                    const isAlerts = card.label === "Alerts Summary";
+                    const isPredictions = card.label === "Predicted Failures";
+                    const isMaintenance = card.label === "Maintenance Forecast";
+                    return (
+                      <React.Fragment key={card.label}>
+                        <Card
+                          onClick={
+                            isMaintenance
+                              ? () => setOpenMaintenanceForecast(true)
+                              : undefined
+                          }
+                          sx={{
+                            p: 1,
+                            minHeight: 0,
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.5,
+                                  overflow: "hidden",
+                            cursor: isMaintenance ? "pointer" : "default",
+                            border: `1px solid ${alpha(
+                              card.rows[0].color,
+                              0.22
+                            )}`,
+                            background: isDark
+                              ? `linear-gradient(145deg, ${alpha(
+                                  card.rows[0].color,
+                                  0.12
+                                )}, rgba(15,23,42,0.92))`
+                              : `linear-gradient(145deg, ${alpha(
+                                  card.rows[0].color,
+                                  0.07
+                                )}, #ffffff)`,
+                            ...(isMaintenance && {
+                              transition: "border-color 0.15s, transform 0.15s",
+                              "&:hover": {
+                                borderColor: alpha(card.rows[0].color, 0.5),
+                                transform: "translateY(-1px)",
+                              },
+                            }),
+                          }}
+                        >
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            spacing={0.5}
+                          >
+                            <Typography
+                              sx={{
+                                fontSize: 10,
+                                fontWeight: 900,
+                                color: "text.secondary",
+                                textTransform: "none",
+                                lineHeight: 1.1,
+                              }}
+                            >
+                              {card.label}
+                            </Typography>
+                            <Stack
+                              direction="row"
+                              spacing={0.6}
+                              alignItems="center"
+                            >
+                              {isMaintenance && (
+                                <Box sx={{ textAlign: "right" }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: 15,
+                                      fontWeight: 900,
+                                      color: "#22c55e",
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {card.value} Vehicles
+                                  </Typography>
+                                  <Typography
+                                    sx={{
+                                      fontSize: 8,
+                                      color: "text.secondary",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    Need service soon
+                                  </Typography>
+                                </Box>
+                              )}
+                              <Tooltip title={card.info} arrow>
+                                <InfoOutlinedIcon
+                                  sx={{
+                                    fontSize: 14,
+                                    color: "text.secondary",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              </Tooltip>
+                            </Stack>
+                          </Stack>
+                          {isAlerts && (
+                            <Stack
+                              spacing={0.55}
+                              sx={{ mt: 0.25, minHeight: 0 }}
+                            >
+                              {card.rows.map((row) => (
+                                <Tooltip
+                                  key={row.label}
+                                  title={row.reason}
+                                  arrow
+                                  placement="top"
+                                >
+                                  <Box
+                                    onClick={
+                                      disableExternalNav
+                                        ? undefined
+                                        : (e) => {
+                                            e.stopPropagation();
+                                            navigate(`/fleet-health?alertsTab=${(row as any).alertsTab}#alerts-feed`);
+                                          }
+                                    }
+                                    sx={{
+                                      display: "grid",
+                                      gridTemplateColumns: "24px 1fr auto",
+                                      alignItems: "center",
+                                      gap: 0.65,
+                                      px: 0.65,
+                                      py: 0.55,
+                                      borderRadius: 1,
+                                      cursor: disableExternalNav ? "default" : "pointer",
+                                      transition: "border-color 0.15s, transform 0.15s",
+                                      bgcolor: alpha(
+                                        row.color,
+                                        isDark ? 0.13 : 0.08
+                                      ),
+                                      border: `1px solid ${alpha(
+                                        row.color,
+                                        0.12
+                                      )}`,
+                                      ...(!disableExternalNav && {
+                                        "&:hover": {
+                                          borderColor: alpha(row.color, 0.5),
+                                          transform: "translateY(-1px)",
+                                        },
+                                      }),
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: "50%",
+                                        bgcolor: alpha(row.color, 0.15),
+                                        display: "grid",
+                                        placeItems: "center",
+                                      }}
+                                    >
+                                      <WarningAmberOutlinedIcon
+                                        sx={{ fontSize: 14, color: row.color }}
+                                      />
+                                    </Box>
+                                    <Typography
+                                      sx={{
+                                        fontSize: 9,
+                                        fontWeight: 900,
+                                        color: row.color,
+                                        lineHeight: 1.1,
+                                      }}
+                                    >
+                                      {row.label}
+                                    </Typography>
+                                    <Typography
+                                      sx={{
+                                        fontSize: 13,
+                                        fontWeight: 900,
+                                        color: isDark ? "#f8fafc" : "#0f172a",
+                                      }}
+                                    >
+                                      {row.value}
+                                    </Typography>
+                                  </Box>
+                                </Tooltip>
+                              ))}
+                            </Stack>
+                          )}
+                          {isPredictions && (
+                            <Stack
+                              spacing={0.65}
+                              sx={{ mt: 0.25, minHeight: 0 }}
+                            >
+                              {card.rows.map((row) => (
+                                <Tooltip
+                                  key={row.label}
+                                  title={row.reason}
+                                  arrow
+                                  placement="top"
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "grid",
+                                      gridTemplateColumns: "24px 1fr",
+                                      gap: 0.7,
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: "50%",
+                                        bgcolor: alpha(row.color, 0.16),
+                                        display: "grid",
+                                        placeItems: "center",
+                                      }}
+                                    >
+                                      <ErrorOutlineOutlinedIcon
+                                        sx={{ fontSize: 13, color: row.color }}
+                                      />
+                                    </Box>
+                                    <Box sx={{ minWidth: 0 }}>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 10,
+                                          fontWeight: 900,
+                                          color: isDark ? "#e2e8f0" : "#0f172a",
+                                          lineHeight: 1.05,
+                                        }}
+                                      >
+                                        {row.value} Vehicles
+                                      </Typography>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 8.5,
+                                          fontWeight: 700,
+                                          color: "text.secondary",
+                                          lineHeight: 1.15,
+                                        }}
+                                        noWrap
+                                      >
+                                        {row.label}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Tooltip>
+                              ))}
+                            </Stack>
+                          )}
+                          {isMaintenance && (
+                            <Box
+                              sx={{
+                                flex: 1,
+                                minHeight: 0,
+                                display: "grid",
+                                gridTemplateColumns: "20px 1fr",
+                                gap: 0.5,
+                                alignItems: "end",
+                                mt: 0.2,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  height: "100%",
+                                  display: "grid",
+                                  gridTemplateRows: "repeat(4, 1fr)",
+                                  color: "text.secondary",
+                                }}
+                              >
+                                {[30, 20, 10, 0].map((tick) => (
+                                  <Typography
+                                    key={tick}
+                                    sx={{
+                                      fontSize: 7.5,
+                                      lineHeight: 1,
+                                      alignSelf: "end",
+                                    }}
+                                  >
+                                    {tick}
+                                  </Typography>
+                                ))}
+                              </Box>
+                              <Box
+                                sx={{
+                                  height: "100%",
+                                  display: "grid",
+                                  gridTemplateColumns: `repeat(${card.rows.length}, 1fr)`,
+                                  alignItems: "end",
+                                  gap: 0.8,
+                                }}
+                              >
+                                {card.rows.map((row) => (
+                                  <Tooltip
+                                    key={row.label}
+                                    title={row.reason}
+                                    arrow
+                                    placement="top"
+                                  >
+                                    <Box
+                                      sx={{
+                                        height: "100%",
+                                        display: "grid",
+                                        gridTemplateRows: "1fr auto",
+                                        alignItems: "end",
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          height: "100%",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          alignItems: "center",
+                                          justifyContent: "flex-end",
+                                        }}
+                                      >
+                                        <Typography
+                                          sx={{
+                                            fontSize: 8,
+                                            fontWeight: 900,
+                                            lineHeight: 1,
+                                            mb: 0.3,
+                                            color: isDark
+                                              ? "#e2e8f0"
+                                              : "#0f172a",
+                                          }}
+                                        >
+                                          {row.value}
+                                        </Typography>
+                                        <Box
+                                          sx={{
+                                            width: "55%",
+                                            height: `${Math.max(
+                                              8,
+                                              (row.value / maxValue) * 80
+                                            )}%`,
+                                            minHeight: 8,
+                                            bgcolor: row.color,
+                                            borderRadius: "3px 3px 0 0",
+                                            boxShadow: `0 0 14px ${alpha(
+                                              row.color,
+                                              0.28
+                                            )}`,
+                                          }}
+                                        />
+                                      </Box>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 7.5,
+                                          fontWeight: 800,
+                                          color: "text.secondary",
+                                          lineHeight: 1.05,
+                                          textAlign: "center",
+                                        }}
+                                      >
+                                        {row.label}
+                                      </Typography>
+                                    </Box>
+                                  </Tooltip>
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+                        </Card>
+                        {isAlerts && (
+                          <Box
+                            sx={{
+                                      minHeight: 0,
+                            }}
+                          >
+                            <Card
+                              sx={{
+                                p: 1,
+                                width: "100%",
+                                height: "100%",
+                                display: "grid",
+                                gridTemplateRows: "auto 1fr auto",
+                                gap: 0.45,
+                                overflow: "hidden",
+                                border: `1px solid ${alpha(
+                                  executiveMetrics.avgDriver !== null &&
+                                    executiveMetrics.avgDriver >= 85
+                                    ? "#22c55e"
+                                    : executiveMetrics.avgDriver !== null &&
+                                      executiveMetrics.avgDriver >= 70
+                                    ? "#f59e0b"
+                                    : "#ef4444",
+                                  0.28
+                                )}`,
+                              }}
+                            >
+                              <Stack
+                                direction="row"
+                                alignItems="center"
+                                justifyContent="space-between"
+                              >
+                                <Typography sx={{ fontSize: 10, fontWeight: 900 }}>
+                                  Overall Driver Score
+                                </Typography>
+                                <Tooltip
+                                  title="Uses avg_driver_score from the backend fleet summary. If that field is absent, the card calculates the arithmetic mean of available vehicle driver_score values and excludes vehicles without a score."
+                                  arrow
+                                >
+                                  <InfoOutlinedIcon
+                                    aria-label="Overall Driver Score calculation"
+                                    sx={{ fontSize: 14, color: "text.secondary" }}
+                                  />
+                                </Tooltip>
+                              </Stack>
+                              {executiveMetrics.avgDriver !== null ? (
+                                <Stack justifyContent="center" spacing={0.75} sx={{ px: 0.8 }}>
+                                  <Box sx={{ textAlign: "center" }}>
+                                    <Typography
+                                      sx={{
+                                        fontSize: 27,
+                                        lineHeight: 1,
+                                        fontWeight: 950,
+                                        color:
+                                          executiveMetrics.avgDriver >= 85
+                                            ? "#22c55e"
+                                            : executiveMetrics.avgDriver >= 70
+                                            ? "#f59e0b"
+                                            : "#ef4444",
+                                      }}
+                                    >
+                                      {executiveMetrics.avgDriver.toFixed(1)}
+                                      <Box component="span" sx={{ fontSize: 11, color: "text.secondary" }}>
+                                        /100
+                                      </Box>
+                                    </Typography>
+                                    <Typography sx={{ mt: 0.35, fontSize: 9, fontWeight: 800, color: "text.secondary" }}>
+                                      {executiveMetrics.avgDriver >= 85
+                                        ? "Strong performance"
+                                        : executiveMetrics.avgDriver >= 70
+                                        ? "Coaching opportunity"
+                                        : "Needs attention"}
+                                    </Typography>
+                                  </Box>
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={Math.max(0, Math.min(100, executiveMetrics.avgDriver))}
+                                    sx={{
+                                      height: 6,
+                                      borderRadius: 999,
+                                      bgcolor: alpha("#94a3b8", 0.18),
+                                      "& .MuiLinearProgress-bar": {
+                                        borderRadius: 999,
+                                        bgcolor:
+                                          executiveMetrics.avgDriver >= 85
+                                            ? "#22c55e"
+                                            : executiveMetrics.avgDriver >= 70
+                                            ? "#f59e0b"
+                                            : "#ef4444",
+                                      },
+                                    }}
+                                  />
+                                </Stack>
+                              ) : (
+                                <Stack alignItems="center" justifyContent="center">
+                                  <Typography sx={{ fontSize: 13, fontWeight: 900 }}>No data</Typography>
+                                </Stack>
+                              )}
+                              <Typography sx={{ fontSize: 8.5, color: "text.secondary", textAlign: "center" }} noWrap>
+                                {executiveMetrics.driverScoreSource}
+                              </Typography>
+                            </Card>
+                          </Box>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </Box>
-              </Card>
               </Grid>
             </Grid>
 
@@ -6219,283 +6723,6 @@ export default function CockpitViewExecutive({
                 })}
               </DialogContent>
             </Dialog>
-
-            <Dialog
-              open={openHealthScorePopup}
-              onClose={() => setOpenHealthScorePopup(false)}
-              fullWidth
-              maxWidth="xs"
-            >
-              <Box
-                sx={{
-                  px: 2,
-                  py: 1.5,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <HealthAndSafetyOutlinedIcon sx={{ fontSize: 18, color: topHealthColor }} />
-                  <Typography sx={{ fontSize: "14px", fontWeight: 700 }}>
-                    Fleet Health Score
-                  </Typography>
-                </Stack>
-                <IconButton onClick={() => setOpenHealthScorePopup(false)} size="small">
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Box>
-              <DialogContent sx={{ p: 1.5, maxHeight: "75vh" }}>
-                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75, mb: 1.25 }}>
-                  {(
-                    [
-                      { label: "Active", statusKey: "active", color: "#22c55e" },
-                      { label: "Parked", statusKey: "parked", color: "#3b82f6" },
-                      { label: "Due for Service", statusKey: "in_service", color: "#8b5cf6" },
-                    ] as const
-                  ).map((g) => {
-                    const group = allPositions.filter((v: any) => v.status === g.statusKey);
-                    const avg = group.length
-                      ? group.reduce((s: number, v: any) => s + getLiveHealth(v), 0) / group.length
-                      : 0;
-                    return (
-                      <Box
-                        key={g.label}
-                        sx={{
-                          p: 1,
-                          borderRadius: 1.5,
-                          textAlign: "center",
-                          bgcolor: alpha(g.color, isDark ? 0.1 : 0.06),
-                          border: `1px solid ${alpha(g.color, 0.25)}`,
-                        }}
-                      >
-                        <Typography sx={{ fontSize: 18, fontWeight: 900, color: g.color, lineHeight: 1 }}>
-                          {avg.toFixed(0)}%
-                        </Typography>
-                        <Typography sx={{ fontSize: 8.5, fontWeight: 700, color: "text.secondary", mt: 0.3 }}>
-                          {g.label}
-                        </Typography>
-                        <Typography sx={{ fontSize: 8, color: "text.secondary" }}>
-                          {group.length} vehicles
-                        </Typography>
-                      </Box>
-                    );
-                  })}
-                </Box>
-                <Stack direction="row" spacing={0.75} sx={{ mb: 1.25 }}>
-                  {(
-                    [
-                      { label: "Normal", count: allPositions.filter((v: any) => getLiveHealth(v) >= 80).length, color: "#22c55e" },
-                      { label: "Warning", count: warningCount, color: "#f59e0b" },
-                      { label: "Critical", count: criticalCount, color: "#ef4444" },
-                    ] as const
-                  ).map((s) => (
-                    <Box
-                      key={s.label}
-                      sx={{
-                        flex: 1,
-                        textAlign: "center",
-                        py: 0.6,
-                        borderRadius: 1,
-                        bgcolor: alpha(s.color, isDark ? 0.12 : 0.07),
-                        border: `1px solid ${alpha(s.color, 0.25)}`,
-                      }}
-                    >
-                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: s.color, lineHeight: 1 }}>
-                        {s.count}
-                      </Typography>
-                      <Typography sx={{ fontSize: 7.5, fontWeight: 700, color: "text.secondary" }}>
-                        {s.label}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-                <Typography sx={{ fontSize: 10, fontWeight: 800, color: "text.secondary", mb: 0.5, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                  Critical Vehicles
-                </Typography>
-                {(() => {
-                  const criticalVehiclesList = [...allPositions]
-                    .filter((v: any) => getLiveHealth(v) < 60)
-                    .sort((a: any, b: any) => getLiveHealth(a) - getLiveHealth(b));
-                  if (criticalVehiclesList.length === 0) {
-                    return (
-                      <Typography sx={{ fontSize: 11, color: "text.secondary", textAlign: "center", py: 2 }}>
-                        No critical vehicles
-                      </Typography>
-                    );
-                  }
-                  return (
-                    <Stack spacing={0.5} sx={{ maxHeight: 220, overflowY: "auto" }}>
-                      {criticalVehiclesList.map((v: any) => (
-                        <Box
-                          key={v.vehicle_id}
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            px: 1,
-                            py: 0.6,
-                            borderRadius: 1,
-                            bgcolor: isDark ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8),
-                          }}
-                        >
-                          <Typography sx={{ fontSize: 11, fontWeight: 700 }}>{v.vehicle_id}</Typography>
-                          <Stack direction="row" spacing={0.75} alignItems="center">
-                            <Chip
-                              size="small"
-                              label={String(v.status).replace("_", " ")}
-                              sx={{ height: 16, fontSize: 8, fontWeight: 700, textTransform: "capitalize" }}
-                            />
-                            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#ef4444", minWidth: 32, textAlign: "right" }}>
-                              {getLiveHealth(v).toFixed(0)}%
-                            </Typography>
-                          </Stack>
-                        </Box>
-                      ))}
-                    </Stack>
-                  );
-                })()}
-              </DialogContent>
-            </Dialog>
-
-            <Dialog
-              open={openDriverScorePopup}
-              onClose={() => setOpenDriverScorePopup(false)}
-              fullWidth
-              maxWidth="sm"
-            >
-              <Box
-                sx={{
-                  px: 2,
-                  py: 1.5,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  borderBottom: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <PersonRoundedIcon sx={{ fontSize: 18, color: "#38bdf8" }} />
-                  <Typography sx={{ fontSize: "14px", fontWeight: 700 }}>
-                    Overall Driver Score
-                  </Typography>
-                </Stack>
-                <IconButton onClick={() => setOpenDriverScorePopup(false)} size="small">
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Box>
-              <DialogContent sx={{ p: 1.5, maxHeight: "75vh" }}>
-                {(() => {
-                  const scoredPositions = allPositions.filter((v: any) => Number.isFinite(Number(v.driver_score)));
-                  const topDriverClean = [...scoredPositions].sort(
-                    (a: any, b: any) => Number(b.driver_score) - Number(a.driver_score)
-                  )[0];
-                  const bottomDriverClean = [...scoredPositions].sort(
-                    (a: any, b: any) => Number(a.driver_score) - Number(b.driver_score)
-                  )[0];
-                  const bottomAlert = bottomDriverClean
-                    ? openAlerts.find((a: any) => String(a.source_id) === bottomDriverClean.vehicle_id)
-                    : null;
-                  const topAlert = topDriverClean
-                    ? openAlerts.find((a: any) => String(a.source_id) === topDriverClean.vehicle_id)
-                    : null;
-                  const bullets: string[] = [];
-                  if (bottomDriverClean) {
-                    bullets.push(
-                      bottomAlert
-                        ? `${bottomDriverClean.driver || "This driver"} (${bottomDriverClean.vehicle_id}) has an open ${String(bottomAlert.module || "").toLowerCase()} alert while running at ${Math.round(Number(bottomDriverClean.speed || 0))} km/h — the combination of a live mechanical fault and current driving style raises near-term breakdown risk.`
-                        : `${bottomDriverClean.driver || "This driver"} (${bottomDriverClean.vehicle_id}) has the fleet's lowest driver score at ${Number(bottomDriverClean.driver_score).toFixed(1)}/100 — worth a coaching conversation before the next dispatch.`
-                    );
-                  }
-                  if (topAlert && topDriverClean) {
-                    bullets.push(
-                      `${topDriverClean.driver || "The top driver"} (${topDriverClean.vehicle_id}) still has an open ${String(topAlert.module || "").toLowerCase()} alert despite a strong driver score — mechanical condition and driving behavior are independent risks, one doesn't offset the other.`
-                    );
-                  }
-                  bullets.push(
-                    executiveMetrics.avgDriver !== null && executiveMetrics.avgDriver < 80
-                      ? `Fleet-wide average driver score is ${executiveMetrics.avgDriver.toFixed(1)}/100 — below the 80 threshold generally used to flag a coaching program, not just a single outlier.`
-                      : `Fleet-wide average driver score is ${executiveMetrics.avgDriver !== null ? executiveMetrics.avgDriver.toFixed(1) : "--"}/100 — within a healthy range; the gap to watch is the spread between the best and lowest performers, not the average.`
-                  );
-                  return (
-                    <>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, mb: 1.5 }}>
-                        <Box
-                          sx={{
-                            p: 1.25,
-                            borderRadius: 1.5,
-                            bgcolor: alpha("#22c55e", isDark ? 0.1 : 0.06),
-                            border: `1px solid ${alpha("#22c55e", 0.25)}`,
-                          }}
-                        >
-                          <Typography sx={{ fontSize: 9, fontWeight: 800, color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.4 }}>
-                            Top Driver
-                          </Typography>
-                          <Typography sx={{ fontSize: 15, fontWeight: 900, mt: 0.3 }} noWrap>
-                            {topDriverClean?.driver || "—"}
-                          </Typography>
-                          <Typography sx={{ fontSize: 10, color: "text.secondary" }} noWrap>
-                            {topDriverClean?.vehicle_id} · {topDriverClean?.route_name || "—"}
-                          </Typography>
-                          <Typography sx={{ fontSize: 22, fontWeight: 900, color: "#22c55e", mt: 0.5, lineHeight: 1 }}>
-                            {topDriverClean ? Number(topDriverClean.driver_score).toFixed(1) : "--"}
-                            <Box component="span" sx={{ fontSize: 10, color: "text.secondary" }}>/100</Box>
-                          </Typography>
-                        </Box>
-                        <Box
-                          sx={{
-                            p: 1.25,
-                            borderRadius: 1.5,
-                            bgcolor: alpha("#ef4444", isDark ? 0.1 : 0.06),
-                            border: `1px solid ${alpha("#ef4444", 0.25)}`,
-                          }}
-                        >
-                          <Typography sx={{ fontSize: 9, fontWeight: 800, color: "#ef4444", textTransform: "uppercase", letterSpacing: 0.4 }}>
-                            Needs Coaching
-                          </Typography>
-                          <Typography sx={{ fontSize: 15, fontWeight: 900, mt: 0.3 }} noWrap>
-                            {bottomDriverClean?.driver || "—"}
-                          </Typography>
-                          <Typography sx={{ fontSize: 10, color: "text.secondary" }} noWrap>
-                            {bottomDriverClean?.vehicle_id} · {bottomDriverClean?.route_name || "—"}
-                          </Typography>
-                          <Typography sx={{ fontSize: 22, fontWeight: 900, color: "#ef4444", mt: 0.5, lineHeight: 1 }}>
-                            {bottomDriverClean ? Number(bottomDriverClean.driver_score).toFixed(1) : "--"}
-                            <Box component="span" sx={{ fontSize: 10, color: "text.secondary" }}>/100</Box>
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Typography sx={{ fontSize: 10, fontWeight: 800, color: "text.secondary", mb: 0.75, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                        Risk Notes
-                      </Typography>
-                      <Stack spacing={0.85}>
-                        {bullets.map((b, i) => (
-                          <Box key={i} sx={{ display: "flex", gap: 0.75, alignItems: "flex-start" }}>
-                            <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#f59e0b", mt: 0.6, flexShrink: 0 }} />
-                            <Typography sx={{ fontSize: 11, lineHeight: 1.5 }}>{b}</Typography>
-                          </Box>
-                        ))}
-                      </Stack>
-                    </>
-                  );
-                })()}
-              </DialogContent>
-            </Dialog>
-
-            <FleetAlertsPopup
-              open={alertsPopupOpen}
-              onClose={() => setAlertsPopupOpen(false)}
-              initialFilter={alertsPopupFilter}
-              isDark={isDark}
-            />
-
-            <VehicleSummaryPopup
-              open={!!vehicleSummaryPopupId}
-              onClose={() => setVehicleSummaryPopupId(null)}
-              vehicleId={vehicleSummaryPopupId}
-              isDark={isDark}
-            />
 
             <Dialog
               open={openFleetMap}
@@ -6827,25 +7054,10 @@ export default function CockpitViewExecutive({
               anchorReference="anchorPosition"
               anchorPosition={
                 popoverPosition
-                  ? (() => {
-                      // The Executive layout's map sits on the right side of
-                      // the screen (unlike Monitoring's, on the left), so a
-                      // fixed rightward offset routinely had no room left
-                      // before the viewport edge and rendered the popup back
-                      // on top of the map instead of beside it. Flip to the
-                      // left of the click point whenever there isn't enough
-                      // width remaining to the right for the popup itself.
-                      const vw = window.innerWidth;
-                      const popupWidthPx = selectedIsActive ? vw * 0.36 : 310;
-                      const gap = 24;
-                      const openLeft = popoverPosition.left + 80 + popupWidthPx > vw - gap;
-                      return {
-                        top: Math.max(gap, popoverPosition.top - 170),
-                        left: openLeft
-                          ? Math.max(gap, popoverPosition.left - popupWidthPx - gap)
-                          : popoverPosition.left + 80,
-                      };
-                    })()
+                  ? {
+                      top: popoverPosition.top - 170,
+                      left: popoverPosition.left + 80,
+                    }
                   : undefined
               }
               transformOrigin={{
@@ -6859,7 +7071,6 @@ export default function CockpitViewExecutive({
               BackdropProps={{ invisible: true, sx: { pointerEvents: "none" } }}
               slotProps={{
                 paper: {
-                  ref: popoverPaperRef,
                   sx: {
                     pointerEvents: "auto",
                     width: selectedIsActive ? "36%" : 310,
@@ -6878,10 +7089,7 @@ export default function CockpitViewExecutive({
 
                     bgcolor: "background.paper",
 
-                    // Initial position only — dragging updates this element's
-                    // transform imperatively (see applyDragTransform) rather
-                    // than through React state, to keep the drag smooth.
-                    transform: "translate(0px, 0px)",
+                    transform: `translate(${dragPos.x}px, ${dragPos.y}px) !important`,
 
                     /* ---------- GLOBAL TYPOGRAPHY ---------- */
 
@@ -6971,6 +7179,28 @@ export default function CockpitViewExecutive({
                   </Box>
 
                   <Stack direction="row" spacing={0.5} alignItems="center">
+                    {!disableExternalNav && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          fontSize: "8px",
+                          py: "1px",
+                          px: "6px",
+                          whiteSpace: "nowrap",
+                        }}
+                        onClick={() => {
+                          setSelectedVehicle(null);
+                          navigate(
+                            `/automotive?vehicle=${encodeURIComponent(
+                              selectedVehicle ?? ""
+                            )}`
+                          );
+                        }}
+                      >
+                        Deep Dive →
+                      </Button>
+                    )}
                     <IconButton
                       size="small"
                       onClick={() => setSelectedVehicle(null)}
@@ -7166,6 +7396,29 @@ export default function CockpitViewExecutive({
                                         </Stack>
                                       </span>
                                     </Tooltip>
+                                  )}
+                                  {!disableExternalNav && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={() => {
+                                        setSelectedVehicle(null);
+                                        navigate(
+                                          `/automotive?vehicle=${encodeURIComponent(
+                                            vehicleDetail.vehicle_id
+                                          )}`
+                                        );
+                                      }}
+                                      sx={{
+                                        fontSize: "8px",
+                                        py: "2px",
+                                        px: "8px",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      Deep Dive →
+                                    </Button>
                                   )}
                                 </Stack>
                               </Box>
@@ -8894,16 +9147,16 @@ export default function CockpitViewExecutive({
         sx={{
           display: "grid",
           // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
-          gap: 1,
+          gap: "var(--app-gap)",
           alignItems: "stretch",
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
-          mt: 0.75,
+          mt: 0,
         }}
       >
         <Box sx={{ flexGrow: 1, minHeight: 0, height: "100%" }}>
-          <Grid container spacing={1.5} sx={{ height: "100%", my: 0 }}>
+          <Grid container spacing={0.5} sx={{ height: "100%", my: 0 }}>
             {false && (
               <Grid
                 item
@@ -9824,452 +10077,258 @@ export default function CockpitViewExecutive({
                 height: "100%",
                 display: "grid",
                 gridTemplateRows: "1fr",
-                gap: 1.5,
+                gap: 0.75,
               }}
             >
+              {aiSummaryExpanded && (
+                <Box
+                  onClick={() => setAiSummaryExpanded(false)}
+                  sx={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 1299,
+                    bgcolor: alpha("#000", isDark ? 0.6 : 0.4),
+                    backdropFilter: "blur(2px)",
+                  }}
+                />
+              )}
+              <Card
+                sx={{
+                  p: 1,
+                  minHeight: 0,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  border: `1px solid ${alpha("#06b6d4", 0.28)}`,
+                  background: aiSummaryExpanded
+                    ? isDark
+                      ? "#0f172a"
+                      : "#ffffff"
+                    : isDark
+                    ? `linear-gradient(145deg, ${alpha(
+                        "#06b6d4",
+                        0.12
+                      )}, rgba(15,23,42,0.9))`
+                    : `linear-gradient(145deg, ${alpha(
+                        "#06b6d4",
+                        0.08
+                      )}, #ffffff)`,
+                  transition: "all 0.2s ease",
+                  ...(aiSummaryExpanded
+                    ? {
+                        position: "fixed",
+                        top: "4vh",
+                        left: "4vw",
+                        right: "4vw",
+                        bottom: "4vh",
+                        zIndex: 1300,
+                        boxShadow: `0 24px 60px ${alpha("#000", 0.4)}`,
+                      }
+                    : {}),
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, mb: 0.6 }}>
+                  <Box
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      display: "grid",
+                      placeItems: "center",
+                      color: "#8b5cf6",
+                      bgcolor: alpha("#8b5cf6", 0.14),
+                      border: `1px solid ${alpha("#8b5cf6", 0.25)}`,
+                    }}
+                  >
+                    <AutoAwesomeOutlinedIcon sx={{ fontSize: 14 }} />
+                  </Box>
+                  <Typography
+                    sx={{
+                      fontSize: 10.5,
+                      fontWeight: 900,
+                      color: isDark ? "#f8fafc" : "#0f172a",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    AI Executive Summary
+                  </Typography>
+                  <Box sx={{ flex: 1 }} />
+                  <Tooltip title={aiSummaryExpanded ? "Collapse summary" : "Click for detailed summary"} arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => setAiSummaryExpanded((v) => !v)}
+                      sx={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        color: "#3b82f6",
+                        background: `radial-gradient(circle, ${alpha("#3b82f6", 0.3)} 0%, ${alpha("#06b6d4", 0.16)} 55%, transparent 80%)`,
+                        border: `1px solid ${alpha("#3b82f6", 0.28)}`,
+                        boxShadow: `0 0 10px ${alpha("#3b82f6", isDark ? 0.3 : 0.2)}`,
+                      }}
+                    >
+                      {aiSummaryExpanded ? (
+                        <CloseFullscreenOutlinedIcon sx={{ fontSize: 17 }} />
+                      ) : (
+                        <PsychologyOutlinedIcon sx={{ fontSize: 22 }} />
+                      )}
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
                 <Box
                   sx={{
-                    display: "grid",
-                    gap: 1.5,
-                    width: "100%",
-                    height: "100%",
+                    flex: 1,
                     minHeight: 0,
-                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    gridTemplateRows: "repeat(2, minmax(0, 1fr))",
-                    gridAutoRows: "minmax(0, 1fr)",
-                    "& > .MuiCard-root": {
-                      borderRadius: 2,
-                      boxShadow: isDark
-                        ? `0 8px 22px ${alpha("#000", 0.18)}`
-                        : `0 8px 22px ${alpha("#0f172a", 0.06)}`,
-                    },
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 0.85,
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                    pr: 0.35,
                   }}
                 >
-                  {/* Cell 1: Fleet Health Score */}
-                  <Card
-                    onClick={() => setOpenHealthScorePopup(true)}
-                    sx={{
-                      p: 1,
-                      minHeight: 0,
-                      height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto 1fr auto",
-                      gap: 0.25,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      transition: "border-color 0.15s, transform 0.15s",
-                      border: `1px solid ${alpha(topHealthColor, 0.28)}`,
-                      background: isDark
-                        ? `linear-gradient(145deg, ${alpha(topHealthColor, 0.14)}, rgba(15,23,42,0.92))`
-                        : `linear-gradient(145deg, ${alpha(topHealthColor, 0.08)}, #ffffff)`,
-                      "&:hover": {
-                        borderColor: alpha(topHealthColor, 0.5),
-                        transform: "translateY(-1px)",
-                      },
-                    }}
-                  >
-                    <Typography sx={topCardTitleSx}>
-                      Fleet Health Score
-                    </Typography>
-                    <Box sx={{ minHeight: 0 }}>
-                      <HealthGauge
-                        value={healthScoreValue}
-                        color={topHealthColor}
-                        formatter="{value}"
-                      />
-                    </Box>
-                    <Box sx={{ textAlign: "center", mt: -1 }}>
-                      <Typography sx={topCardMetaSx}>/100</Typography>
-                      <Typography
-                        sx={{ ...topCardSubSx, color: topHealthColor }}
-                      >
-                        {scoreLabel(healthScoreValue)}
-                      </Typography>
-                    </Box>
-                  </Card>
-
-                  {/* Cell 2: Fleet Availability + Utilization Score merged */}
-                  <Card
-                    sx={{
-                      p: 1,
-                      minHeight: 0,
-                      height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto 1fr auto",
-                      gap: 0.4,
-                      overflow: "hidden",
-                      border: `1px solid ${alpha(topAvailabilityColor, 0.28)}`,
-                      background: isDark
-                        ? `linear-gradient(145deg, ${alpha(topAvailabilityColor, 0.1)}, rgba(15,23,42,0.92))`
-                        : `linear-gradient(145deg, ${alpha(topAvailabilityColor, 0.06)}, #ffffff)`,
-                    }}
-                  >
-                    <Typography sx={topCardTitleSx}>
-                      Availability &amp; Utilization
-                    </Typography>
-                    <Box
+                  {aiSummaryExpanded && (
+                    <Typography
                       sx={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 0.6,
-                        minHeight: 0,
+                        fontSize: 10.5,
+                        lineHeight: 1.55,
+                        color: "text.secondary",
+                        flexShrink: 0,
+                        mb: 0.3,
                       }}
                     >
-                      <Box
-                        sx={{
-                          textAlign: "center",
-                          borderRight: `1px solid ${alpha(topAvailabilityColor, 0.18)}`,
-                          pr: 0.5,
-                        }}
-                      >
-                        <Typography sx={{ ...topCardValueSx, fontSize: 19, color: topAvailabilityColor }}>
-                          {availabilityScore}%
-                        </Typography>
-                        <Typography sx={topCardMetaSx}>Available</Typography>
-                        <Typography sx={{ ...topCardMetaSx, fontSize: 8 }}>
-                          {activeCount + parkedCount}/{executiveMetrics.total || 0}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: "center", pl: 0.5 }}>
-                        <Typography sx={{ ...topCardValueSx, fontSize: 19, color: topUtilizationColor }}>
-                          {utilizationScore}%
-                        </Typography>
-                        <Typography sx={topCardMetaSx}>Utilized</Typography>
-                        <Typography sx={{ ...topCardMetaSx, fontSize: 8 }}>
-                          {activeCount} active
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Stack
-                      direction="row"
-                      spacing={0.4}
-                      sx={{ minHeight: 0, justifyContent: "center", flexWrap: "wrap" }}
-                    >
-                      {availabilityRows.map((row) => (
-                        <Box key={row.label} sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
-                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: row.color, flexShrink: 0 }} />
-                          <Typography sx={{ ...topCardMetaSx, fontSize: 7.5 }}>{row.value}</Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </Card>
-
-                  {/* Cell 3: Avg Engine Health */}
-                  <Card
-                    sx={{
-                      p: 1,
-                      minHeight: 0,
-                      height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto 1fr auto",
-                      alignItems: "center",
-                      gap: 0.4,
-                      overflow: "hidden",
-                      border: `1px solid ${alpha("#f97316", 0.28)}`,
-                      background: isDark
-                        ? `linear-gradient(145deg, ${alpha("#f97316", 0.12)}, rgba(15,23,42,0.92))`
-                        : `linear-gradient(145deg, ${alpha("#f97316", 0.07)}, #ffffff)`,
-                    }}
-                  >
-                    <Typography sx={topCardTitleSx}>Avg Engine Health</Typography>
-                    <Box sx={{ textAlign: "center" }}>
-                      <SpeedOutlinedIcon sx={{ fontSize: 20, color: "#f97316", mb: 0.2 }} />
-                      <Typography sx={{ ...topCardValueSx, color: "#f97316" }}>{avgEngineHealth}%</Typography>
-                    </Box>
-                    <Typography sx={{ ...topCardMetaSx, textAlign: "center" }}>
-                      by 2% in 24 hours
+                      {aiExecutiveStory}
                     </Typography>
-                  </Card>
-
-                  {/* Cell 4: Alerts Summary + Active Alerts merged */}
-                  <Card
-                    onClick={() => {
-                      setAlertsPopupFilter("all");
-                      setAlertsPopupOpen(true);
-                    }}
-                    sx={{
-                      p: 1,
-                      minHeight: 0,
-                      height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto auto 1fr",
-                      gap: 0.4,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      transition: "border-color 0.15s, transform 0.15s",
-                      border: `1px solid ${alpha("#ef4444", 0.24)}`,
-                      background: isDark
-                        ? `linear-gradient(145deg, ${alpha("#ef4444", 0.1)}, rgba(15,23,42,0.92))`
-                        : `linear-gradient(145deg, ${alpha("#ef4444", 0.06)}, #ffffff)`,
-                      "&:hover": {
-                        borderColor: alpha("#ef4444", 0.5),
-                        transform: "translateY(-1px)",
-                      },
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography sx={{ fontSize: 10, fontWeight: 900, color: "text.secondary" }}>
-                        Alerts Summary
-                      </Typography>
-                      <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#ef4444", lineHeight: 1 }}>
-                        {alertTotal ?? 0}
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 8, color: "text.secondary" }}>
-                      {executiveMetrics.resolvedToday} resolved today · click for details
-                    </Typography>
-                    <Stack direction="row" spacing={0.5} sx={{ minHeight: 0 }}>
-                      {alertChartRows.map((row) => (
+                  )}
+                  {aiSummaryExpanded
+                    ? aiExecutiveInsights.map((insight) => (
                         <Box
-                          key={row.label}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAlertsPopupFilter(row.alertsTab as "critical" | "warning" | "resolved");
-                            setAlertsPopupOpen(true);
-                          }}
+                          key={insight.label}
                           sx={{
-                            flex: 1,
-                            textAlign: "center",
-                            borderRadius: 1,
-                            py: 0.5,
-                            bgcolor: alpha(row.color, isDark ? 0.13 : 0.08),
-                            border: `1px solid ${alpha(row.color, 0.2)}`,
-                            cursor: "pointer",
-                            transition: "border-color 0.15s",
-                            "&:hover": { borderColor: alpha(row.color, 0.5) },
+                            minWidth: 0,
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 0.9,
+                            px: 0.15,
+                            py: 0.85,
+                            borderBottom: `1px solid ${
+                              isDark ? "rgba(148,163,184,0.14)" : "rgba(148,163,184,0.22)"
+                            }`,
+                            "&:last-of-type": { borderBottom: "none" },
                           }}
                         >
-                          <Typography sx={{ fontSize: 13, fontWeight: 900, color: row.color, lineHeight: 1 }}>
-                            {row.value}
-                          </Typography>
-                          <Typography sx={{ fontSize: 7, fontWeight: 800, color: "text.secondary" }}>
-                            {row.label}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </Card>
-
-                  {/* Cell 5: Maintenance Forecast */}
-                  <Card
-                    onClick={() => setOpenMaintenanceForecast(true)}
-                    sx={{
-                      p: 1,
-                      minHeight: 0,
-                      height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto 1fr",
-                      gap: 0.45,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      transition: "border-color 0.15s, transform 0.15s",
-                      border: `1px solid ${alpha("#38bdf8", 0.24)}`,
-                      background: isDark
-                        ? `linear-gradient(145deg, ${alpha("#38bdf8", 0.1)}, rgba(15,23,42,0.92))`
-                        : `linear-gradient(145deg, ${alpha("#38bdf8", 0.06)}, #ffffff)`,
-                      "&:hover": {
-                        borderColor: alpha("#38bdf8", 0.5),
-                        transform: "translateY(-1px)",
-                      },
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography sx={{ fontSize: 10, fontWeight: 900, color: "text.secondary" }}>
-                        Maintenance Forecast
-                      </Typography>
-                      <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#22c55e", lineHeight: 1 }}>
-                        {maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length}
-                      </Typography>
-                    </Stack>
-                    <Box
-                      sx={{
-                        flex: 1,
-                        minHeight: 0,
-                        display: "grid",
-                        gridTemplateColumns: "20px 1fr",
-                        gap: 0.5,
-                        alignItems: "end",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          height: "100%",
-                          display: "grid",
-                          gridTemplateRows: "repeat(4, 1fr)",
-                          color: "text.secondary",
-                        }}
-                      >
-                        {[30, 20, 10, 0].map((tick) => (
-                          <Typography key={tick} sx={{ fontSize: 7.5, lineHeight: 1, alignSelf: "end" }}>
-                            {tick}
-                          </Typography>
-                        ))}
-                      </Box>
-                      <Box
-                        sx={{
-                          height: "100%",
-                          display: "grid",
-                          gridTemplateColumns: `repeat(${maintenanceRows.length}, 1fr)`,
-                          alignItems: "end",
-                          gap: 0.8,
-                        }}
-                      >
-                        {maintenanceRows.map((row) => (
-                          <Tooltip key={row.label} title={row.reason} arrow placement="top">
-                            <Box
-                              sx={{
-                                height: "100%",
-                                display: "grid",
-                                gridTemplateRows: "1fr auto",
-                                alignItems: "end",
-                                minWidth: 0,
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  height: "100%",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  justifyContent: "flex-end",
-                                }}
-                              >
-                                <Typography
-                                  sx={{
-                                    fontSize: 8,
-                                    fontWeight: 900,
-                                    lineHeight: 1,
-                                    mb: 0.3,
-                                    color: isDark ? "#e2e8f0" : "#0f172a",
-                                  }}
-                                >
-                                  {row.value}
-                                </Typography>
-                                <Box
-                                  sx={{
-                                    width: "55%",
-                                    height: `${Math.max(
-                                      8,
-                                      (row.value / Math.max(1, ...maintenanceRows.map((r) => r.value))) * 80
-                                    )}%`,
-                                    minHeight: 8,
-                                    bgcolor: row.color,
-                                    borderRadius: "3px 3px 0 0",
-                                    boxShadow: `0 0 14px ${alpha(row.color, 0.28)}`,
-                                  }}
-                                />
-                              </Box>
+                          <Box
+                            aria-hidden="true"
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              mt: 0.5,
+                              borderRadius: "50%",
+                              bgcolor: insight.color,
+                              boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Stack direction="row" alignItems="baseline" flexWrap="wrap" spacing={0.75}>
                               <Typography
                                 sx={{
-                                  fontSize: 7.5,
-                                  fontWeight: 800,
-                                  color: "text.secondary",
-                                  lineHeight: 1.05,
-                                  textAlign: "center",
+                                  minWidth: 0,
+                                  fontSize: 10.5,
+                                  fontWeight: 900,
+                                  color: isDark ? "#f8fafc" : "#0f172a",
                                 }}
                               >
-                                {row.label}
+                                {insight.label}:
                               </Typography>
-                            </Box>
-                          </Tooltip>
-                        ))}
-                      </Box>
-                    </Box>
-                  </Card>
-
-                  {/* Cell 6: Overall Driver Score */}
-                  <Card
-                    onClick={() => setOpenDriverScorePopup(true)}
-                    sx={{
-                      p: 1,
-                      minHeight: 0,
-                      height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto 1fr auto",
-                      gap: 0.45,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      transition: "border-color 0.15s, transform 0.15s",
-                      border: `1px solid ${alpha(
-                        executiveMetrics.avgDriver !== null && executiveMetrics.avgDriver >= 85
-                          ? "#22c55e"
-                          : executiveMetrics.avgDriver !== null && executiveMetrics.avgDriver >= 70
-                          ? "#f59e0b"
-                          : "#ef4444",
-                        0.28
-                      )}`,
-                      "&:hover": { transform: "translateY(-1px)" },
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography sx={{ fontSize: 10, fontWeight: 900 }}>
-                        Overall Driver Score
-                      </Typography>
-                      <Tooltip title="Uses avg_driver_score from the backend fleet summary. Click for details." arrow>
-                        <InfoOutlinedIcon
-                          aria-label="Overall Driver Score calculation"
-                          sx={{ fontSize: 14, color: "text.secondary" }}
-                        />
-                      </Tooltip>
-                    </Stack>
-                    {executiveMetrics.avgDriver !== null ? (
-                      <Stack justifyContent="center" spacing={0.75} sx={{ px: 0.8 }}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <Typography
-                            sx={{
-                              fontSize: 27,
-                              lineHeight: 1,
-                              fontWeight: 950,
-                              color:
-                                executiveMetrics.avgDriver >= 85
-                                  ? "#22c55e"
-                                  : executiveMetrics.avgDriver >= 70
-                                  ? "#f59e0b"
-                                  : "#ef4444",
-                            }}
-                          >
-                            {executiveMetrics.avgDriver.toFixed(1)}
-                            <Box component="span" sx={{ fontSize: 11, color: "text.secondary" }}>
-                              /100
-                            </Box>
-                          </Typography>
-                          <Typography sx={{ mt: 0.35, fontSize: 9, fontWeight: 800, color: "text.secondary" }}>
-                            {executiveMetrics.avgDriver >= 85
-                              ? "Strong performance"
-                              : executiveMetrics.avgDriver >= 70
-                              ? "Coaching opportunity"
-                              : "Needs attention"}
-                          </Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: 10.5,
+                                  lineHeight: 1.2,
+                                  fontWeight: 900,
+                                  color: insight.color,
+                                  px: 0.6,
+                                  py: 0.2,
+                                  borderRadius: 0.65,
+                                  bgcolor: alpha(insight.color, isDark ? 0.14 : 0.09),
+                                }}
+                              >
+                                {insight.value}
+                              </Typography>
+                            </Stack>
+                            <Typography sx={{ mt: 0.35, fontSize: 10.5, lineHeight: 1.5, color: "text.secondary" }}>
+                              {insight.detail}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                mt: 0.3,
+                                fontSize: 10.5,
+                                lineHeight: 1.5,
+                                fontWeight: 750,
+                                color: isDark ? "#dbeafe" : "#334155",
+                              }}
+                            >
+                              {insight.action}
+                            </Typography>
+                          </Box>
                         </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={Math.max(0, Math.min(100, executiveMetrics.avgDriver))}
+                      ))
+                    : aiExecutiveInsights
+                        .filter((insight) => insight.label !== "Driver requiring coaching")
+                        .slice(0, 6)
+                        .map((insight) => (
+                        <Box
+                          key={insight.label}
                           sx={{
-                            height: 6,
-                            borderRadius: 999,
-                            bgcolor: alpha("#94a3b8", 0.18),
-                            "& .MuiLinearProgress-bar": {
-                              borderRadius: 999,
-                              bgcolor:
-                                executiveMetrics.avgDriver >= 85
-                                  ? "#22c55e"
-                                  : executiveMetrics.avgDriver >= 70
-                                  ? "#f59e0b"
-                                  : "#ef4444",
-                            },
+                            minWidth: 0,
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 0.9,
+                            px: 0.15,
+                            py: 0.5,
                           }}
-                        />
-                      </Stack>
-                    ) : (
-                      <Stack alignItems="center" justifyContent="center">
-                        <Typography sx={{ fontSize: 13, fontWeight: 900 }}>No data</Typography>
-                      </Stack>
-                    )}
-                    <Typography sx={{ fontSize: 8.5, color: "text.secondary", textAlign: "center" }} noWrap>
-                      {executiveMetrics.driverScoreSource}
-                    </Typography>
-                  </Card>
+                        >
+                          <Box
+                            aria-hidden="true"
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              mt: 0.5,
+                              borderRadius: "50%",
+                              bgcolor: insight.color,
+                              boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography sx={{ fontSize: 10.5, lineHeight: 1.5 }}>
+                              <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                                {insight.label}:
+                              </Box>{" "}
+                              <Box component="span" sx={{ fontWeight: 900, color: insight.color }}>
+                                {insight.value}.
+                              </Box>{" "}
+                              {firstSentence(insight.detail)}
+                            </Typography>
+                            {insight.label !== "Fleet condition" && (
+                              <Typography
+                                sx={{
+                                  mt: 0.2,
+                                  fontSize: 10.5,
+                                  lineHeight: 1.4,
+                                  fontWeight: 750,
+                                  color: isDark ? "#dbeafe" : "#334155",
+                                }}
+                              >
+                                {insight.action}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      ))}
                 </Box>
+              </Card>
             </Grid>
 
             <Grid item xs={12} sm={7} sx={{ minHeight: 0, height: "100%" }}>
@@ -10793,15 +10852,26 @@ export default function CockpitViewExecutive({
                               >
                                 <Box>
                                   <Typography
-                                    onClick={() => setVehicleSummaryPopupId(row.vehicle_id)}
+                                    onClick={() => {
+                                      if (disableExternalNav) return;
+                                      navigate(
+                                        `/automotive?vehicle=${encodeURIComponent(
+                                          row.vehicle_id
+                                        )}`
+                                      );
+                                    }}
                                     sx={{
                                       fontSize: "12px",
                                       fontWeight: 700,
-                                      color: isDark ? "#22d3ee" : "#0891b2",
+                                      color: disableExternalNav
+                                        ? "text.primary"
+                                        : isDark ? "#22d3ee" : "#0891b2",
                                       lineHeight: 1.25,
-                                      cursor: "pointer",
-                                      textDecoration: "underline",
-                                      "&:hover": { color: "#1976d2" },
+                                      cursor: disableExternalNav ? "default" : "pointer",
+                                      textDecoration: disableExternalNav ? "none" : "underline",
+                                      "&:hover": disableExternalNav
+                                        ? {}
+                                        : { color: "#1976d2" },
                                     }}
                                   >
                                     {(row.name ?? row.vehicle_id)
