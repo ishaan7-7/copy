@@ -2291,20 +2291,32 @@
       }
       .index-doc-header {
         padding: 18px 22px 16px;
-        min-height: 115px;
         box-sizing: border-box;
         color: #fff;
       }
       .index-doc-header.index-link-header {
         cursor: pointer;
-        transition: filter 0.15s ease, transform 0.15s ease;
+        transition: filter 0.2s ease, transform 0.2s ease,
+          box-shadow 0.2s ease;
       }
       .index-doc-header.index-link-header:hover,
       .index-doc-header.index-link-header:focus-visible {
-        filter: brightness(1.1);
-        transform: translateY(-1px);
-        outline: 3px solid rgba(255, 255, 255, 0.75);
-        outline-offset: -3px;
+        filter: brightness(1.08);
+        transform: translateY(-3px);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.22);
+      }
+      .index-doc-header.index-link-header:focus-visible {
+        outline: 2px solid rgba(255, 255, 255, 0.85);
+        outline-offset: 2px;
+      }
+      html.dark .index-doc-header.index-link-header:hover,
+      html.dark .index-doc-header.index-link-header:focus-visible {
+        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55),
+          0 0 22px rgba(96, 165, 250, 0.3);
+      }
+      html.dark .index-doc-header.index-link-header:focus-visible {
+        outline: 2px solid #93c5fd;
+        outline-offset: 2px;
       }
       .index-doc-num {
         font-size: 10px;
@@ -2744,14 +2756,63 @@
             });
           });
         }
+
+        // Card header heights are content-driven (title/description wrap
+        // differently per document and per viewport width), so a fixed CSS
+        // height can't keep them level at every width — measure the tallest
+        // rendered header and apply it to all as a floor instead. Re-runs on
+        // resize and once web fonts finish loading, since either can change
+        // how many lines the title/description wrap to.
+        function equalizeIndexHeaders() {
+          var headers = document.querySelectorAll(
+            ".master-index .index-doc-header"
+          );
+          if (!headers.length) return;
+          var i;
+          for (i = 0; i < headers.length; i++) headers[i].style.minHeight = "";
+          var max = 0;
+          for (i = 0; i < headers.length; i++) {
+            var h = headers[i].getBoundingClientRect().height;
+            if (h > max) max = h;
+          }
+          for (i = 0; i < headers.length; i++)
+            headers[i].style.minHeight = max + "px";
+        }
+
+        var indexHeaderEqualizeTimer;
+        function scheduleEqualizeIndexHeaders() {
+          clearTimeout(indexHeaderEqualizeTimer);
+          indexHeaderEqualizeTimer = setTimeout(function () {
+            requestAnimationFrame(function () {
+              requestAnimationFrame(equalizeIndexHeaders);
+            });
+          }, 50);
+        }
+
+        function initIndexHeaderEqualizer() {
+          scheduleEqualizeIndexHeaders();
+          var content = document.querySelectorAll(
+            ".master-index .index-doc-title, .master-index .index-doc-desc"
+          );
+          var i;
+          if (window.ResizeObserver && content.length) {
+            var observer = new ResizeObserver(scheduleEqualizeIndexHeaders);
+            for (i = 0; i < content.length; i++) observer.observe(content[i]);
+          } else {
+            window.addEventListener("resize", scheduleEqualizeIndexHeaders);
+          }
+        }
+
         if (document.readyState === "loading") {
           document.addEventListener("DOMContentLoaded", function () {
             initScopedAnchorNavigation();
             initIndexNavigation();
+            initIndexHeaderEqualizer();
           });
         } else {
           initScopedAnchorNavigation();
           initIndexNavigation();
+          initIndexHeaderEqualizer();
         }
       })();
     </script>
