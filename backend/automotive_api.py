@@ -1120,6 +1120,20 @@ def get_vehicle_summary(vehicle_id: str):
 
     import pandas as pd
 
+    is_historical = vehicle_id in _HISTORICAL_IDS
+
+    # ── 0. Fleet sim data — fetched once up front so the historical-vehicle
+    # fallbacks below (module health, last trip) can reuse it instead of each
+    # making their own request. Returns empty dict if the simulator is
+    # offline, same as before.
+    fleet_sim: dict = {}
+    try:
+        import urllib.request as _urllib_req
+        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=5)
+        fleet_sim = json.loads(_req.read())
+    except Exception:
+        pass
+
     # ── 1. Health snapshot from live cache ────────────────────────────────────
     health_snapshot: dict = {
         "health_score": None,
@@ -1147,12 +1161,36 @@ def get_vehicle_summary(vehicle_id: str):
                     health_snapshot["fleet_rank"] = rank
                     break
 
+    # Historical vehicles never appear in the live "fleet-summary" cache (it's
+    # sourced from the live gold stream, which only currently-active vehicles
+    # write to) — fleet_sim_server already resolves last-known module health
+    # correctly for them via its own precomputed last_state cache, so fall
+    # back to that instead of duplicating a batch-gold-parquet read here.
+    if not health_snapshot.get("module_contribs") or not any(health_snapshot["module_contribs"].values()):
+        sim_module_health = fleet_sim.get("module_health") or {}
+        if sim_module_health:
+            sim_health = fleet_sim.get("health", health_snapshot.get("health_score"))
+            sim_status = (
+                "CRITICAL" if sim_health is not None and sim_health < 60
+                else "WARNING" if sim_health is not None and sim_health < 80
+                else "OK" if sim_health is not None
+                else health_snapshot.get("status", "UNKNOWN")
+            )
+            health_snapshot = {
+                "health_score": sim_health,
+                "status": sim_status,
+                "fleet_rank": health_snapshot.get("fleet_rank"),
+                "fleet_total": health_snapshot.get("fleet_total"),
+                "module_contribs": {mod: sim_module_health.get(mod) for mod in _VEHICLE_MODULES},
+            }
+
     # ── 2. KPI snapshot (latest bronze sensor values per module) ──────────────
+    _bronze_root = _BATCH_BRONZE_ROOT if is_historical else _DELTA_ROOT
     kpi_snapshot: dict = {}
     for mod in _VEHICLE_MODULES:
         sensors = _KPI_SENSORS.get(mod, [])
         kpi_snapshot[mod] = {"sensors": []}
-        partition_path = os.path.join(_DELTA_ROOT, mod, f"source_id={vehicle_id}")
+        partition_path = os.path.join(_bronze_root, mod, f"source_id={vehicle_id}")
         sensor_vals: dict = {}
         if os.path.exists(partition_path):
             pfiles = dr.list_files(partition_path, max_files=5)
@@ -1207,7 +1245,7 @@ def get_vehicle_summary(vehicle_id: str):
 
     # ── 3. Service info (odometer from body bronze) ───────────────────────────
     odometer_km: float | None = None
-    body_partition = os.path.join(_DELTA_ROOT, "body", f"source_id={vehicle_id}")
+    body_partition = os.path.join(_bronze_root, "body", f"source_id={vehicle_id}")
     if os.path.exists(body_partition):
         bfiles = dr.list_files(body_partition, max_files=5)
         if bfiles:
@@ -1236,11 +1274,15 @@ def get_vehicle_summary(vehicle_id: str):
     feature_scores: dict = {}
     feature_modules: dict = {}
     for mod in _VEHICLE_MODULES:
-        silver_path = os.path.join(_SILVER_ROOT, mod)
-        if not os.path.exists(silver_path):
-            continue
         try:
-            combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
+            if is_historical:
+                _bsp = os.path.join(_BATCH_SILVER_ROOT, mod, f"source_id={vehicle_id}", "silver.parquet")
+                combined = pd.read_parquet(_bsp) if os.path.exists(_bsp) else pd.DataFrame()
+            else:
+                silver_path = os.path.join(_SILVER_ROOT, mod)
+                if not os.path.exists(silver_path):
+                    continue
+                combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
             if combined.empty or "top_features" not in combined.columns:
                 continue
             for raw in combined["top_features"].dropna():
@@ -1284,6 +1326,27 @@ def get_vehicle_summary(vehicle_id: str):
         except Exception:
             pass
 
+    # Historical vehicles have no dtc_history.json entry until someone
+    # manually clicks Investigate on one of their alerts — fall back to the
+    # precomputed synthetic DTC layer so the Recent DTC card isn't empty by
+    # default, reshaped into the same {code, severity, message} trigger shape
+    # the frontend already renders for live-analyzed runs.
+    if last_dtc is None and is_historical:
+        _hist_dtcs = _load_historical_layer(vehicle_id, "dtcs") or []
+        if _hist_dtcs:
+            last_dtc = {
+                "source_id": vehicle_id,
+                "run_ts": None,
+                "triggers": [
+                    {
+                        "code": d.get("dtc_code"),
+                        "severity": str(d.get("severity", "")).upper(),
+                        "message": d.get("dashboard_message") or d.get("description"),
+                    }
+                    for d in _hist_dtcs
+                ],
+            }
+
     # ── 6. Alerts summary from live cache ────────────────────────────────────
     alerts_live = _get_live(f"alerts-{vehicle_id}")
     open_alerts: list = alerts_live.get("open", []) if alerts_live else []
@@ -1294,17 +1357,25 @@ def get_vehicle_summary(vehicle_id: str):
         "recent_open": open_alerts[:8],
     }
 
-    # ── 7. Fleet sim data (optional — returns empty dict if simulator offline) ─
-    fleet_sim: dict = {}
+    # ── 7. Trip data — fleet_sim was already fetched in step 0 above. Active
+    # vehicles get their in-progress trip; historical vehicles get their most
+    # recent completed trip from the dedicated /last-trip route (which reads
+    # fleet_sim_server's own precomputed cache — same source last_state's
+    # module_health came from) instead of leaving trip_data empty.
     trip_data: dict = {}
+    last_trip_data: dict = {}
     try:
         import urllib.request as _urllib_req
-        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=5)
-        fleet_sim = json.loads(_req.read())
         if fleet_sim.get("status") == "active":
             try:
                 _treq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/trip", timeout=5)
                 trip_data = json.loads(_treq.read())
+            except Exception:
+                pass
+        else:
+            try:
+                _ltreq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/last-trip", timeout=5)
+                last_trip_data = json.loads(_ltreq.read()).get("last_trip") or {}
             except Exception:
                 pass
     except Exception:
@@ -1320,6 +1391,7 @@ def get_vehicle_summary(vehicle_id: str):
         "alerts_summary": alerts_summary,
         "fleet_sim": fleet_sim,
         "trip_data": trip_data,
+        "last_trip_data": last_trip_data,
     }
     _set_cache(cache_key, result)
     return result

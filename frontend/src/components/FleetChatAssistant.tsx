@@ -972,7 +972,7 @@ export default function FleetChatAssistant({
     setQuestionInput("");
     setTyping(true);
 
-    const delay = 250 + Math.floor(Math.random() * 251);
+    const delay = 1200 + Math.floor(Math.random() * 1000);
     Promise.all([resolveAnswer(cleanQuestion), minDelay(delay)]).then(([answer]) =>
       pushAssistantAnswer(answer)
     );
@@ -986,7 +986,7 @@ export default function FleetChatAssistant({
     ]);
     setTyping(true);
 
-    const delay = 250 + Math.floor(Math.random() * 251);
+    const delay = 1200 + Math.floor(Math.random() * 1000);
     Promise.all([runTopic(topic, topicCtx), minDelay(delay)]).then(([answer]) =>
       pushAssistantAnswer(answer)
     );

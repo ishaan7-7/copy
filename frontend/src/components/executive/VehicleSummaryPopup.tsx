@@ -95,6 +95,17 @@ export default function VehicleSummaryPopup({
   const queryClient = useQueryClient();
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [xAxisMode, setXAxisMode] = useState<"timestamp" | "mileage">("timestamp");
+  // Resolve is optimistic (below) but the underlying alert caches only
+  // refresh every 3-5s server-side — a background refetch landing inside
+  // that window can briefly report the alert as still OPEN and clobber the
+  // optimistic patch. resolvedIds pins the locally-resolved state so the
+  // badge/section placement can't flicker back, for the life of this popup.
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  // Decoupled from resolveMutation.isPending on purpose — that reflects the
+  // raw network promise, which can vary with backend load. A short, bounded
+  // local timer keeps the "Resolving…" → resolved transition predictable
+  // regardless of how long the actual request takes underneath.
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const enabled = open && !!vehicleId;
 
@@ -197,6 +208,24 @@ export default function VehicleSummaryPopup({
     }
   };
 
+  const handleResolve = (alert: any) => {
+    setResolvedIds((prev) => new Set(prev).add(alert.alert_id));
+    setResolvingId(alert.alert_id);
+    resolveMutation.mutate(alert, {
+      onError: () => {
+        setResolvedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(alert.alert_id);
+          return next;
+        });
+      },
+    });
+    const delay = 1500 + Math.random() * 1000;
+    setTimeout(() => {
+      setResolvingId((cur) => (cur === alert.alert_id ? null : cur));
+    }, delay);
+  };
+
   const summaryData: any = summaryQuery.data;
   const behaviorData: any = behaviorQuery.data;
   const healthScore: number | null = summaryData?.health_snapshot?.health_score ?? null;
@@ -209,9 +238,25 @@ export default function VehicleSummaryPopup({
   const serviceProgress = odometerKm != null ? Math.min(100, ((odometerKm % 15000) / 15000) * 100) : 0;
   const fleetSimData: any = summaryData?.fleet_sim ?? {};
   const tripData: any = summaryData?.trip_data ?? null;
+  const lastTripData: any = summaryData?.last_trip_data ?? null;
   const isVehicleActive = fleetSimData?.status === "active";
   const lastDtc: any = summaryData?.last_dtc ?? null;
-  const dtcTriggers: any[] = lastDtc?.triggers ?? [];
+  // Investigate can run the same alert's peak window more than once, and the
+  // precomputed historical DTC layer can repeat a code across modules-worth
+  // of entries — de-dupe by code so the same fault doesn't eat two of the
+  // card's two visible rows.
+  const dtcTriggers: any[] = useMemo(() => {
+    const raw: any[] = lastDtc?.triggers ?? [];
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const t of raw) {
+      const code = t.code || "";
+      if (seen.has(code)) continue;
+      seen.add(code);
+      out.push(t);
+    }
+    return out;
+  }, [lastDtc]);
 
   const topDrivers: any[] = (summaryData?.top_anomaly_drivers ?? []).filter((d: any) =>
     TOP_DRIVER_MODULES.includes(d.module)
@@ -528,6 +573,32 @@ export default function VehicleSummaryPopup({
                     </Box>
                   )}
 
+                  {!isVehicleActive && lastTripData?.origin && (
+                    <Box sx={{ pt: 1, borderTop: `1px solid ${isDark ? alpha("#334155", 0.5) : alpha("#e2e8f0", 1)}` }}>
+                      <Stack direction="row" alignItems="center" spacing={0.6} sx={{ mb: 0.6 }}>
+                        <SpeedRoundedIcon sx={{ fontSize: 11, color: "#64748b" }} />
+                        <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>Last Trip</Typography>
+                      </Stack>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.6, p: 0.6, borderRadius: 1, bgcolor: isDark ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8) }}>
+                        <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: isDark ? "#94a3b8" : "#475569", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lastTripData.origin || "--"}</Typography>
+                        <Typography sx={{ fontSize: 9, color: isDark ? "#475569" : "#94a3b8" }}>→</Typography>
+                        <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: isDark ? "#94a3b8" : "#475569", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{lastTripData.destination || "--"}</Typography>
+                      </Box>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0.5 }}>
+                        {[
+                          { label: "Distance", value: lastTripData.distance_km != null ? `${Math.round(convertDistance(lastTripData.distance_km, region))}` : "--" },
+                          { label: "Avg Speed", value: lastTripData.avg_speed_kmh != null ? `${Math.round(convertSpeed(lastTripData.avg_speed_kmh, region))}` : "--" },
+                          { label: "Harsh Events", value: String((lastTripData.harsh_braking_count ?? 0) + (lastTripData.harsh_accel_count ?? 0) + (lastTripData.harsh_cornering_count ?? 0)) },
+                        ].map(({ label, value }) => (
+                          <Box key={label} sx={{ p: 0.6, borderRadius: 1, bgcolor: isDark ? alpha("#1e293b", 0.5) : alpha("#f1f5f9", 0.8), textAlign: "center" }}>
+                            <Typography sx={{ fontSize: 13, fontWeight: 700, fontFamily: "monospace", color: "#64748b" }}>{value}</Typography>
+                            <Typography sx={{ fontSize: 8, color: isDark ? "#475569" : "#94a3b8" }}>{label}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
                   <Box sx={{ pt: 1, borderTop: `1px solid ${isDark ? alpha("#334155", 0.5) : alpha("#e2e8f0", 1)}`, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     <Stack direction="row" alignItems="center" spacing={0.6} sx={{ mb: 0.6, flexShrink: 0 }}>
                       <PersonRoundedIcon sx={{ fontSize: 11, color: "#38bdf8" }} />
@@ -598,13 +669,13 @@ export default function VehicleSummaryPopup({
                       <Typography sx={{ fontSize: 11, color: "text.secondary" }}>No DTC present</Typography>
                     </Box>
                   ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, minHeight: 0, maxHeight: 200, overflow: "auto" }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, flex: 1, minHeight: 0, maxHeight: 216, overflow: "auto" }}>
                       {dtcTriggers.map((t: any, i: number) => {
                         const isCrit = t.severity === "CRITICAL";
                         const sevColor = isCrit ? "#ef4444" : "#f59e0b";
                         const details = t.code ? getDtcDetails(t.code) : null;
                         return (
-                          <Box key={i} sx={{ borderRadius: 1.5, overflow: "hidden", border: `1px solid ${alpha(sevColor, 0.28)}`, bgcolor: alpha(sevColor, isDark ? 0.05 : 0.03), display: "flex" }}>
+                          <Box key={i} sx={{ borderRadius: 1.5, overflow: "hidden", flexShrink: 0, border: `1px solid ${alpha(sevColor, 0.28)}`, bgcolor: alpha(sevColor, isDark ? 0.05 : 0.03), display: "flex" }}>
                             <Box sx={{ width: 3, flexShrink: 0, bgcolor: sevColor }} />
                             <Box sx={{ p: 0.9, flex: 1, minWidth: 0 }}>
                               <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, mb: 0.4 }}>
@@ -653,9 +724,9 @@ export default function VehicleSummaryPopup({
                   <Typography sx={{ fontSize: 11, color: "text.secondary" }}>No alerts for this vehicle</Typography>
                 </Box>
               ) : (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9, p: 1.5, pt: 0, maxHeight: 420, overflow: "auto" }}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9, p: 1.5, pt: 0, maxHeight: 224, overflow: "auto" }}>
                   {allVehicleAlerts.map((a: any, i: number) => {
-                    const isOpenAlert = a.status === "OPEN";
+                    const isOpenAlert = a.status === "OPEN" && !resolvedIds.has(a.alert_id);
                     const isAnalyzed = dtcRunMap[`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`] != null;
                     const dtcRun = dtcRunMap[`${a.module}|${normPeakTs(a.peak_anomaly_ts)}`];
                     const scoreNum = Number(a.max_composite_score ?? 0);
@@ -672,7 +743,7 @@ export default function VehicleSummaryPopup({
                     }
                     const triggers: any[] = dtcRun?.triggers ?? [];
                     return (
-                      <Box key={a.alert_id || i} sx={{ display: "flex", borderRadius: 2, overflow: "hidden", border: `1px solid ${isDark ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: isDark ? alpha("#1e293b", 0.5) : "#ffffff" }}>
+                      <Box key={a.alert_id || i} sx={{ display: "flex", flexShrink: 0, borderRadius: 2, overflow: "hidden", border: `1px solid ${isDark ? alpha("#334155", 0.7) : alpha("#e2e8f0", 1)}`, bgcolor: isDark ? alpha("#1e293b", 0.5) : "#ffffff" }}>
                         <Box sx={{ width: 4, flexShrink: 0, bgcolor: isOpenAlert ? "#ef4444" : "#22c55e" }} />
                         <Box sx={{ flex: 1, p: 1.25, display: "flex", gap: 1.5, alignItems: "flex-start", minWidth: 0 }}>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -745,11 +816,11 @@ export default function VehicleSummaryPopup({
                             {isOpenAlert ? (
                               <Button
                                 size="small"
-                                disabled={resolveMutation.isPending}
-                                onClick={() => resolveMutation.mutate(a)}
+                                disabled={resolvingId === a.alert_id}
+                                onClick={() => handleResolve(a)}
                                 sx={{ fontSize: 9.5, fontWeight: 700, height: 24, px: 1.25, borderRadius: "6px", bgcolor: isDark ? alpha("#22c55e", 0.1) : alpha("#16a34a", 0.07), color: isDark ? "#22c55e" : "#15803d", border: `1px solid ${isDark ? alpha("#22c55e", 0.22) : alpha("#16a34a", 0.18)}`, "&:hover": { bgcolor: isDark ? alpha("#22c55e", 0.18) : alpha("#16a34a", 0.13) } }}
                               >
-                                {resolveMutation.isPending && resolveMutation.variables?.alert_id === a.alert_id ? "Resolving…" : "Resolve"}
+                                {resolvingId === a.alert_id ? "Resolving…" : "Resolve"}
                               </Button>
                             ) : (
                               <Box sx={{ display: "flex", alignItems: "center", gap: 0.3, height: 24, px: 1, borderRadius: "6px", bgcolor: alpha("#22c55e", 0.08) }}>
@@ -767,7 +838,7 @@ export default function VehicleSummaryPopup({
 
             {/* ROW 3: Live Sensors — 4 merged-pair cards */}
             <Box sx={cardSx}>
-              {sectionLabel("#38bdf8", "Live Sensors", <SensorsRoundedIcon sx={{ fontSize: 12, color: "#38bdf8" }} />)}
+              {sectionLabel("#38bdf8", isVehicleActive ? "Live Sensors" : "Last Recorded Sensor Values", <SensorsRoundedIcon sx={{ fontSize: 12, color: "#38bdf8" }} />)}
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1 }}>
                 {sensorPairCards.map((card) => (
                   <Box key={card.title} sx={{ p: 1, borderRadius: 1.5, bgcolor: isDark ? "#1e293b" : "#ffffff", border: `1px solid ${alpha(card.color, isDark ? 0.28 : 0.22)}` }}>

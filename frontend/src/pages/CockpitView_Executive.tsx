@@ -4492,11 +4492,9 @@ export default function CockpitViewExecutive({
 
   const healthScoreValue = Math.round(liveAvgHealth || 0);
   const availabilityScore = executiveMetrics.availability;
-  const utilizationScore = executiveMetrics.utilization;
   const riskScore = Math.min(100, Math.max(0, executiveMetrics.riskIndex));
   const topHealthColor = scoreTone(healthScoreValue);
   const topAvailabilityColor = scoreTone(availabilityScore);
-  const topUtilizationColor = scoreTone(utilizationScore);
   const topRiskColor = scoreTone(100 - riskScore);
   const topCardTitleSx = {
     fontSize: 10,
@@ -4521,6 +4519,17 @@ export default function CockpitViewExecutive({
     color: "text.secondary",
     lineHeight: 1.1,
   };
+  const scoreColorFor = (v: number) =>
+    v >= 85 ? "#22c55e" : v >= 70 ? "#f59e0b" : "#ef4444";
+  const driverScoreColor =
+    executiveMetrics.avgDriver !== null ? scoreColorFor(executiveMetrics.avgDriver) : "#94a3b8";
+  const dueSoonCount =
+    maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length;
+  const fleetCompositionRows = [
+    { label: "Active", shortLabel: "Active", value: activeCount, color: "#16A34A" },
+    { label: "Parked", shortLabel: "Parked", value: parkedCount, color: "#2563EB" },
+    { label: "Workshop", shortLabel: "In Workshop", value: serviceCount, color: "#7C3AED" },
+  ];
 
   const alertChartRows = [
     {
@@ -5804,7 +5813,7 @@ export default function CockpitViewExecutive({
               <Card
                 sx={{
                   p: 1,
-                  height: aiSummaryExpanded ? "fit-content" : "100%",
+                  height: aiSummaryExpanded ? "auto" : "100%",
                   minHeight: 0,
                   overflow: "hidden",
                   display: "flex",
@@ -5998,9 +6007,9 @@ export default function CockpitViewExecutive({
                             minWidth: 0,
                             display: "flex",
                             alignItems: "flex-start",
-                            gap: 0.75,
+                            gap: 0.6,
                             px: 0.8,
-                            py: 0.65,
+                            py: 0.25,
                             borderBottom: `1px solid ${
                               isDark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.18)"
                             }`,
@@ -6016,7 +6025,7 @@ export default function CockpitViewExecutive({
                             sx={{
                               width: 8,
                               height: 8,
-                              mt: 0.5,
+                              mt: 0.4,
                               borderRadius: "50%",
                               bgcolor: insight.color,
                               boxShadow: `0 0 0 3px ${alpha(insight.color, 0.12)}`,
@@ -6024,7 +6033,7 @@ export default function CockpitViewExecutive({
                             }}
                           />
                           <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography sx={{ fontSize: 10.5, lineHeight: 1.5 }}>
+                            <Typography variant="inherit" sx={{ fontSize: 10, lineHeight: 1.25 }}>
                               <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
                                 {insight.label}:
                               </Box>{" "}
@@ -6040,10 +6049,11 @@ export default function CockpitViewExecutive({
                     <Box
                       sx={{
                         gridColumn: "1 / -1",
+                        alignSelf: "start",
                         mx: 0.8,
-                        mt: 0.7,
+                        mt: 0.3,
                         px: 1,
-                        py: 0.65,
+                        py: 0.4,
                         borderRadius: 1.25,
                         border: `1px solid ${
                           isDark ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.24)"
@@ -6051,7 +6061,16 @@ export default function CockpitViewExecutive({
                         bgcolor: isDark ? alpha("#0f172a", 0.55) : alpha("#ffffff", 0.72),
                       }}
                     >
-                      <Typography sx={{ fontSize: 9.5, lineHeight: 1.35, color: "text.secondary" }}>
+                      <Typography
+                        variant="inherit"
+                        sx={{
+                          fontSize: 9,
+                          lineHeight: 1.3,
+                          color: "text.secondary",
+                          maxHeight: 9 * 1.3 * 2,
+                          overflow: "hidden",
+                        }}
+                      >
                         <Box component="span" sx={{ fontWeight: 900, color: isDark ? "#f8fafc" : "#0f172a" }}>
                           Recommended Action:
                         </Box>{" "}
@@ -9878,27 +9897,22 @@ export default function CockpitViewExecutive({
                       },
                     }}
                   >
-                    <Typography sx={topCardTitleSx}>
+                    <Typography variant="inherit" sx={topCardTitleSx}>
                       Fleet Health Score
                     </Typography>
                     <Box sx={{ minHeight: 0 }}>
                       <HealthGauge
                         value={healthScoreValue}
                         color={topHealthColor}
-                        formatter="{value}"
+                        formatter="{value}%"
                       />
                     </Box>
-                    <Box sx={{ textAlign: "center", mt: -1 }}>
-                      <Typography sx={topCardMetaSx}>/100</Typography>
-                      <Typography
-                        sx={{ ...topCardSubSx, color: topHealthColor }}
-                      >
-                        {scoreLabel(healthScoreValue)}
-                      </Typography>
-                    </Box>
+                    <Typography variant="inherit" sx={{ ...topCardSubSx, color: topHealthColor, textAlign: "center", mt: -1 }}>
+                      {scoreLabel(healthScoreValue)}
+                    </Typography>
                   </Card>
 
-                  {/* Cell 2: Fleet Availability + Utilization Score merged */}
+                  {/* Cell 2: Availability */}
                   <Card
                     sx={{
                       order: 3,
@@ -9906,8 +9920,8 @@ export default function CockpitViewExecutive({
                       minHeight: 0,
                       height: "100%",
                       display: "grid",
-                      gridTemplateRows: "auto 1fr",
-                      gap: 0.65,
+                      gridTemplateRows: "auto 1fr auto",
+                      gap: 0.25,
                       overflow: "hidden",
                       border: `1px solid ${alpha(topAvailabilityColor, 0.28)}`,
                       background: isDark
@@ -9915,90 +9929,20 @@ export default function CockpitViewExecutive({
                         : `linear-gradient(145deg, ${alpha(topAvailabilityColor, 0.06)}, #ffffff)`,
                     }}
                   >
-                    <Typography sx={topCardTitleSx}>
-                      Availability &amp; Utilization
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 0.7,
-                        minHeight: 0,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          minWidth: 0,
-                          p: 0.7,
-                          borderRadius: 1.25,
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "center",
-                          bgcolor: alpha(topAvailabilityColor, isDark ? 0.1 : 0.06),
-                          border: `1px solid ${alpha(topAvailabilityColor, 0.16)}`,
-                        }}
-                      >
-                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={0.4}>
-                          <Typography sx={{ fontSize: 8, lineHeight: 1, fontWeight: 850, color: "text.secondary" }}>
-                            AVAILABILITY
-                          </Typography>
-                          <GpsFixedOutlinedIcon sx={{ fontSize: 13, color: topAvailabilityColor }} />
-                        </Stack>
-                        <Typography sx={{ ...topCardValueSx, mt: 0.45, fontSize: 21, lineHeight: 1, color: topAvailabilityColor }}>
-                          {availabilityScore}%
-                        </Typography>
-                        <Typography sx={{ ...topCardMetaSx, mt: 0.25, fontSize: 8 }}>
-                          {activeCount + parkedCount}/{executiveMetrics.total || 0} vehicles available
-                        </Typography>
-                        <LinearProgress
-                          variant="determinate"
-                          value={availabilityScore}
-                          sx={{
-                            mt: 0.6,
-                            height: 4,
-                            borderRadius: 99,
-                            bgcolor: alpha(topAvailabilityColor, 0.14),
-                            "& .MuiLinearProgress-bar": { borderRadius: 99, bgcolor: topAvailabilityColor },
-                          }}
-                        />
-                      </Box>
-                      <Box
-                        sx={{
-                          minWidth: 0,
-                          p: 0.7,
-                          borderRadius: 1.25,
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "center",
-                          bgcolor: alpha(topUtilizationColor, isDark ? 0.1 : 0.06),
-                          border: `1px solid ${alpha(topUtilizationColor, 0.16)}`,
-                        }}
-                      >
-                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={0.4}>
-                          <Typography sx={{ fontSize: 8, lineHeight: 1, fontWeight: 850, color: "text.secondary" }}>
-                            UTILIZATION
-                          </Typography>
-                          <TimelineOutlinedIcon sx={{ fontSize: 13, color: topUtilizationColor }} />
-                        </Stack>
-                        <Typography sx={{ ...topCardValueSx, mt: 0.45, fontSize: 21, lineHeight: 1, color: topUtilizationColor }}>
-                          {utilizationScore}%
-                        </Typography>
-                        <Typography sx={{ ...topCardMetaSx, mt: 0.25, fontSize: 8 }}>
-                          {activeCount} vehicles active now
-                        </Typography>
-                        <LinearProgress
-                          variant="determinate"
-                          value={utilizationScore}
-                          sx={{
-                            mt: 0.6,
-                            height: 4,
-                            borderRadius: 99,
-                            bgcolor: alpha(topUtilizationColor, 0.14),
-                            "& .MuiLinearProgress-bar": { borderRadius: 99, bgcolor: topUtilizationColor },
-                          }}
-                        />
-                      </Box>
+                    <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+                      <Typography variant="inherit" sx={topCardTitleSx}>Availability</Typography>
+                      <GpsFixedOutlinedIcon sx={{ fontSize: 12, color: topAvailabilityColor }} />
+                    </Stack>
+                    <Box sx={{ minHeight: 0 }}>
+                      <HealthGauge
+                        value={availabilityScore}
+                        color={topAvailabilityColor}
+                        formatter="{value}%"
+                      />
                     </Box>
+                    <Typography variant="inherit" sx={{ ...topCardMetaSx, fontSize: 8.5, textAlign: "center", mt: -1 }} noWrap>
+                      {activeCount + parkedCount}/{executiveMetrics.total || 0} available
+                    </Typography>
                   </Card>
 
                   {/* Cell 1: Total Fleet */}
@@ -10008,10 +9952,9 @@ export default function CockpitViewExecutive({
                       p: 1,
                       minHeight: 0,
                       height: "100%",
-                      display: "grid",
-                      gridTemplateRows: "auto 1fr auto",
-                      alignItems: "center",
-                      gap: 0.4,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
                       overflow: "hidden",
                       border: `1px solid ${alpha("#2563eb", 0.28)}`,
                       background: isDark
@@ -10019,14 +9962,76 @@ export default function CockpitViewExecutive({
                         : `linear-gradient(145deg, ${alpha("#2563eb", 0.07)}, #ffffff)`,
                     }}
                   >
-                    <Typography sx={topCardTitleSx}>Total Fleet</Typography>
-                    <Box sx={{ textAlign: "center" }}>
-                      <DirectionsCarFilledOutlinedIcon sx={{ fontSize: 20, color: "#2563eb", mb: 0.2 }} />
-                      <Typography sx={{ ...topCardValueSx, color: "#2563eb" }}>{executiveMetrics.total || 0}</Typography>
+                    <Typography variant="inherit" sx={topCardTitleSx}>Total Fleet</Typography>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.3 }}>
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          flexShrink: 0,
+                          borderRadius: "50%",
+                          display: "grid",
+                          placeItems: "center",
+                          bgcolor: alpha("#2563eb", isDark ? 0.18 : 0.1),
+                          color: "#2563eb",
+                        }}
+                      >
+                        <DirectionsCarFilledOutlinedIcon sx={{ fontSize: 19 }} />
+                      </Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="inherit" sx={{ ...topCardValueSx, color: "#2563eb" }}>{executiveMetrics.total || 0}</Typography>
+                        <Typography variant="inherit" sx={topCardMetaSx} noWrap>
+                          Monitored Vehicles
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        height: 7,
+                        borderRadius: 999,
+                        overflow: "hidden",
+                        bgcolor: alpha("#94a3b8", 0.16),
+                      }}
+                    >
+                      {fleetCompositionRows.map((s) => (
+                        <Box
+                          key={s.label}
+                          sx={{
+                            width: `${executiveMetrics.total ? (s.value / executiveMetrics.total) * 100 : 0}%`,
+                            minWidth: s.value > 0 ? 3 : 0,
+                            bgcolor: s.color,
+                          }}
+                        />
+                      ))}
                     </Box>
-                    <Typography sx={{ ...topCardMetaSx, textAlign: "center" }}>
-                      Monitored Vehicles
-                    </Typography>
+                    <Stack direction="row" spacing={0.5} justifyContent="space-between">
+                      {fleetCompositionRows.map((s) => (
+                        <Box
+                          key={s.label}
+                          sx={{
+                            flex: "0 1 auto",
+                            minWidth: 0,
+                            borderRadius: 1,
+                            px: 0.5,
+                            py: 0.3,
+                            textAlign: "center",
+                            bgcolor: alpha(s.color, isDark ? 0.14 : 0.08),
+                          }}
+                        >
+                          <Typography variant="inherit" sx={{ fontSize: 11, fontWeight: 900, lineHeight: 1.1, color: s.color }}>
+                            {s.value}
+                          </Typography>
+                          <Typography
+                            variant="inherit"
+                            sx={{ fontSize: 7, fontWeight: 800, color: "text.secondary", lineHeight: 1.15 }}
+                            noWrap
+                          >
+                            {s.shortLabel.toUpperCase()}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
                   </Card>
 
                   {/* Cell 4: Alerts Summary + Active Alerts merged */}
@@ -10057,14 +10062,14 @@ export default function CockpitViewExecutive({
                     }}
                   >
                     <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography sx={{ fontSize: 10, fontWeight: 900, color: "text.secondary" }}>
+                      <Typography variant="inherit" sx={{ fontSize: 10, fontWeight: 900, color: "text.secondary" }}>
                         Alerts Summary
                       </Typography>
-                      <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#ef4444", lineHeight: 1 }}>
+                      <Typography variant="inherit" sx={{ fontSize: 15, fontWeight: 900, color: "#ef4444", lineHeight: 1 }}>
                         {alertTotal ?? 0}
                       </Typography>
                     </Stack>
-                    <Stack spacing={0.55} justifyContent="center" sx={{ minHeight: 0 }}>
+                    <Stack spacing={0.55} justifyContent="space-evenly" sx={{ minHeight: 0 }}>
                       {alertChartRows.map((row) => (
                         <Box
                           key={row.label}
@@ -10085,7 +10090,7 @@ export default function CockpitViewExecutive({
                             "&:hover": { bgcolor: alpha(row.color, 0.07) },
                           }}
                         >
-                          <Typography sx={{ fontSize: 8, fontWeight: 800, color: "text.secondary" }}>
+                          <Typography variant="inherit" sx={{ fontSize: 8, fontWeight: 800, color: "text.secondary" }}>
                             {row.label}
                           </Typography>
                           <Box
@@ -10108,7 +10113,7 @@ export default function CockpitViewExecutive({
                               }}
                             />
                           </Box>
-                          <Typography sx={{ fontSize: 10, fontWeight: 900, color: row.color, textAlign: "right" }}>
+                          <Typography variant="inherit" sx={{ fontSize: 10, fontWeight: 900, color: row.color, textAlign: "right" }}>
                             {row.value}
                           </Typography>
                         </Box>
@@ -10140,12 +10145,26 @@ export default function CockpitViewExecutive({
                       },
                     }}
                   >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography sx={{ fontSize: 10, fontWeight: 900, color: "text.secondary" }}>
-                        Maintenance Forecast
-                      </Typography>
-                      <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#22c55e", lineHeight: 1 }}>
-                        {maintenanceVehicleBuckets.within_1_week.length + maintenanceVehicleBuckets.weeks_1_2.length}
+                    <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="inherit"
+                          sx={{
+                            fontSize: 6.5,
+                            fontWeight: 800,
+                            letterSpacing: ".07em",
+                            color: "text.secondary",
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          PREDICTED
+                        </Typography>
+                        <Typography variant="inherit" sx={{ fontSize: 10, fontWeight: 900, color: "text.secondary", lineHeight: 1.1 }}>
+                          Maintenance Forecast
+                        </Typography>
+                      </Box>
+                      <Typography variant="inherit" sx={{ fontSize: 15, fontWeight: 900, color: "#38bdf8", lineHeight: 1, flexShrink: 0, mt: 0.2 }}>
+                        {dueSoonCount}
                       </Typography>
                     </Stack>
                     <Box
@@ -10167,7 +10186,7 @@ export default function CockpitViewExecutive({
                         }}
                       >
                         {[30, 20, 10, 0].map((tick) => (
-                          <Typography key={tick} sx={{ fontSize: 7.5, lineHeight: 1, alignSelf: "end" }}>
+                          <Typography key={tick} variant="inherit" sx={{ fontSize: 7.5, lineHeight: 1, alignSelf: "end" }}>
                             {tick}
                           </Typography>
                         ))}
@@ -10202,6 +10221,7 @@ export default function CockpitViewExecutive({
                                 }}
                               >
                                 <Typography
+                                  variant="inherit"
                                   sx={{
                                     fontSize: 8,
                                     fontWeight: 900,
@@ -10227,6 +10247,7 @@ export default function CockpitViewExecutive({
                                 />
                               </Box>
                               <Typography
+                                variant="inherit"
                                 sx={{
                                   fontSize: 7.5,
                                   fontWeight: 800,
@@ -10254,88 +10275,41 @@ export default function CockpitViewExecutive({
                       height: "100%",
                       display: "grid",
                       gridTemplateRows: "auto 1fr auto",
-                      gap: 0.45,
+                      gap: 0.25,
                       overflow: "hidden",
                       cursor: "pointer",
                       transition: "border-color 0.15s, transform 0.15s",
-                      border: `1px solid ${alpha(
-                        executiveMetrics.avgDriver !== null && executiveMetrics.avgDriver >= 85
-                          ? "#22c55e"
-                          : executiveMetrics.avgDriver !== null && executiveMetrics.avgDriver >= 70
-                          ? "#f59e0b"
-                          : "#ef4444",
-                        0.28
-                      )}`,
+                      border: `1px solid ${alpha(driverScoreColor, 0.28)}`,
                       "&:hover": { transform: "translateY(-1px)" },
                     }}
                   >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography sx={{ fontSize: 10, fontWeight: 900 }}>
-                        Overall Driver Score
-                      </Typography>
+                    <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.4}>
+                      <Typography variant="inherit" sx={topCardTitleSx}>Overall Driver Score</Typography>
                       <Tooltip title="Uses avg_driver_score from the backend fleet summary. Click for details." arrow>
                         <InfoOutlinedIcon
                           aria-label="Overall Driver Score calculation"
-                          sx={{ fontSize: 14, color: "text.secondary" }}
+                          sx={{ fontSize: 12, color: "text.secondary" }}
                         />
                       </Tooltip>
                     </Stack>
                     {executiveMetrics.avgDriver !== null ? (
-                      <Stack justifyContent="center" spacing={0.75} sx={{ px: 0.8 }}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <Typography
-                            sx={{
-                              fontSize: 27,
-                              lineHeight: 1,
-                              fontWeight: 950,
-                              color:
-                                executiveMetrics.avgDriver >= 85
-                                  ? "#22c55e"
-                                  : executiveMetrics.avgDriver >= 70
-                                  ? "#f59e0b"
-                                  : "#ef4444",
-                            }}
-                          >
-                            {executiveMetrics.avgDriver.toFixed(1)}
-                            <Box component="span" sx={{ fontSize: 11, color: "text.secondary" }}>
-                              /100
-                            </Box>
-                          </Typography>
-                          <Typography sx={{ mt: 0.35, fontSize: 9, fontWeight: 800, color: "text.secondary" }}>
-                            {executiveMetrics.avgDriver >= 85
-                              ? "Strong performance"
-                              : executiveMetrics.avgDriver >= 70
-                              ? "Coaching opportunity"
-                              : "Needs attention"}
-                          </Typography>
+                      <>
+                        <Box sx={{ minHeight: 0 }}>
+                          <HealthGauge
+                            value={executiveMetrics.avgDriver}
+                            color={driverScoreColor}
+                            formatter="{value}%"
+                          />
                         </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={Math.max(0, Math.min(100, executiveMetrics.avgDriver))}
-                          sx={{
-                            height: 6,
-                            borderRadius: 999,
-                            bgcolor: alpha("#94a3b8", 0.18),
-                            "& .MuiLinearProgress-bar": {
-                              borderRadius: 999,
-                              bgcolor:
-                                executiveMetrics.avgDriver >= 85
-                                  ? "#22c55e"
-                                  : executiveMetrics.avgDriver >= 70
-                                  ? "#f59e0b"
-                                  : "#ef4444",
-                            },
-                          }}
-                        />
-                      </Stack>
+                        <Typography variant="inherit" sx={{ ...topCardSubSx, color: driverScoreColor, textAlign: "center", mt: -1 }}>
+                          {scoreLabel(executiveMetrics.avgDriver)}
+                        </Typography>
+                      </>
                     ) : (
                       <Stack alignItems="center" justifyContent="center">
-                        <Typography sx={{ fontSize: 13, fontWeight: 900 }}>No data</Typography>
+                        <Typography variant="inherit" sx={{ fontSize: 13, fontWeight: 900 }}>No data</Typography>
                       </Stack>
                     )}
-                    <Typography sx={{ fontSize: 8.5, color: "text.secondary", textAlign: "center" }} noWrap>
-                      {executiveMetrics.driverScoreSource}
-                    </Typography>
                   </Card>
                 </Box>
             </Grid>

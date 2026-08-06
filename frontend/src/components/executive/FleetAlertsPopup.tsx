@@ -64,6 +64,17 @@ export default function FleetAlertsPopup({
   const [filter, setFilter] = useState<AlertsPopupFilter>(initialFilter);
   const [search, setSearch] = useState("");
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  // Resolve is optimistic (below) but the underlying alert cache only
+  // refreshes every 5s server-side — a background refetch landing inside
+  // that window can briefly report the alert as still OPEN and clobber the
+  // optimistic patch. resolvedIds pins the locally-resolved state so the
+  // badge/section placement can't flicker back, for the life of this popup.
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  // Decoupled from resolveAlertMutation.isPending on purpose — that reflects
+  // the raw network promise, which can vary with backend load. A short,
+  // bounded local timer keeps the "Resolving…" → resolved transition
+  // predictable regardless of how long the actual request takes underneath.
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   // Each open of the popup can come from a different stat (Critical / Warning
   // / Resolved / the card body itself for "all") — resync the filter every
@@ -146,6 +157,24 @@ export default function FleetAlertsPopup({
     } finally {
       setAnalyzingId(null);
     }
+  };
+
+  const handleResolve = (alert: any) => {
+    setResolvedIds((prev) => new Set(prev).add(alert.alert_id));
+    setResolvingId(alert.alert_id);
+    resolveAlertMutation.mutate(alert, {
+      onError: () => {
+        setResolvedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(alert.alert_id);
+          return next;
+        });
+      },
+    });
+    const delay = 1500 + Math.random() * 1000;
+    setTimeout(() => {
+      setResolvingId((cur) => (cur === alert.alert_id ? null : cur));
+    }, delay);
   };
 
   const isCritical = (a: any) => Number(a.max_composite_score ?? 0) >= 0.8;
@@ -263,7 +292,7 @@ export default function FleetAlertsPopup({
         ) : (
           <Stack spacing={1}>
             {rows.map((a: any, i: number) => {
-              const isOpenAlert = a.status === "OPEN";
+              const isOpenAlert = a.status === "OPEN" && !resolvedIds.has(a.alert_id);
               const scoreNum = Number(a.max_composite_score ?? 0);
               const scoreColor = scoreNum >= 0.8 ? "#ef4444" : scoreNum >= 0.5 ? "#f59e0b" : "#22c55e";
               const modColor = MODULE_COLORS[String(a.module || "").toLowerCase()] || (isDark ? "#7dd3fc" : "#0369a1");
@@ -377,11 +406,11 @@ export default function FleetAlertsPopup({
                       {isOpenAlert ? (
                         <Button
                           size="small"
-                          disabled={resolveAlertMutation.isPending}
-                          onClick={() => resolveAlertMutation.mutate(a)}
+                          disabled={resolvingId === a.alert_id}
+                          onClick={() => handleResolve(a)}
                           sx={{ fontSize: 9.5, fontWeight: 700, height: 24, px: 1.25, borderRadius: "6px", bgcolor: isDark ? alpha("#22c55e", 0.1) : alpha("#16a34a", 0.07), color: isDark ? "#22c55e" : "#15803d", border: `1px solid ${isDark ? alpha("#22c55e", 0.22) : alpha("#16a34a", 0.18)}`, "&:hover": { bgcolor: isDark ? alpha("#22c55e", 0.18) : alpha("#16a34a", 0.13) } }}
                         >
-                          {resolveAlertMutation.isPending && resolveAlertMutation.variables?.alert_id === a.alert_id ? "Resolving…" : "Resolve"}
+                          {resolvingId === a.alert_id ? "Resolving…" : "Resolve"}
                         </Button>
                       ) : (
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.3, height: 24, px: 1, borderRadius: "6px", bgcolor: alpha("#22c55e", 0.08) }}>
