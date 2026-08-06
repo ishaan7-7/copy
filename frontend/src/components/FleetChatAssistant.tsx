@@ -11,6 +11,9 @@ import {
   Button,
   Chip,
   Divider,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Fab,
   IconButton,
   Menu,
@@ -31,6 +34,7 @@ import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SmartToyRoundedIcon from "@mui/icons-material/SmartToyRounded";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -51,6 +55,12 @@ import {
   type AssistantTopic,
   type TopicContext,
 } from "../utils/assistantTopics";
+import {
+  buildExecutiveFleetAnswer,
+  executiveQuestionIntentById,
+  matchExecutiveFleetQuestion,
+  type ExecutiveQuestionAnswer,
+} from "../utils/executiveFleetQuestions";
 
 const FLEET_API = "http://127.0.0.1:8009/api/fleet";
 const CHAT_POSITION_KEY = "telemetrix-fleet-chat-position-v3";
@@ -115,6 +125,9 @@ type Message = {
   role: "assistant" | "user";
   text: string;
   knowledgeSection?: string;
+  detailTitle?: string;
+  detailText?: string;
+  detailIntentId?: string;
 };
 
 type ChatSession = {
@@ -260,6 +273,11 @@ export default function FleetChatAssistant({
   const [activeSessionId, setActiveSessionId] = useState(initialChatState.activeSessionId);
   const [messages, setMessages] = useState<Message[]>(initialChatState.messages);
   const [historyAnchorEl, setHistoryAnchorEl] = useState<HTMLElement | null>(null);
+  const [detailAnswer, setDetailAnswer] = useState<{
+    title: string;
+    text: string;
+  } | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const pageTopics = useMemo(() => topicsFor(pageKey, assistantRole), [pageKey, assistantRole]);
   // `fleetPositions` (fleet_sim_server) is a static, hand-authored seed value
   // that never changes at runtime — CockpitView.tsx already treats it as a
@@ -876,7 +894,8 @@ export default function FleetChatAssistant({
             queryClient.fetchQuery({
               queryKey: ["chat-topic", spec.url, JSON.stringify(spec.params ?? {})],
               queryFn: () => axios.get(spec.url, { params: spec.params }).then((r) => r.data),
-              staleTime: 10000,
+              staleTime: 120000,
+              gcTime: 600000,
             })
           )
         );
@@ -890,8 +909,23 @@ export default function FleetChatAssistant({
     }
   };
 
-  const resolveAnswer = async (question: string): Promise<string | KnowledgeRepoAnswer> => {
+  const resolveAnswer = async (
+    question: string
+  ): Promise<string | KnowledgeRepoAnswer | ExecutiveQuestionAnswer> => {
     const normalized = question.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    const executiveIntent = matchExecutiveFleetQuestion(question);
+    if (executiveIntent) {
+      const cachedAlerts = queryClient.getQueryData<any>(["layout-alert-notifications"]);
+      return buildExecutiveFleetAnswer(executiveIntent, {
+        positions: resolvedFleetPositions ?? [],
+        fleetSummary,
+        alerts: cachedAlerts ?? {
+          open_alerts: Array.from({ length: activeAlertCount }, () => ({
+            severity: "open",
+          })),
+        },
+      });
+    }
     // Current page's own topics win first — a bare "full briefing" should
     // mean *this* page's briefing, not whichever other page's topic happens
     // to share the same generic trigger words. Only once nothing local
@@ -907,7 +941,7 @@ export default function FleetChatAssistant({
     return answerFor(question);
   };
 
-  const pushAssistantAnswer = (answer: string | KnowledgeRepoAnswer) => {
+  const pushAssistantAnswer = (answer: string | KnowledgeRepoAnswer | ExecutiveQuestionAnswer) => {
     if (cancelledRef.current) return;
     setMessages((current) => [
       ...current,
@@ -915,7 +949,14 @@ export default function FleetChatAssistant({
         id: nextId.current++,
         role: "assistant",
         text: typeof answer === "string" ? answer : answer.text,
-        knowledgeSection: typeof answer === "string" ? undefined : answer.section,
+        knowledgeSection:
+          typeof answer === "string" || !("section" in answer) ? undefined : answer.section,
+        detailTitle:
+          typeof answer === "string" || !("details" in answer) ? undefined : answer.title,
+        detailText:
+          typeof answer === "string" || !("details" in answer) ? undefined : answer.details,
+        detailIntentId:
+          typeof answer === "string" || !("intentId" in answer) ? undefined : answer.intentId,
       },
     ]);
     setTyping(false);
@@ -931,7 +972,7 @@ export default function FleetChatAssistant({
     setQuestionInput("");
     setTyping(true);
 
-    const delay = 2300 + Math.floor(Math.random() * 700);
+    const delay = 250 + Math.floor(Math.random() * 251);
     Promise.all([resolveAnswer(cleanQuestion), minDelay(delay)]).then(([answer]) =>
       pushAssistantAnswer(answer)
     );
@@ -945,10 +986,84 @@ export default function FleetChatAssistant({
     ]);
     setTyping(true);
 
-    const delay = 2300 + Math.floor(Math.random() * 700);
+    const delay = 250 + Math.floor(Math.random() * 251);
     Promise.all([runTopic(topic, topicCtx), minDelay(delay)]).then(([answer]) =>
       pushAssistantAnswer(answer)
     );
+  };
+
+  const openExecutiveDetails = async (message: Message) => {
+    if (!message.detailIntentId) {
+      setDetailAnswer({
+        title: message.detailTitle ?? "Fleet Details",
+        text: message.detailText ?? "No additional details are available.",
+      });
+      return;
+    }
+
+    const intent = executiveQuestionIntentById(message.detailIntentId);
+    if (!intent) return;
+    setDetailAnswer({
+      title: message.detailTitle ?? intent.title,
+      text: message.detailText ?? "",
+    });
+    setDetailLoading(true);
+
+    const alertIntents = new Set([
+      "urgent_alerts",
+      "alert_trend",
+      "business_impact",
+      "actions",
+      "summary",
+    ]);
+    const automotiveIntents = new Set([
+      "health_cause",
+      "lowest",
+      "failure_forecast",
+      "maintenance_due",
+      "failure_categories",
+      "summary",
+    ]);
+    const dtcIntents = new Set(["health_cause", "failure_categories", "summary"]);
+
+    const fetchDetail = async (key: string, url: string) => {
+      try {
+        return await queryClient.fetchQuery({
+          queryKey: ["executive-chat-detail", key],
+          queryFn: () => axios.get(url).then((response) => response.data),
+          staleTime: 120000,
+          gcTime: 600000,
+        });
+      } catch {
+        return undefined;
+      }
+    };
+
+    const [alerts, automotiveSummary, dtcDistribution] = await Promise.all([
+      alertIntents.has(intent.id)
+        ? fetchDetail("alerts", "http://127.0.0.1:8005/api/alerts/metrics")
+        : Promise.resolve(undefined),
+      automotiveIntents.has(intent.id)
+        ? fetchDetail("automotive-summary", "http://127.0.0.1:8005/api/automotive/fleet-summary")
+        : Promise.resolve(undefined),
+      dtcIntents.has(intent.id)
+        ? fetchDetail(
+            "dtc-distribution",
+            "http://127.0.0.1:8005/api/automotive/dtc/fleet-distribution"
+          )
+        : Promise.resolve(undefined),
+    ]);
+
+    if (cancelledRef.current) return;
+    const detailed = buildExecutiveFleetAnswer(intent, {
+      positions: resolvedFleetPositions ?? [],
+      fleetSummary,
+      alerts: alerts ?? queryClient.getQueryData(["layout-alert-notifications"]),
+      automotiveSummary,
+      dtcDistribution,
+    });
+    setDetailAnswer({ title: detailed.title, text: detailed.details });
+    setDetailLoading(false);
   };
 
   // Switching sessions or starting a new one while an answer is still in
@@ -1438,6 +1553,27 @@ export default function FleetChatAssistant({
                       For more information, click here
                     </Button>
                   )}
+                  {message.detailText && (
+                    <Button
+                      size="small"
+                      startIcon={<VisibilityOutlinedIcon sx={{ fontSize: "14px !important" }} />}
+                      onClick={() => openExecutiveDetails(message)}
+                      sx={{
+                        mt: 0.6,
+                        p: 0,
+                        minWidth: 0,
+                        color: accent,
+                        fontSize: 10.5,
+                        fontWeight: 850,
+                        lineHeight: 1.35,
+                        textTransform: "none",
+                        justifyContent: "flex-start",
+                        "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
+                      }}
+                    >
+                      View details
+                    </Button>
+                  )}
                 </Box>
               ))}
               {typing && (
@@ -1569,6 +1705,63 @@ export default function FleetChatAssistant({
           </Box>
         </Paper>
       )}
+      <Dialog
+        open={Boolean(detailAnswer)}
+        onClose={() => setDetailAnswer(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            pb: 1,
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontSize: 16, fontWeight: 900 }}>{detailAnswer?.title}</Typography>
+            <Typography sx={{ mt: 0.2, fontSize: 10.5, color: "text.secondary" }}>
+              Live backend-derived fleet explanation
+            </Typography>
+          </Box>
+          <IconButton
+            size="small"
+            aria-label="Close fleet details"
+            onClick={() => setDetailAnswer(null)}
+          >
+            <CloseRoundedIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {detailLoading && (
+            <Typography sx={{ mb: 1, fontSize: 10.5, fontWeight: 800, color: accent }}>
+              Loading the latest supporting data…
+            </Typography>
+          )}
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              bgcolor: alpha(accent, dark ? 0.07 : 0.035),
+              borderColor: alpha(accent, 0.18),
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: 12,
+                lineHeight: 1.65,
+                color: "text.secondary",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {detailAnswer?.text || "Preparing fleet details…"}
+            </Typography>
+          </Paper>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
