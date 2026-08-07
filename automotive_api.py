@@ -810,15 +810,18 @@ def get_vehicle_module_decomposition(vehicle_id: str):
     mod_series: dict = {}
     for mod in _VEHICLE_MODULES:
         combined = pd.DataFrame()
-        if vehicle_id not in _HISTORICAL_IDS:
+        if vehicle_id in _HISTORICAL_IDS:
+            _bp = os.path.join(_BATCH_SILVER_ROOT, mod, f"source_id={vehicle_id}", "silver.parquet")
+            if os.path.exists(_bp):
+                combined = pd.read_parquet(_bp)
+        else:
             live_rows = _get_live(f"module-health-live-{mod}-{vehicle_id}")
             if live_rows:
                 combined = pd.DataFrame(live_rows)
-        if combined.empty:
-            silver_path = os.path.join(_SILVER_ROOT, mod)
-            if not os.path.exists(silver_path):
-                continue
-            combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
+            if combined.empty:
+                silver_path = os.path.join(_SILVER_ROOT, mod)
+                if os.path.exists(silver_path):
+                    combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
         if combined.empty or "health_score" not in combined.columns:
             continue
         try:

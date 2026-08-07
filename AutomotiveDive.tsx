@@ -832,7 +832,7 @@ export default function AutomotiveDive({
       axios
         .get(`${API}/api/automotive/vehicle-decomposition/${selectedVehicle}`)
         .then((r) => r.data),
-    enabled: !!selectedVehicle && !isHistorical,
+    enabled: !!selectedVehicle,
     refetchInterval: false,
   });
 
