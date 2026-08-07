@@ -776,6 +776,12 @@ export default function AutomotiveDive({
     wasActiveRef.current = isActive;
   }, [isActive]);
 
+  // isPlaceholderData guards against React Query's global keepPreviousData
+  // default (main.tsx): right after switching the selected vehicle, a query
+  // keyed on selectedVehicle can still hold the PREVIOUS vehicle's cached
+  // data while its new fetch is in flight. Every isXPending flag below folds
+  // that in alongside isLoading so derived data resets to empty/undefined
+  // instead of briefly rendering one vehicle's data under another's view.
   const sensorQuery = useQuery({
     queryKey: ["autoSensorHistory", selectedVehicle, selectedModule],
     queryFn: () =>
@@ -787,6 +793,7 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle,
     refetchInterval: false,
   });
+  const isSensorPending = sensorQuery.isLoading || sensorQuery.isPlaceholderData;
 
   const bodyOdometerQuery = useQuery({
     queryKey: ["autoBodyOdometer", selectedVehicle],
@@ -798,6 +805,7 @@ export default function AutomotiveDive({
     refetchInterval: false,
     staleTime: 60000,
   });
+  const isBodyOdometerPending = bodyOdometerQuery.isLoading || bodyOdometerQuery.isPlaceholderData;
 
   const moduleHealthQuery = useQuery({
     queryKey: ["autoModuleHealth", selectedVehicle, selectedModule],
@@ -810,6 +818,8 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle,
     refetchInterval: isActive && autoRefresh ? 10000 : false,
   });
+  const isModuleHealthPending = moduleHealthQuery.isLoading || moduleHealthQuery.isPlaceholderData;
+  const moduleHealthSafeData = isModuleHealthPending ? undefined : moduleHealthQuery.data;
 
   const vehicleHealthQuery = useQuery({
     queryKey: ["autoVehicleHealth", selectedVehicle],
@@ -825,6 +835,8 @@ export default function AutomotiveDive({
         ? 10000
         : false,
   });
+  const isVehicleHealthPending = vehicleHealthQuery.isLoading || vehicleHealthQuery.isPlaceholderData;
+  const vehicleHealthSafeData = isVehicleHealthPending ? undefined : vehicleHealthQuery.data;
 
   const vehicleDecompQuery = useQuery({
     queryKey: ["autoVehicleDecomp", selectedVehicle],
@@ -835,6 +847,8 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle,
     refetchInterval: false,
   });
+  const isVehicleDecompPending = vehicleDecompQuery.isLoading || vehicleDecompQuery.isPlaceholderData;
+  const vehicleDecompSafeData = isVehicleDecompPending ? undefined : vehicleDecompQuery.data;
 
   // Module analysis cross-fleet (Bronze stats per vehicle per module)
   const crossfleetQuery = useQuery({
@@ -856,6 +870,7 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle,
     refetchInterval: false,
   });
+  const isVehicleAlertsPending = vehicleAlertsQuery.isLoading || vehicleAlertsQuery.isPlaceholderData;
 
   const resolveAlertMutation = useMutation({
     mutationFn: (alert: any) =>
@@ -901,11 +916,12 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle,
     refetchInterval: false,
   });
+  const isDtcHistoryPending = dtcHistoryQuery.isLoading || dtcHistoryQuery.isPlaceholderData;
 
-  const vehicleOpenAlerts: any[] = vehicleAlertsQuery.data?.open ?? [];
-  const vehicleClosedAlerts: any[] = vehicleAlertsQuery.data?.closed ?? [];
+  const vehicleOpenAlerts: any[] = isVehicleAlertsPending ? [] : vehicleAlertsQuery.data?.open ?? [];
+  const vehicleClosedAlerts: any[] = isVehicleAlertsPending ? [] : vehicleAlertsQuery.data?.closed ?? [];
   const allVehicleAlerts = [...vehicleOpenAlerts, ...vehicleClosedAlerts];
-  const dtcRuns: any[] = dtcHistoryQuery.data?.runs ?? [];
+  const dtcRuns: any[] = isDtcHistoryPending ? [] : dtcHistoryQuery.data?.runs ?? [];
   const normPeakTs = (ts: string) => String(ts || "").slice(0, 16).replace(" ", "T");
   const analyzedSet = new Set(dtcRuns.map((r: any) => `${r.module}|${normPeakTs(r.peak_ts)}`));
   const analyzedVehicleAlerts = allVehicleAlerts.filter((a: any) =>
@@ -931,6 +947,7 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && !!analysisModule && isActive && !isHistorical,
     refetchInterval: isActive && autoRefresh ? 10_000 : false,
   });
+  const isModuleTimelinePending = moduleTimelineQuery.isLoading || moduleTimelineQuery.isPlaceholderData;
 
   const moduleFleetRankingQuery = useQuery({
     queryKey: ["moduleFleetRanking", analysisModule],
@@ -979,6 +996,7 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
     refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 10000 : false,
   });
+  const isVehicleSummaryPending = vehicleSummaryQuery.isLoading || vehicleSummaryQuery.isPlaceholderData;
 
   const observerQuery = useQuery({
     queryKey: ["observerSnapshot"],
@@ -987,6 +1005,8 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
     refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 5000 : false,
   });
+  // Not vehicle-keyed (queryKey has no selectedVehicle) — a genuine fleet-wide
+  // snapshot, so keepPreviousData here is fine as-is; no pending flag needed.
 
   const bronzeStatsQuery = useQuery({
     queryKey: ["vehicleBronzeStats", selectedVehicle],
@@ -996,6 +1016,8 @@ export default function AutomotiveDive({
     refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 30000 : false,
     staleTime: 25000,
   });
+  const isBronzeStatsPending = bronzeStatsQuery.isLoading || bronzeStatsQuery.isPlaceholderData;
+  const bronzeStatsData = isBronzeStatsPending ? undefined : bronzeStatsQuery.data;
 
   const fleetSimBehaviorQuery = useQuery({
     queryKey: ["fleetSimBehavior", selectedVehicle],
@@ -1004,6 +1026,7 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
     refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 5000 : false,
   });
+  const isFleetSimBehaviorPending = fleetSimBehaviorQuery.isLoading || fleetSimBehaviorQuery.isPlaceholderData;
 
   const fleetPositionQuery = useQuery({
     queryKey: ["autoFleetPosition", selectedVehicle],
@@ -1013,6 +1036,7 @@ export default function AutomotiveDive({
     refetchInterval: viewMode === "summary" && !isHistorical ? 5000 : false,
     staleTime: 3000,
   });
+  const isFleetPositionPending = fleetPositionQuery.isLoading || fleetPositionQuery.isPlaceholderData;
 
   const kpiSensorHistoryQuery = useQuery({
     queryKey: ["kpiSensorHistory", selectedVehicle, kpiChartSensor?.module],
@@ -1031,6 +1055,9 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && isHistorical,
     staleTime: Infinity,
   });
+  const isHistLastStatePending = histLastStateQuery.isLoading || histLastStateQuery.isPlaceholderData;
+  const histLastStateRaw = histLastStateQuery.data;
+  const histLastStateData = isHistLastStatePending ? undefined : histLastStateRaw;
 
   const histDriverSummaryQuery = useQuery({
     queryKey: ["histDriverSummary", selectedVehicle, region],
@@ -1039,6 +1066,9 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && isHistorical,
     staleTime: Infinity,
   });
+  const isHistDriverSummaryPending = histDriverSummaryQuery.isLoading || histDriverSummaryQuery.isPlaceholderData;
+  const histDriverSummaryRaw = histDriverSummaryQuery.data;
+  const histDriverSummaryData = isHistDriverSummaryPending ? undefined : histDriverSummaryRaw;
 
   const histTripsQuery = useQuery({
     queryKey: ["histTrips", selectedVehicle, region],
@@ -1047,6 +1077,9 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && isHistorical,
     staleTime: Infinity,
   });
+  const isHistTripsPending = histTripsQuery.isLoading || histTripsQuery.isPlaceholderData;
+  const histTripsRaw = histTripsQuery.data;
+  const histTripsData = isHistTripsPending ? undefined : histTripsRaw;
 
   const histDtcsQuery = useQuery({
     queryKey: ["histDtcs", selectedVehicle, isHistorical],
@@ -1058,6 +1091,9 @@ export default function AutomotiveDive({
     staleTime: isHistorical ? Infinity : 15000,
     refetchInterval: isActive && autoRefresh && !isHistorical ? 15000 : false,
   });
+  const isHistDtcsPending = histDtcsQuery.isLoading || histDtcsQuery.isPlaceholderData;
+  const histDtcsRaw = histDtcsQuery.data;
+  const histDtcsData = isHistDtcsPending ? undefined : histDtcsRaw;
 
   const histAlertsQuery = useQuery({
     queryKey: ["histAlerts", selectedVehicle],
@@ -1067,6 +1103,9 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && isHistorical,
     staleTime: Infinity,
   });
+  const isHistAlertsPending = histAlertsQuery.isLoading || histAlertsQuery.isPlaceholderData;
+  const histAlertsRaw = histAlertsQuery.data;
+  const histAlertsData = isHistAlertsPending ? undefined : histAlertsRaw;
 
   useEffect(() => {
     if (selectedVehicle) return;
@@ -1117,10 +1156,10 @@ export default function AutomotiveDive({
 
   // BRONZE derived
   const SERVICE_INTERVAL_KM = 15000;
-  const sensorData: any[] = sensorQuery.data?.data || [];
+  const sensorData: any[] = isSensorPending ? [] : sensorQuery.data?.data || [];
   const latestBronzeRow: any =
     sensorData.length > 0 ? sensorData[sensorData.length - 1] : null;
-  const bodyOdometerData: any[] = bodyOdometerQuery.data?.data || [];
+  const bodyOdometerData: any[] = isBodyOdometerPending ? [] : bodyOdometerQuery.data?.data || [];
   const latestBodyRow: any =
     bodyOdometerData.length > 0 ? bodyOdometerData[bodyOdometerData.length - 1] : null;
   const lastMileage: number = latestBodyRow?.odometer_reading ?? latestBronzeRow?.odometer_reading ?? latestBronzeRow?.mileage ?? 0;
@@ -1135,17 +1174,17 @@ export default function AutomotiveDive({
 
   // SILVER derived
   const moduleHealthData: any[] = useMemo(() => {
-    const raw: any[] = moduleHealthQuery.data?.data || [];
+    const raw: any[] = moduleHealthSafeData?.data || [];
     const factor = Math.max(1, Math.floor(raw.length / 400));
     return factor === 1
       ? raw
       : raw.filter((_: any, i: number) => i % factor === 0);
-  }, [moduleHealthQuery.data]);
+  }, [moduleHealthSafeData]);
 
   const latestSilverRow: any = useMemo(() => {
-    const raw: any[] = moduleHealthQuery.data?.data || [];
+    const raw: any[] = moduleHealthSafeData?.data || [];
     return raw.length > 0 ? raw[raw.length - 1] : null;
-  }, [moduleHealthQuery.data]);
+  }, [moduleHealthSafeData]);
 
   const topFeatures = useMemo(
     () => parseTopFeatures(latestSilverRow?.top_features || ""),
@@ -1153,7 +1192,7 @@ export default function AutomotiveDive({
   );
 
   const latestSeverity: string = useMemo(() => {
-    const raw: any[] = moduleHealthQuery.data?.data || [];
+    const raw: any[] = moduleHealthSafeData?.data || [];
     if (raw.length === 0) return "NORMAL";
     const recent = raw.slice(-50);
     const counts: Record<string, number> = {};
@@ -1162,7 +1201,7 @@ export default function AutomotiveDive({
       counts[s] = (counts[s] || 0) + 1;
     }
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "NORMAL";
-  }, [moduleHealthQuery.data]);
+  }, [moduleHealthSafeData]);
 
   const severityColor =
     latestSeverity === "CRITICAL"
@@ -1173,14 +1212,14 @@ export default function AutomotiveDive({
 
   // GOLD derived
   const healthRaw = useMemo(() => {
-    const base: any[] = vehicleHealthQuery.data?.data || [];
+    const base: any[] = vehicleHealthSafeData?.data || [];
     if (!sseConnected || isHistorical || !selectedVehicle) return base;
     const ring = sseRing.get(selectedVehicle) ?? [];
     if (!ring.length) return base;
     const lastTs = base.length ? String(base[base.length - 1].ts ?? "") : "";
     const extra = ring.filter((p: any) => String(p.ts ?? "") > lastTs);
     return extra.length ? [...base, ...extra] : base;
-  }, [vehicleHealthQuery.data, sseConnected, isHistorical, selectedVehicle, sseRing, sseFleetVehicles]);
+  }, [vehicleHealthSafeData, sseConnected, isHistorical, selectedVehicle, sseRing, sseFleetVehicles]);
 
   const healthHistory = useMemo(() => {
     const raw: any[] = healthRaw;
@@ -1215,8 +1254,8 @@ export default function AutomotiveDive({
     return vList.find((v: any) => v.source_id === selectedVehicle) ?? null;
   }, [observerQuery.data, selectedVehicle]);
 
-  const summaryData = vehicleSummaryQuery.data as any;
-  const behaviorData = fleetSimBehaviorQuery.data as any;
+  const summaryData = isVehicleSummaryPending ? undefined : (vehicleSummaryQuery.data as any);
+  const behaviorData = isFleetSimBehaviorPending ? undefined : (fleetSimBehaviorQuery.data as any);
   const healthScore: number | null = summaryData?.health_snapshot?.health_score ?? null;
   const healthStatus: string = summaryData?.health_snapshot?.status ?? "UNKNOWN";
   const fleetRank: number | null = summaryData?.health_snapshot?.fleet_rank ?? null;
@@ -1246,18 +1285,18 @@ export default function AutomotiveDive({
   }, [topDrivers]);
   const alertsSummary: { open_count: number; closed_count: number; recent_open: any[] } = summaryData?.alerts_summary ?? { open_count: 0, closed_count: 0, recent_open: [] };
   const alertsBadgeCount = isHistorical
-    ? ((histAlertsQuery.data as any[]) ?? []).filter((a: any) => a.status === "OPEN").length
+    ? ((histAlertsData as any[]) ?? []).filter((a: any) => a.status === "OPEN").length
     : alertsSummary.open_count;
-  const fleetSimData: any = fleetPositionQuery.data ?? summaryData?.fleet_sim ?? {};
+  const fleetSimData: any = (isFleetPositionPending ? undefined : fleetPositionQuery.data) ?? summaryData?.fleet_sim ?? {};
   const tripData: any = summaryData?.trip_data ?? null;
   const isVehicleActive = fleetSimData?.status === "active";
 
   const histModuleContribs: Record<string, number> = useMemo(() => {
-    return (histLastStateQuery.data as any)?.module_health ?? {};
-  }, [histLastStateQuery.data]);
+    return (histLastStateData as any)?.module_health ?? {};
+  }, [histLastStateData]);
 
   const histTopDrivers = useMemo(() => {
-    const alerts: any[] = (histAlertsQuery.data as any[]) ?? [];
+    const alerts: any[] = (histAlertsData as any[]) ?? [];
     const scores: Record<string, { module: string; score: number }> = {};
     for (const alert of alerts) {
       const mod = (alert.module ?? "").toLowerCase();
@@ -1275,10 +1314,10 @@ export default function AutomotiveDive({
       .map(([feature, { module, score }]) => ({ feature, module, score }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
-  }, [histAlertsQuery.data]);
+  }, [histAlertsData]);
 
   const histBehaviorData = useMemo(() => {
-    const ds: any = histDriverSummaryQuery.data;
+    const ds: any = histDriverSummaryData;
     if (!ds?.score) return null;
     const totalKm = Math.max(ds.total_km ?? 1, 1);
     return {
@@ -1294,7 +1333,7 @@ export default function AutomotiveDive({
         cornering: ds.harsh_cornering_count ?? 0,
       },
     };
-  }, [histDriverSummaryQuery.data]);
+  }, [histDriverSummaryData]);
 
   const histMaxDriverScore = histTopDrivers.length > 0 ? Math.max(...histTopDrivers.map((d) => d.score)) : 1;
 
@@ -1311,12 +1350,12 @@ export default function AutomotiveDive({
   const sensorKeys: string[] = crossfleetQuery.data?.sensor_keys || [];
 
   const moduleTimelineData: any[] = useMemo(() => {
-    const raw: any[] = moduleTimelineQuery.data?.data || [];
+    const raw: any[] = isModuleTimelinePending ? [] : moduleTimelineQuery.data?.data || [];
     const factor = Math.max(1, Math.floor(raw.length / 300));
     return factor === 1
       ? raw
       : raw.filter((_: any, i: number) => i % factor === 0);
-  }, [moduleTimelineQuery.data]);
+  }, [moduleTimelineQuery.data, isModuleTimelinePending]);
 
   const fleetColDefs = useMemo<ColDef[]>(
     () => [
@@ -1729,7 +1768,7 @@ export default function AutomotiveDive({
   };
 
   const decompositionHistory = useMemo(() => {
-    const raw: any[] = vehicleDecompQuery.data?.data || [];
+    const raw: any[] = vehicleDecompSafeData?.data || [];
     return raw.map((r: any) => ({
       ts: r.ts || String(r.timestamp || "").slice(5, 16),
       mileage: r.mileage ?? 0,
@@ -1744,7 +1783,7 @@ export default function AutomotiveDive({
         ])
       ),
     }));
-  }, [vehicleDecompQuery.data]);
+  }, [vehicleDecompSafeData]);
 
   const radarData = useMemo(() => {
     const v = vehicles.find((v: any) => v.vehicle_id === selectedVehicle);
@@ -1762,7 +1801,7 @@ export default function AutomotiveDive({
   }, [vehicles, selectedVehicle]);
 
   const { anomalyTrendSeries, anomalyTrendData } = useMemo(() => {
-    const raw: any[] = moduleHealthQuery.data?.data || [];
+    const raw: any[] = moduleHealthSafeData?.data || [];
     if (!raw.length)
       return {
         anomalyTrendSeries: [] as string[],
@@ -1793,10 +1832,10 @@ export default function AutomotiveDive({
       return row;
     });
     return { anomalyTrendSeries: series, anomalyTrendData: data };
-  }, [moduleHealthQuery.data]);
+  }, [moduleHealthSafeData]);
 
   const severityDistribution = useMemo(() => {
-    const raw: any[] = moduleHealthQuery.data?.data || [];
+    const raw: any[] = moduleHealthSafeData?.data || [];
     const counts: Record<string, number> = {
       NORMAL: 0,
       WARNING: 0,
@@ -1827,10 +1866,10 @@ export default function AutomotiveDive({
         color: "#ef4444",
       },
     ];
-  }, [moduleHealthQuery.data]);
+  }, [moduleHealthSafeData]);
 
   const severityRuns = useMemo(() => {
-    const raw: any[] = moduleHealthQuery.data?.data || [];
+    const raw: any[] = moduleHealthSafeData?.data || [];
     if (!raw.length)
       return [] as {
         severity: string;
@@ -1869,7 +1908,7 @@ export default function AutomotiveDive({
     cur.endTs = String(raw[raw.length - 1].timestamp || "").slice(5, 16);
     runs.push(cur);
     return runs;
-  }, [moduleHealthQuery.data]);
+  }, [moduleHealthSafeData]);
 
   const sensorStats = useMemo(() => {
     if (!sensorData.length) return [] as any[];
@@ -2171,7 +2210,7 @@ export default function AutomotiveDive({
 
               {isHistorical ? (
                 (() => {
-                  const _ls: any = histLastStateQuery.data ?? {};
+                  const _ls: any = histLastStateData ?? {};
                   const _h: number | null = _ls.health ?? null;
                   const _hColor = _h == null ? "#94a3b8" : _h >= 80 ? "#22c55e" : _h >= 60 ? "#f59e0b" : "#ef4444";
                   const _hStatus = _h == null ? null : _h >= 80 ? "OK" : _h >= 60 ? "WARNING" : "CRITICAL";
@@ -2286,8 +2325,8 @@ export default function AutomotiveDive({
               </Paper>
 
               {(() => {
-                const ls: any = histLastStateQuery.data ?? {};
-                const ds: any = histDriverSummaryQuery.data ?? {};
+                const ls: any = histLastStateData ?? {};
+                const ds: any = histDriverSummaryData ?? {};
                 const h: number = ls.health ?? 0;
                 const hColor = h >= 80 ? "#22c55e" : h >= 60 ? "#f59e0b" : "#ef4444";
                 const _stMap: Record<string, { color: string; label: string }> = {
@@ -2358,8 +2397,8 @@ export default function AutomotiveDive({
                         ))}
                       </Box>
                     )}
-                    {histTripsQuery.data && (histTripsQuery.data as any[]).length > 0 && (() => {
-                      const _trips = histTripsQuery.data as any[];
+                    {histTripsData && (histTripsData as any[]).length > 0 && (() => {
+                      const _trips = histTripsData as any[];
                       const _lt = _trips[_trips.length - 1];
                       const _fmt = (iso: string) => iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) : "–";
                       return (
@@ -2422,17 +2461,17 @@ export default function AutomotiveDive({
                 <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8, mb: 1, flexShrink: 0 }}>Fault Codes (DTCs)</Typography>
                 {histDtcsQuery.isLoading ? (<CircularProgress size={20} />) : (
                   <Box sx={{ overflow: "auto", flex: 1, minHeight: 0 }}>
-                    {((histDtcsQuery.data as any[]) ?? []).length === 0 ? (
+                    {((histDtcsData as any[]) ?? []).length === 0 ? (
                       <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No fault codes recorded</Typography>
                     ) : (
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
                         <thead><tr>{["Module", "Code", "Severity", "Description", ""].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
                         <tbody>
-                          {((histDtcsQuery.data as any[]) ?? []).map((dtc: any, i: number) => {
+                          {((histDtcsData as any[]) ?? []).map((dtc: any, i: number) => {
                             const _sevRaw = String(dtc.severity || "").toLowerCase();
                             const _sevColor = _sevRaw === "critical" ? "#ef4444" : "#f59e0b";
                             const _sevLabel = _sevRaw === "critical" ? "Critical" : "Non-Critical";
-                            const matchingAlert = ((histAlertsQuery.data as any[]) ?? []).find((a: any) => a.module === dtc.module && a.peak_anomaly_ts);
+                            const matchingAlert = ((histAlertsData as any[]) ?? []).find((a: any) => a.module === dtc.module && a.peak_anomaly_ts);
                             return (
                               <tr key={i} style={{ borderBottom: `1px solid ${darkMode ? "#1e293b" : "#f1f5f9"}`, background: i % 2 === 0 ? "transparent" : darkMode ? "rgba(30,41,59,0.3)" : "rgba(248,250,252,0.5)" }}>
                                 <td style={{ padding: "5px 8px", color: (MODULE_COLORS as any)[dtc.module] || (darkMode ? "#94a3b8" : "#64748b"), fontWeight: 700, textTransform: "capitalize" }}>{dtc.module}</td>
@@ -2519,18 +2558,18 @@ export default function AutomotiveDive({
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexShrink: 0 }}>
                   <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: "#22c55e" }} />
                   <Typography sx={{ fontSize: "11px", fontWeight: 700, color: darkMode ? "text.primary" : "#005071", textTransform: "uppercase", letterSpacing: 0.8 }}>Trip History</Typography>
-                  {histTripsQuery.data && (<Chip size="small" label={`${((histTripsQuery.data as any[]) ?? []).length} trips`} sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: darkMode ? alpha("#22c55e", 0.12) : alpha("#22c55e", 0.08), color: "#22c55e" }} />)}
+                  {histTripsData && (<Chip size="small" label={`${((histTripsData as any[]) ?? []).length} trips`} sx={{ height: 16, borderRadius: 1, fontSize: "8px", fontWeight: 700, bgcolor: darkMode ? alpha("#22c55e", 0.12) : alpha("#22c55e", 0.08), color: "#22c55e" }} />)}
                   <Typography sx={{ fontSize: "9px", color: "text.secondary" }}>Historical · read-only</Typography>
                 </Box>
                 {histTripsQuery.isLoading ? (<CircularProgress size={20} />) : (
                   <Box sx={{ overflow: "auto", flex: 1, minHeight: 0 }}>
-                    {((histTripsQuery.data as any[]) ?? []).length === 0 ? (
+                    {((histTripsData as any[]) ?? []).length === 0 ? (
                       <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>No trip records</Typography>
                     ) : (
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
                         <thead><tr>{["Date", distanceUnitLabel(region), "Duration", `Avg ${speedUnitLabel(region)}`, "Brake", "Accel", "Corner", "Score"].map((col) => (<th key={col} style={{ textAlign: "left", padding: "4px 8px", fontWeight: 700, color: darkMode ? "#64748b" : "#94a3b8", borderBottom: `1px solid ${darkMode ? "#1e293b" : "#e2e8f0"}`, whiteSpace: "nowrap", position: "sticky", top: 0, background: darkMode ? "#0a1628" : "#f8fafc" }}>{col}</th>))}</tr></thead>
                         <tbody>
-                          {[...((histTripsQuery.data as any[]) ?? [])].reverse().map((trip: any, i: number) => {
+                          {[...((histTripsData as any[]) ?? [])].reverse().map((trip: any, i: number) => {
                             const dur = trip.duration_secs ?? (trip.duration_mins != null ? trip.duration_mins * 60 : 0);
                             const hh = Math.floor(dur / 3600);
                             const mm = Math.round((dur % 3600) / 60);
@@ -2562,7 +2601,7 @@ export default function AutomotiveDive({
 
             {/* ── HISTORICAL: RECORDED ALERTS (full width) ── */}
             {selectedVehicle && (() => {
-              const _hAll: any[] = (histAlertsQuery.data as any[]) ?? [];
+              const _hAll: any[] = (histAlertsData as any[]) ?? [];
               const _hOpen = _hAll.filter((a: any) => a.status === "OPEN");
               const _hClosed = _hAll.filter((a: any) => a.status !== "OPEN");
               const _hRows = histAlertsTab === 0 ? _hAll : histAlertsTab === 1 ? _hOpen : _hClosed;
@@ -2865,7 +2904,7 @@ export default function AutomotiveDive({
                       const vList: any[] = (observerQuery.data as any)?.vehicles || [];
                       return vList.find((v: any) => v.vehicle_id === selectedVehicle || v.source_id === selectedVehicle) ?? null;
                     })();
-                    const bronze = bronzeStatsQuery.data as any;
+                    const bronze = bronzeStatsData as any;
                     const hasData = kafkaEntry != null || (bronze?.total_rows > 0);
                     const totalRows = kafkaEntry?.rows_processed ?? bronze?.total_rows ?? 0;
                     const activeMods: string[] = kafkaEntry ? [] : (bronze?.active_modules ?? []);
@@ -2958,7 +2997,7 @@ export default function AutomotiveDive({
 
                 {/* Recent DTCs */}
                 {(() => {
-                  const allDtcs: any[] = (histDtcsQuery.data as any[]) ?? [];
+                  const allDtcs: any[] = (histDtcsData as any[]) ?? [];
                   const slots = [allDtcs[0] ?? null, allDtcs[1] ?? null];
                   const noData = histDtcsQuery.isLoading;
                   return (
@@ -3681,7 +3720,7 @@ export default function AutomotiveDive({
 
             <Chip
               size="small"
-              label={`${moduleHealthQuery.data?.count ?? 0} Silver pts`}
+              label={`${moduleHealthSafeData?.count ?? 0} Silver pts`}
               sx={{
                 borderRadius: "4px",
                 fontWeight: 700,
@@ -3697,7 +3736,7 @@ export default function AutomotiveDive({
 
             <Badge
               badgeContent={isHistorical
-                ? ((histAlertsQuery.data as any[]) ?? []).filter((a: any) => a.module?.toLowerCase() === selectedModule && a.status === "OPEN").length || undefined
+                ? ((histAlertsData as any[]) ?? []).filter((a: any) => a.module?.toLowerCase() === selectedModule && a.status === "OPEN").length || undefined
                 : vehicleOpenAlerts.filter((a: any) => a.module?.toLowerCase() === selectedModule).length || undefined}
               color="error"
               sx={{ "& .MuiBadge-badge": { fontSize: "9px", height: 16, minWidth: 16 } }}
@@ -3867,7 +3906,7 @@ export default function AutomotiveDive({
                         </Box>
                         <Chip
                           size="small"
-                          label={vehicleHealthQuery.data?.data_source || " - "}
+                          label={vehicleHealthSafeData?.data_source || " - "}
                           sx={{ borderRadius: 2, fontWeight: "bold", fontSize: "10px", height: 18 }}
                         />
                       </Box>
@@ -5058,7 +5097,7 @@ export default function AutomotiveDive({
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 2, pt: "16px !important" }}>
-          {kpiSensorHistoryQuery.isLoading ? (
+          {kpiSensorHistoryQuery.isLoading || kpiSensorHistoryQuery.isPlaceholderData ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
               <CircularProgress size={28} />
             </Box>
