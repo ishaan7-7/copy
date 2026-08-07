@@ -6527,6 +6527,7 @@ export default function CockpitViewExecutive({
               onClose={() => setAlertsPopupOpen(false)}
               initialFilter={alertsPopupFilter}
               isDark={isDark}
+              onVehicleClick={(vehicleId) => setVehicleSummaryPopupId(vehicleId)}
             />
 
             <VehicleSummaryPopup
@@ -7132,11 +7133,15 @@ export default function CockpitViewExecutive({
                                   </Typography>
                                 </Box>
                                 <Typography
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={() => setVehicleSummaryPopupId(vehicleDetail.vehicle_id)}
                                   sx={{
                                     fontSize: "15px !important",
                                     fontWeight: 800,
                                     lineHeight: 1.2,
                                     color: isDark ? "#f1f5f9" : "#0f172a",
+                                    cursor: "pointer",
+                                    "&:hover": { textDecoration: "underline" },
                                   }}
                                 >
                                   {vehicleDetail.name.toUpperCase()}
@@ -7782,11 +7787,15 @@ export default function CockpitViewExecutive({
                             }}
                           >
                             <Typography
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={() => setVehicleSummaryPopupId(vehicleDetail.vehicle_id)}
                               sx={{
                                 fontSize: "14px !important",
                                 fontWeight: 800,
                                 mb: 0.4,
                                 whiteSpace: "nowrap",
+                                cursor: "pointer",
+                                "&:hover": { textDecoration: "underline" },
                               }}
                             >
                               {vehicleDetail.name.toUpperCase()}
