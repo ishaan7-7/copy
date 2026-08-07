@@ -1047,6 +1047,10 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && !!kpiChartSensor && !isHistorical,
     staleTime: 60_000,
   });
+  const kpiSensorHistoryData = useMemo(() => {
+    const raw: any[] = (kpiSensorHistoryQuery.data as any)?.data ?? [];
+    return raw.map((r: any) => ({ ...r, mileage: convertDistance(r.mileage ?? 0, region) }));
+  }, [kpiSensorHistoryQuery.data, region]);
 
   const histLastStateQuery = useQuery({
     queryKey: ["histLastState", selectedVehicle, region],
@@ -1167,19 +1171,21 @@ export default function AutomotiveDive({
   const nextServiceInKm = Math.round(SERVICE_INTERVAL_KM - kmSinceService);
   const downsampledBronze = useMemo(() => {
     const factor = Math.max(1, Math.floor(sensorData.length / 400));
-    return factor === 1
+    const sampled = factor === 1
       ? sensorData
       : sensorData.filter((_: any, i: number) => i % factor === 0);
-  }, [sensorData]);
+    return sampled.map((r: any) => ({ ...r, mileage: convertDistance(r.mileage ?? 0, region) }));
+  }, [sensorData, region]);
 
   // SILVER derived
   const moduleHealthData: any[] = useMemo(() => {
     const raw: any[] = moduleHealthSafeData?.data || [];
     const factor = Math.max(1, Math.floor(raw.length / 400));
-    return factor === 1
+    const sampled = factor === 1
       ? raw
       : raw.filter((_: any, i: number) => i % factor === 0);
-  }, [moduleHealthSafeData]);
+    return sampled.map((r: any) => ({ ...r, mileage: convertDistance(r.mileage ?? 0, region) }));
+  }, [moduleHealthSafeData, region]);
 
   const latestSilverRow: any = useMemo(() => {
     const raw: any[] = moduleHealthSafeData?.data || [];
@@ -1229,9 +1235,9 @@ export default function AutomotiveDive({
     return sampled.map((r: any) => ({
       ts: r.ts || String(r.timestamp || "").slice(5, 16),
       health: r.health,
-      mileage: r.mileage ?? 0,
+      mileage: convertDistance(r.mileage ?? 0, region),
     }));
-  }, [healthRaw]);
+  }, [healthRaw, region]);
 
   const summaryHealthData = useMemo(() => {
     const raw: any[] = healthRaw;
@@ -1240,14 +1246,14 @@ export default function AutomotiveDive({
     return sampled.map((r: any) => ({
       ts: r.ts || String(r.timestamp || "").slice(5, 16),
       health: r.health,
-      mileage: r.mileage ?? 0,
+      mileage: convertDistance(r.mileage ?? 0, region),
       engine_contrib: r.engine_contrib,
       transmission_contrib: r.transmission_contrib,
       battery_contrib: r.battery_contrib,
       body_contrib: r.body_contrib,
       tyre_contrib: r.tyre_contrib,
     }));
-  }, [healthRaw]);
+  }, [healthRaw, region]);
 
   const observerVehicleEntry = useMemo(() => {
     const vList: any[] = (observerQuery.data as any)?.vehicles || [];
@@ -1771,7 +1777,7 @@ export default function AutomotiveDive({
     const raw: any[] = vehicleDecompSafeData?.data || [];
     return raw.map((r: any) => ({
       ts: r.ts || String(r.timestamp || "").slice(5, 16),
-      mileage: r.mileage ?? 0,
+      mileage: convertDistance(r.mileage ?? 0, region),
       ...Object.fromEntries(
         ALL_MODULES.map((mod) => [
           mod,
@@ -1783,7 +1789,7 @@ export default function AutomotiveDive({
         ])
       ),
     }));
-  }, [vehicleDecompSafeData]);
+  }, [vehicleDecompSafeData, region]);
 
   const radarData = useMemo(() => {
     const v = vehicles.find((v: any) => v.vehicle_id === selectedVehicle);
@@ -1824,7 +1830,7 @@ export default function AutomotiveDive({
       });
       const row: Record<string, any> = {
         timestamp: String(r.timestamp || "").slice(5, 16),
-        mileage: r.mileage ?? 0,
+        mileage: convertDistance(r.mileage ?? 0, region),
       };
       series.forEach((s) => {
         row[s] = fm[s] ?? 0;
@@ -1832,7 +1838,7 @@ export default function AutomotiveDive({
       return row;
     });
     return { anomalyTrendSeries: series, anomalyTrendData: data };
-  }, [moduleHealthSafeData]);
+  }, [moduleHealthSafeData, region]);
 
   const severityDistribution = useMemo(() => {
     const raw: any[] = moduleHealthSafeData?.data || [];
@@ -2173,7 +2179,7 @@ export default function AutomotiveDive({
                 fontSize: "11px",
               }}
             >
-              MILEAGE
+              MILEAGE ({distanceUnitLabel(region).toUpperCase()})
             </ToggleButton>
           </ToggleButtonGroup>
         </Box>
@@ -5101,13 +5107,13 @@ export default function AutomotiveDive({
             <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
               <CircularProgress size={28} />
             </Box>
-          ) : !(kpiSensorHistoryQuery.data as any)?.data?.length ? (
+          ) : !kpiSensorHistoryData.length ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
               <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>No data available</Typography>
             </Box>
           ) : (
             <SensorChart
-              data={(kpiSensorHistoryQuery.data as any).data}
+              data={kpiSensorHistoryData}
               group={{
                 title: `${kpiChartSensor?.label ?? ""} (${kpiChartSensor?.unit ?? ""})`,
                 sensors: [{

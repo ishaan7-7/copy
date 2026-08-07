@@ -311,10 +311,10 @@ export default function VehicleSummaryPopup({
     const sampled = factor === 1 ? raw : raw.filter((_: any, i: number) => i % factor === 0);
     return sampled.map((r: any) => ({
       ts: r.ts || String(r.timestamp || "").slice(5, 16),
-      mileage: r.mileage ?? 0,
+      mileage: convertDistance(r.mileage ?? 0, region),
       health: r.health,
     }));
-  }, [healthHistQuery.data, isHealthHistPending]);
+  }, [healthHistQuery.data, isHealthHistPending, region]);
 
   const vehicleOpenAlerts: any[] = isAlertsPending ? [] : alertsQuery.data?.open ?? [];
   const vehicleClosedAlerts: any[] = isAlertsPending ? [] : alertsQuery.data?.closed ?? [];
@@ -494,7 +494,7 @@ export default function VehicleSummaryPopup({
                       }}
                     >
                       <ToggleButton value="timestamp">Time</ToggleButton>
-                      <ToggleButton value="mileage">Mileage</ToggleButton>
+                      <ToggleButton value="mileage">Mileage ({distanceUnitLabel(region)})</ToggleButton>
                     </ToggleButtonGroup>
                   </Box>
                   {isHealthHistPending ? (
