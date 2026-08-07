@@ -5,6 +5,7 @@ import sys
 import json
 import time
 from threading import Lock
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException, Query
 
 _PROJECT_ROOT_FOR_IMPORT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -1115,6 +1116,142 @@ def get_vehicle_bronze_stats(vehicle_id: str):
     return result
 
 
+# get_vehicle_summary fans its I/O out across this pool instead of running the
+# ~12 blocking network/parquet calls below one after another — DuckDB's reader
+# is explicitly documented as safe for concurrent use from FastAPI's own
+# threadpool (common/duck_reader.py: "each query gets its own cursor... 7
+# concurrent vehicle queries... now complete in ~80ms total"), and the two
+# fleet_sim_server calls are independent plain HTTP requests. Shared across
+# requests (not one pool per call) to avoid thread-creation overhead on what's
+# a frequently-polled endpoint.
+_SUMMARY_EXECUTOR = ThreadPoolExecutor(max_workers=16, thread_name_prefix="vehicle-summary")
+
+# Top Anomaly Drivers only needs a recent window to reflect *current* anomaly
+# patterns, not the full live history — scanning all _SILVER_MAX_FILES (200)
+# per module x 5 modules against unpartitioned live silver files (which hold
+# every vehicle's rows, filtered down to one source_id per query) was the
+# single most expensive part of this endpoint for active vehicles.
+_TOP_DRIVERS_MAX_FILES = 30
+
+
+def _fetch_fleet_sim(vehicle_id: str) -> dict:
+    try:
+        import urllib.request as _urllib_req
+        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=5)
+        return json.loads(_req.read())
+    except Exception:
+        return {}
+
+
+def _fetch_kpi_sensors(mod: str, vehicle_id: str, bronze_root: str) -> list[dict]:
+    sensors = _KPI_SENSORS.get(mod, [])
+    partition_path = os.path.join(bronze_root, mod, f"source_id={vehicle_id}")
+    sensor_vals: dict = {}
+    if os.path.exists(partition_path):
+        pfiles = dr.list_files(partition_path, max_files=5)
+        if pfiles:
+            col_list = list(dict.fromkeys([s[0] for s in sensors] + ["timestamp"]))
+            col_sql = ", ".join(f'"{c}"' for c in col_list)
+            try:
+                df = dr.query_df(f"SELECT {col_sql} FROM read_parquet(?)", pfiles)
+                if not df.empty:
+                    if "timestamp" in df.columns:
+                        df = df.sort_values("timestamp")
+                    last_row = df.iloc[-1]
+                    for skey, _, _ in sensors:
+                        if skey in df.columns:
+                            raw = last_row[skey]
+                            try:
+                                sensor_vals[skey] = round(float(raw), 2) if raw is not None and str(raw) != "nan" else None
+                            except Exception:
+                                sensor_vals[skey] = None
+            except Exception:
+                pass
+    out = []
+    for skey, slabel, sunit in sensors:
+        spec = _KEY_SENSOR_SPECS.get(mod, {}).get(skey)
+        lo, hi = (spec[0], spec[1]) if spec else (None, None)
+        out.append({
+            "key": skey,
+            "label": slabel,
+            "unit": sunit,
+            "value": sensor_vals.get(skey),
+            "range_lo": lo,
+            "range_hi": hi,
+        })
+    return out
+
+
+def _fetch_odometer_km(vehicle_id: str, bronze_root: str) -> float | None:
+    body_partition = os.path.join(bronze_root, "body", f"source_id={vehicle_id}")
+    if not os.path.exists(body_partition):
+        return None
+    bfiles = dr.list_files(body_partition, max_files=5)
+    if not bfiles:
+        return None
+    try:
+        bdf = dr.query_df('SELECT "odometer_reading", "timestamp" FROM read_parquet(?)', bfiles)
+        if not bdf.empty and "odometer_reading" in bdf.columns:
+            if "timestamp" in bdf.columns:
+                bdf = bdf.sort_values("timestamp")
+            raw_odo = bdf["odometer_reading"].iloc[-1]
+            if raw_odo is not None and str(raw_odo) != "nan":
+                return round(float(raw_odo), 1)
+    except Exception:
+        pass
+    return None
+
+
+def _fetch_module_feature_scores(mod: str, vehicle_id: str, is_historical: bool) -> dict[str, float]:
+    import pandas as pd
+    scores: dict[str, float] = {}
+    try:
+        if is_historical:
+            _bsp = os.path.join(_BATCH_SILVER_ROOT, mod, f"source_id={vehicle_id}", "silver.parquet")
+            combined = pd.read_parquet(_bsp) if os.path.exists(_bsp) else pd.DataFrame()
+        else:
+            silver_path = os.path.join(_SILVER_ROOT, mod)
+            if not os.path.exists(silver_path):
+                return scores
+            combined = _query_vehicle_df(silver_path, vehicle_id, _TOP_DRIVERS_MAX_FILES)
+        if combined.empty or "top_features" not in combined.columns:
+            return scores
+        for raw in combined["top_features"].dropna():
+            try:
+                feats = json.loads(str(raw))
+                for f, v in feats.items():
+                    if f == "odometer_reading":
+                        continue
+                    scores[f] = scores.get(f, 0.0) + abs(float(v))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return scores
+
+
+def _fetch_trip_data(vehicle_id: str, fleet_sim: dict) -> tuple[dict, dict]:
+    trip_data: dict = {}
+    last_trip_data: dict = {}
+    try:
+        import urllib.request as _urllib_req
+        if fleet_sim.get("status") == "active":
+            try:
+                _treq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/trip", timeout=5)
+                trip_data = json.loads(_treq.read())
+            except Exception:
+                pass
+        else:
+            try:
+                _ltreq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/last-trip", timeout=5)
+                last_trip_data = json.loads(_ltreq.read()).get("last_trip") or {}
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return trip_data, last_trip_data
+
+
 @router.get("/api/automotive/vehicle-summary/{vehicle_id}")
 def get_vehicle_summary(vehicle_id: str):
     cache_key = f"vehicle-summary-{vehicle_id}"
@@ -1122,21 +1259,26 @@ def get_vehicle_summary(vehicle_id: str):
     if cached is not None:
         return cached
 
-    import pandas as pd
-
     is_historical = vehicle_id in _HISTORICAL_IDS
+    _bronze_root = _BATCH_BRONZE_ROOT if is_historical else _DELTA_ROOT
 
-    # ── 0. Fleet sim data — fetched once up front so the historical-vehicle
-    # fallbacks below (module health, last trip) can reuse it instead of each
-    # making their own request. Returns empty dict if the simulator is
-    # offline, same as before.
-    fleet_sim: dict = {}
-    try:
-        import urllib.request as _urllib_req
-        _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=5)
-        fleet_sim = json.loads(_req.read())
-    except Exception:
-        pass
+    # Fan out every independent I/O call at once. Only trip_data (step 7)
+    # genuinely depends on another call's result (fleet_sim's status), so it's
+    # submitted in a second wave once fleet_sim resolves — everything else
+    # runs fully concurrently in _SUMMARY_EXECUTOR.
+    fleet_sim_future = _SUMMARY_EXECUTOR.submit(_fetch_fleet_sim, vehicle_id)
+    kpi_futures = {
+        mod: _SUMMARY_EXECUTOR.submit(_fetch_kpi_sensors, mod, vehicle_id, _bronze_root)
+        for mod in _VEHICLE_MODULES
+    }
+    odometer_future = _SUMMARY_EXECUTOR.submit(_fetch_odometer_km, vehicle_id, _bronze_root)
+    driver_futures = {
+        mod: _SUMMARY_EXECUTOR.submit(_fetch_module_feature_scores, mod, vehicle_id, is_historical)
+        for mod in _VEHICLE_MODULES
+    }
+
+    fleet_sim: dict = fleet_sim_future.result()
+    trip_future = _SUMMARY_EXECUTOR.submit(_fetch_trip_data, vehicle_id, fleet_sim)
 
     # ── 1. Health snapshot from live cache ────────────────────────────────────
     health_snapshot: dict = {
@@ -1189,44 +1331,7 @@ def get_vehicle_summary(vehicle_id: str):
             }
 
     # ── 2. KPI snapshot (latest bronze sensor values per module) ──────────────
-    _bronze_root = _BATCH_BRONZE_ROOT if is_historical else _DELTA_ROOT
-    kpi_snapshot: dict = {}
-    for mod in _VEHICLE_MODULES:
-        sensors = _KPI_SENSORS.get(mod, [])
-        kpi_snapshot[mod] = {"sensors": []}
-        partition_path = os.path.join(_bronze_root, mod, f"source_id={vehicle_id}")
-        sensor_vals: dict = {}
-        if os.path.exists(partition_path):
-            pfiles = dr.list_files(partition_path, max_files=5)
-            if pfiles:
-                col_list = list(dict.fromkeys([s[0] for s in sensors] + ["timestamp"]))
-                col_sql = ", ".join(f'"{c}"' for c in col_list)
-                try:
-                    df = dr.query_df(f"SELECT {col_sql} FROM read_parquet(?)", pfiles)
-                    if not df.empty:
-                        if "timestamp" in df.columns:
-                            df = df.sort_values("timestamp")
-                        last_row = df.iloc[-1]
-                        for skey, _, _ in sensors:
-                            if skey in df.columns:
-                                raw = last_row[skey]
-                                try:
-                                    sensor_vals[skey] = round(float(raw), 2) if raw is not None and str(raw) != "nan" else None
-                                except Exception:
-                                    sensor_vals[skey] = None
-                except Exception:
-                    pass
-        for skey, slabel, sunit in sensors:
-            spec = _KEY_SENSOR_SPECS.get(mod, {}).get(skey)
-            lo, hi = (spec[0], spec[1]) if spec else (None, None)
-            kpi_snapshot[mod]["sensors"].append({
-                "key": skey,
-                "label": slabel,
-                "unit": sunit,
-                "value": sensor_vals.get(skey),
-                "range_lo": lo,
-                "range_hi": hi,
-            })
+    kpi_snapshot: dict = {mod: {"sensors": kpi_futures[mod].result()} for mod in _VEHICLE_MODULES}
 
     # ── 2b. Tyre RL/RR temp — derived from FL/FR (rear axle runs hotter) ────────
     _tyre_sensors = kpi_snapshot.get("tyre", {}).get("sensors", [])
@@ -1248,22 +1353,7 @@ def get_vehicle_summary(vehicle_id: str):
         })
 
     # ── 3. Service info (odometer from body bronze) ───────────────────────────
-    odometer_km: float | None = None
-    body_partition = os.path.join(_bronze_root, "body", f"source_id={vehicle_id}")
-    if os.path.exists(body_partition):
-        bfiles = dr.list_files(body_partition, max_files=5)
-        if bfiles:
-            try:
-                bdf = dr.query_df('SELECT "odometer_reading", "timestamp" FROM read_parquet(?)', bfiles)
-                if not bdf.empty and "odometer_reading" in bdf.columns:
-                    if "timestamp" in bdf.columns:
-                        bdf = bdf.sort_values("timestamp")
-                    raw_odo = bdf["odometer_reading"].iloc[-1]
-                    if raw_odo is not None and str(raw_odo) != "nan":
-                        odometer_km = round(float(raw_odo), 1)
-            except Exception:
-                pass
-
+    odometer_km: float | None = odometer_future.result()
     next_service_in_km: float | None = None
     if odometer_km is not None:
         next_service_in_km = round(_SERVICE_INTERVAL_KM - (odometer_km % _SERVICE_INTERVAL_KM), 1)
@@ -1278,30 +1368,11 @@ def get_vehicle_summary(vehicle_id: str):
     feature_scores: dict = {}
     feature_modules: dict = {}
     for mod in _VEHICLE_MODULES:
-        try:
-            if is_historical:
-                _bsp = os.path.join(_BATCH_SILVER_ROOT, mod, f"source_id={vehicle_id}", "silver.parquet")
-                combined = pd.read_parquet(_bsp) if os.path.exists(_bsp) else pd.DataFrame()
-            else:
-                silver_path = os.path.join(_SILVER_ROOT, mod)
-                if not os.path.exists(silver_path):
-                    continue
-                combined = _query_vehicle_df(silver_path, vehicle_id, _SILVER_MAX_FILES)
-            if combined.empty or "top_features" not in combined.columns:
-                continue
-            for raw in combined["top_features"].dropna():
-                try:
-                    feats = json.loads(str(raw))
-                    for f, v in feats.items():
-                        if f == "odometer_reading":
-                            continue
-                        feature_scores[f] = feature_scores.get(f, 0.0) + abs(float(v))
-                        if f not in feature_modules:
-                            feature_modules[f] = mod
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        mod_scores = driver_futures[mod].result()
+        for f, s in mod_scores.items():
+            feature_scores[f] = feature_scores.get(f, 0.0) + s
+            if f not in feature_modules:
+                feature_modules[f] = mod
 
     # Top 3 per module (not top 5 overall) so every module is represented —
     # a flat cross-module top-N let 1-2 high-magnitude modules crowd out the
@@ -1374,29 +1445,12 @@ def get_vehicle_summary(vehicle_id: str):
         "recent_open": open_alerts[:8],
     }
 
-    # ── 7. Trip data — fleet_sim was already fetched in step 0 above. Active
-    # vehicles get their in-progress trip; historical vehicles get their most
-    # recent completed trip from the dedicated /last-trip route (which reads
-    # fleet_sim_server's own precomputed cache — same source last_state's
-    # module_health came from) instead of leaving trip_data empty.
-    trip_data: dict = {}
-    last_trip_data: dict = {}
-    try:
-        import urllib.request as _urllib_req
-        if fleet_sim.get("status") == "active":
-            try:
-                _treq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/trip", timeout=5)
-                trip_data = json.loads(_treq.read())
-            except Exception:
-                pass
-        else:
-            try:
-                _ltreq = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}/last-trip", timeout=5)
-                last_trip_data = json.loads(_ltreq.read()).get("last_trip") or {}
-            except Exception:
-                pass
-    except Exception:
-        pass
+    # ── 7. Trip data — submitted above once fleet_sim's status was known.
+    # Active vehicles get their in-progress trip; historical vehicles get
+    # their most recent completed trip from the dedicated /last-trip route
+    # (which reads fleet_sim_server's own precomputed cache — same source
+    # last_state's module_health came from) instead of leaving trip_data empty.
+    trip_data, last_trip_data = trip_future.result()
 
     result = {
         "vehicle_id": vehicle_id,
