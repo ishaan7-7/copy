@@ -2931,6 +2931,11 @@ export default function CockpitViewExecutive({
   const [vehiclePopoverAnchor, setVehiclePopoverAnchor] = useState<HTMLElement | null>(null);
 
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
+  // Bounding rect of whichever map instance (inline or the fullscreen "Fleet
+  // Map" dialog) the marker click came from, captured at click time — the
+  // vehicle card anchors off this map panel's left edge instead of the click
+  // point, so it always opens beside the map instead of over it.
+  const [mapPanelRect, setMapPanelRect] = useState<DOMRect | null>(null);
 
   const [drawerTab, setDrawerTab] = useState(0);
   const [openFleetScatter, setOpenFleetScatter] = useState(false);
@@ -4191,6 +4196,8 @@ export default function CockpitViewExecutive({
           left: event.originalEvent.clientX,
         });
       }
+      const mapEl = (event?.target as any)?._map?.getContainer?.() as HTMLElement | undefined;
+      setMapPanelRect(mapEl ? mapEl.getBoundingClientRect() : null);
     },
     []
   );
@@ -6869,21 +6876,23 @@ export default function CockpitViewExecutive({
                 popoverPosition
                   ? (() => {
                       // The Executive layout's map sits on the right side of
-                      // the screen (unlike Monitoring's, on the left), so a
-                      // fixed rightward offset routinely had no room left
-                      // before the viewport edge and rendered the popup back
-                      // on top of the map instead of beside it. Flip to the
-                      // left of the click point whenever there isn't enough
-                      // width remaining to the right for the popup itself.
+                      // the screen (unlike Monitoring's, on the left). The
+                      // card used to anchor off the click point itself,
+                      // which — even after flipping left near the viewport
+                      // edge — still landed on top of the map most of the
+                      // time, since the click is by definition inside the
+                      // map's own bounds. Anchor off the map panel's left
+                      // edge instead (captured at click time in
+                      // handleVehicleMarkerClick) so the card always opens
+                      // beside the map, never over it, regardless of where
+                      // in the map the marker sits.
                       const vw = window.innerWidth;
                       const popupWidthPx = selectedIsActive ? vw * 0.36 : 310;
-                      const gap = 24;
-                      const openLeft = popoverPosition.left + 80 + popupWidthPx > vw - gap;
+                      const gap = 16;
+                      const mapLeft = mapPanelRect ? mapPanelRect.left : popoverPosition.left;
                       return {
                         top: Math.max(gap, popoverPosition.top - 170),
-                        left: openLeft
-                          ? Math.max(gap, popoverPosition.left - popupWidthPx - gap)
-                          : popoverPosition.left + 80,
+                        left: Math.max(gap, mapLeft - popupWidthPx - gap),
                       };
                     })()
                   : undefined
@@ -10316,7 +10325,7 @@ export default function CockpitViewExecutive({
                       <>
                         <Box sx={{ minHeight: 0 }}>
                           <HealthGauge
-                            value={executiveMetrics.avgDriver}
+                            value={Math.round(executiveMetrics.avgDriver)}
                             color={driverScoreColor}
                             formatter="{value}%"
                           />
