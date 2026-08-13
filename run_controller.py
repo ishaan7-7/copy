@@ -8,9 +8,12 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from threading import Event
 from typing import Optional
 
 import psutil
+
+from common.log_pipe import install_timestamped_stdout
 
 ROOT_DIR    = Path(__file__).parent.resolve()
 VENV_PYTHON = ROOT_DIR / ".venv" / "Scripts" / "python.exe"
@@ -96,6 +99,7 @@ def cmd_start(args: argparse.Namespace) -> None:
     env["PYTHONPATH"] = str(ROOT_DIR)
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
+    env["PYTHONUNBUFFERED"] = "1"
 
     worker_cmd = [str(VENV_PYTHON), __file__, "--worker"]
     if overrides:
@@ -192,6 +196,7 @@ def cmd_config(_args: argparse.Namespace) -> None:
 
 
 def _worker_main(overrides_json: str = "") -> None:
+    install_timestamped_stdout()
     sys.path.insert(0, str(ROOT_DIR))
     from replay.service.replay_service import ReplayService
 
@@ -214,17 +219,15 @@ def _worker_main(overrides_json: str = "") -> None:
         archive_dlq=cfg.get("reset", {}).get("archive_dlq", True),
     )
 
-    _stop = False
+    stop_event = Event()
 
     def _on_signal(*_: object) -> None:
-        nonlocal _stop
-        _stop = True
+        stop_event.set()
 
     signal.signal(signal.SIGTERM, _on_signal)
 
     try:
-        while not _stop:
-            time.sleep(1)
+        stop_event.wait()
     except KeyboardInterrupt:
         pass
     finally:

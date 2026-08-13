@@ -37,6 +37,8 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { MODULE_COLORS } from "../../constants/chartColors";
 import { getDtcDetails } from "../../utils/dtcKnowledge";
 import { useStore } from "../../store";
+import { useGoldStream } from "../../contexts/GoldStreamContext";
+import { useFleetBehaviorStream } from "../../contexts/FleetBehaviorStreamContext";
 import {
   convertDistance,
   convertSpeed,
@@ -103,8 +105,10 @@ export default function VehicleSummaryPopup({
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const enabled = open && !!vehicleId;
+  const { vehicles: sseVehicles, ringBuffer, vehicleLive } = useGoldStream();
+  const { behavior: sseBehavior } = useFleetBehaviorStream();
 
-  
+
   const summaryQuery = useQuery({
     queryKey: ["vehSummaryPopup", vehicleId],
     queryFn: () => axios.get(`${API}/api/automotive/vehicle-summary/${vehicleId}`).then((r) => r.data),
@@ -125,7 +129,7 @@ export default function VehicleSummaryPopup({
     queryKey: ["vehBehaviorPopup", vehicleId],
     queryFn: () => axios.get(`${API}/api/fleet/vehicle/${vehicleId}/behavior`).then((r) => r.data),
     enabled,
-    refetchInterval: enabled ? 8000 : false,
+    refetchInterval: enabled ? 15000 : false,
   });
   const isBehaviorPending = behaviorQuery.isLoading || behaviorQuery.isPlaceholderData;
 
@@ -240,14 +244,26 @@ export default function VehicleSummaryPopup({
   };
 
   const summaryData: any = isSummaryPending ? undefined : summaryQuery.data;
-  const behaviorData: any = isBehaviorPending ? undefined : behaviorQuery.data;
+  const liveBehavior = vehicleId ? sseBehavior[vehicleId] : undefined;
+  const behaviorData: any = liveBehavior ?? (isBehaviorPending ? undefined : behaviorQuery.data);
   const healthScore: number | null = summaryData?.health_snapshot?.health_score ?? null;
   const healthStatus: string = summaryData?.health_snapshot?.status ?? "UNKNOWN";
   const fleetRank: number | null = summaryData?.health_snapshot?.fleet_rank ?? null;
   const fleetTotal: number | null = summaryData?.health_snapshot?.fleet_total ?? null;
-  const moduleContribs: Record<string, number> = summaryData?.health_snapshot?.module_contribs ?? {};
-  const odometerKm: number | null = summaryData?.service_info?.odometer_km ?? null;
-  const nextServiceKm: number | null = summaryData?.service_info?.next_service_in_km ?? null;
+  const sseVehicleEntry = sseVehicles.find((v) => v.vehicle_id === vehicleId);
+  const restModuleContribs: Record<string, number> = summaryData?.health_snapshot?.module_contribs ?? {};
+  const moduleContribs: Record<string, number> = sseVehicleEntry
+    ? {
+        engine: sseVehicleEntry.engine_contrib ?? restModuleContribs.engine,
+        transmission: sseVehicleEntry.transmission_contrib ?? restModuleContribs.transmission,
+        battery: sseVehicleEntry.battery_contrib ?? restModuleContribs.battery,
+        body: sseVehicleEntry.body_contrib ?? restModuleContribs.body,
+        tyre: sseVehicleEntry.tyre_contrib ?? restModuleContribs.tyre,
+      }
+    : restModuleContribs;
+  const liveDetail = vehicleId ? vehicleLive[vehicleId] : undefined;
+  const odometerKm: number | null = liveDetail?.service_info?.odometer_km ?? summaryData?.service_info?.odometer_km ?? null;
+  const nextServiceKm: number | null = liveDetail?.service_info?.next_service_in_km ?? summaryData?.service_info?.next_service_in_km ?? null;
   const serviceProgress = odometerKm != null ? Math.min(100, ((odometerKm % 15000) / 15000) * 100) : 0;
   const fleetSimData: any = summaryData?.fleet_sim ?? {};
   const tripData: any = summaryData?.trip_data ?? null;
@@ -286,7 +302,20 @@ export default function VehicleSummaryPopup({
   }, [topDrivers]);
 
   const healthChartData = useMemo(() => {
-    const raw: any[] = isHealthHistPending ? [] : healthHistQuery.data?.data ?? [];
+    const restRaw: any[] = isHealthHistPending ? [] : healthHistQuery.data?.data ?? [];
+    const liveRaw: any[] = vehicleId ? ringBuffer.get(vehicleId) ?? [] : [];
+
+    let raw: any[];
+    if (liveRaw.length > 0) {
+      const liveStart = liveRaw[0]?.ts;
+      const seed = liveStart
+        ? restRaw.filter((r: any) => String(r.ts || r.timestamp || "") < liveStart)
+        : restRaw;
+      raw = [...seed, ...liveRaw];
+    } else {
+      raw = restRaw;
+    }
+
     const factor = Math.max(1, Math.floor(raw.length / 150));
     const sampled = factor === 1 ? raw : raw.filter((_: any, i: number) => i % factor === 0);
     return sampled.map((r: any) => ({
@@ -294,7 +323,7 @@ export default function VehicleSummaryPopup({
       mileage: convertDistance(r.mileage ?? 0, region),
       health: r.health,
     }));
-  }, [healthHistQuery.data, isHealthHistPending, region]);
+  }, [healthHistQuery.data, isHealthHistPending, region, vehicleId, ringBuffer, sseVehicles]);
 
   const vehicleOpenAlerts: any[] = isAlertsPending ? [] : alertsQuery.data?.open ?? [];
   const vehicleClosedAlerts: any[] = isAlertsPending ? [] : alertsQuery.data?.closed ?? [];
@@ -304,7 +333,7 @@ export default function VehicleSummaryPopup({
   const dtcRunMap: Record<string, any> = {};
   for (const r of dtcRuns) dtcRunMap[`${r.module}|${normPeakTs(r.peak_ts)}`] = r;
 
-  const kpi = summaryData?.kpi_snapshot ?? {};
+  const kpi = liveDetail?.kpi_snapshot ?? summaryData?.kpi_snapshot ?? {};
   const engineSensors: any[] = kpi.engine?.sensors ?? [];
   const batterySensors: any[] = kpi.battery?.sensors ?? [];
   const bodySensors: any[] = kpi.body?.sensors ?? [];

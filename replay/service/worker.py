@@ -204,7 +204,7 @@ def run_worker(
                     rows_sent_total.inc()
 
                     if rows_per_second:
-                        time.sleep(1.0 / rows_per_second)
+                        shutdown_event.wait(timeout=1.0 / rows_per_second)
 
                 elif replay_mode == "batch":
                     if not batch:

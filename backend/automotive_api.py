@@ -1960,6 +1960,28 @@ def _sync_refresh_automotive_cache() -> None:
         print(f"Automotive cache refresh failed, will retry next cycle: {e}")
 
 
+def _precompute_vehicle_live_details() -> None:
+    fleet_live = _get_live("fleet-summary")
+    if not fleet_live:
+        return
+    vehicle_ids = [v.get("vehicle_id") for v in fleet_live.get("vehicles", [])]
+    for vid in vehicle_ids:
+        if not vid:
+            continue
+        try:
+            kpi_snapshot = {mod: {"sensors": _fetch_kpi_sensors(mod, vid, _DELTA_ROOT)} for mod in _VEHICLE_MODULES}
+            odometer_km = _fetch_odometer_km(vid, _DELTA_ROOT)
+            next_service_in_km = None
+            if odometer_km is not None:
+                next_service_in_km = round(_SERVICE_INTERVAL_KM - (odometer_km % _SERVICE_INTERVAL_KM), 1)
+            _set_live(f"vehicle-live-{vid}", {
+                "kpi_snapshot": kpi_snapshot,
+                "service_info": {"odometer_km": odometer_km, "next_service_in_km": next_service_in_km},
+            })
+        except Exception:
+            pass
+
+
 async def automotive_live_loop() -> None:
     global _sse_event_loop
     _sse_event_loop = asyncio.get_event_loop()
@@ -1968,6 +1990,7 @@ async def automotive_live_loop() -> None:
 
         await asyncio.gather(
             asyncio.to_thread(_sync_refresh_automotive_cache),
+            asyncio.to_thread(_precompute_vehicle_live_details),
             *[asyncio.to_thread(_precompute_module_fleet_health, mod)
               for mod in _VEHICLE_MODULES],
         )
@@ -2005,9 +2028,17 @@ def _compute_and_broadcast_sse_delta() -> None:
             delta[vid] = new_pts
     fleet_summary_cached = _LIVE_CACHE.get("fleet-summary")
     vehicle_streams = fleet_summary_cached.get("vehicles", []) if fleet_summary_cached else []
-    if not delta and not vehicle_streams:
+    with _LIVE_CACHE_LOCK:
+        live_keys = [k for k in _LIVE_CACHE if k.startswith("vehicle-live-")]
+    vehicle_live: dict = {}
+    for key in live_keys:
+        vid = key[len("vehicle-live-"):]
+        cached = _LIVE_CACHE.get(key)
+        if cached:
+            vehicle_live[vid] = cached
+    if not delta and not vehicle_streams and not vehicle_live:
         return
-    payload = json.dumps({"type": "gold_delta", "vehicles": vehicle_streams, "delta": delta})
+    payload = json.dumps({"type": "gold_delta", "vehicles": vehicle_streams, "delta": delta, "vehicle_live": vehicle_live})
     _sse_broadcast(payload)
 
 

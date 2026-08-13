@@ -8,13 +8,14 @@ import {
   Stack,
   Divider,
   LinearProgress,
+  CircularProgress,
   Alert,
 } from "@mui/material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useStore } from "../store";
 
-const API = "http://127.0.0.1:8005";
+const API = "http://127.0.0.1:8010";
 
 interface ReplayStatus {
   running: boolean;
@@ -177,30 +178,34 @@ export default function ReplayControl({ isActive = true }: { isActive?: boolean 
             variant="contained"
             disabled={busy || !!status?.running}
             onClick={() => startMutation.mutate()}
+            startIcon={startMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}
           >
-            Start
+            {startMutation.isPending ? "Starting…" : "Start"}
           </Button>
           <Button
             variant="outlined"
             disabled={busy || !status?.running}
             onClick={() => stopMutation.mutate()}
+            startIcon={stopMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}
           >
-            Stop
+            {stopMutation.isPending ? "Stopping…" : "Stop"}
           </Button>
           <Button
             variant="outlined"
             disabled={busy || !!status?.running}
             onClick={() => startResetMutation.mutate()}
+            startIcon={startResetMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}
           >
-            Start with Reset
+            {startResetMutation.isPending ? "Starting…" : "Start with Reset"}
           </Button>
           <Button
             variant="outlined"
             color="warning"
             disabled={busy || !!status?.running}
             onClick={() => resetMutation.mutate()}
+            startIcon={resetMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}
           >
-            Reset
+            {resetMutation.isPending ? "Resetting…" : "Reset"}
           </Button>
         </Stack>
 
@@ -232,8 +237,13 @@ export default function ReplayControl({ isActive = true }: { isActive?: boolean 
           color="error"
           disabled={hardResetMutation.isPending || hardResetWatching}
           onClick={handleHardResetClick}
+          startIcon={hardResetMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}
         >
-          {confirmingHardReset ? "Click again to confirm" : "Full Hard Reset"}
+          {hardResetMutation.isPending
+            ? "Starting…"
+            : confirmingHardReset
+            ? "Click again to confirm"
+            : "Full Hard Reset"}
         </Button>
       </Card>
     </Box>

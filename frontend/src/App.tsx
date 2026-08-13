@@ -5,6 +5,7 @@ import Layout from "./components/Layout";
 import { useStore } from "./store";
 import { lightTheme, darkTheme } from "./theme";
 import { GoldStreamProvider } from "./contexts/GoldStreamContext";
+import { FleetBehaviorStreamProvider } from "./contexts/FleetBehaviorStreamContext";
 import TelematrixLandingPage from "./pages/TelematrixLandingPage";
 
 const scrollbarStyles = (dark: boolean) => ({
@@ -122,16 +123,18 @@ function App() {
 
   return (
     <GoldStreamProvider>
-      <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
-        <CssBaseline />
-        <GlobalStyles styles={scrollbarStyles(darkMode)} />
-        <HashRouter>
-          <Routes>
-            <Route path="/" element={<TelematrixLandingPage />} />
-            <Route path="/*" element={<Layout />} />
-          </Routes>
-        </HashRouter>
-      </ThemeProvider>
+      <FleetBehaviorStreamProvider>
+        <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
+          <CssBaseline />
+          <GlobalStyles styles={scrollbarStyles(darkMode)} />
+          <HashRouter>
+            <Routes>
+              <Route path="/" element={<TelematrixLandingPage />} />
+              <Route path="/*" element={<Layout />} />
+            </Routes>
+          </HashRouter>
+        </ThemeProvider>
+      </FleetBehaviorStreamProvider>
     </GoldStreamProvider>
   );
 }

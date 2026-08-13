@@ -21,16 +21,32 @@ export interface VehicleStream {
   tyre_contrib: number;
 }
 
+export interface SensorReading {
+  key: string;
+  label: string;
+  unit: string;
+  value: number | null;
+  range_lo: number | null;
+  range_hi: number | null;
+}
+
+export interface VehicleLiveDetail {
+  kpi_snapshot: Record<string, { sensors: SensorReading[] }>;
+  service_info: { odometer_km: number | null; next_service_in_km: number | null };
+}
+
 interface GoldStreamState {
   vehicles: VehicleStream[];
   connected: boolean;
   ringBuffer: Map<string, HealthPoint[]>;
+  vehicleLive: Record<string, VehicleLiveDetail>;
 }
 
 const GoldStreamContext = createContext<GoldStreamState>({
   vehicles: [],
   connected: false,
   ringBuffer: new Map(),
+  vehicleLive: {},
 });
 
 export function useGoldStream() {
@@ -40,6 +56,7 @@ export function useGoldStream() {
 export function GoldStreamProvider({ children }: { children: React.ReactNode }) {
   const [vehicles, setVehicles] = useState<VehicleStream[]>([]);
   const [connected, setConnected] = useState(false);
+  const [vehicleLive, setVehicleLive] = useState<Record<string, VehicleLiveDetail>>({});
   const ringBuffer = useRef<Map<string, HealthPoint[]>>(new Map());
   const esRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,6 +116,7 @@ export function GoldStreamProvider({ children }: { children: React.ReactNode }) 
               for (const pt of pts) appendRing(vid, pt);
             }
           }
+          if (payload.vehicle_live) setVehicleLive(payload.vehicle_live);
         } catch {}
       };
 
@@ -127,7 +145,7 @@ export function GoldStreamProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <GoldStreamContext.Provider value={{ vehicles, connected, ringBuffer: ringBuffer.current }}>
+    <GoldStreamContext.Provider value={{ vehicles, connected, ringBuffer: ringBuffer.current, vehicleLive }}>
       {children}
     </GoldStreamContext.Provider>
   );

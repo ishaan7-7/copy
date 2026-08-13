@@ -5,9 +5,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
-ROOT_DIR         = Path(__file__).resolve().parents[2]
+ROOT_DIR         = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+from common.log_pipe import timestamped_popen
+
 VENV_PYTHON      = ROOT_DIR / ".venv" / "Scripts" / "python.exe"
 if not VENV_PYTHON.exists():
     VENV_PYTHON = Path(sys.executable)
@@ -20,7 +26,14 @@ HARD_RESET_LOG   = ROOT_DIR / "logs" / "hard_reset_from_dashboard.log"
 
 HARD_RESET_PORTS = [8000, 8001, 8002, 8003, 8004, 8006, 8007, 8009]
 
-router = APIRouter()
+app = FastAPI(title="Replay Control Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def _to_thread(func, *args, **kwargs):
@@ -68,7 +81,12 @@ def _port_listening(port: int) -> bool:
         return False
 
 
-@router.get("/api/replay/status")
+@app.get("/health")
+def health_check():
+    return {"status": "Replay Control Service Online", "port": 8010}
+
+
+@app.get("/api/replay/status")
 async def replay_status():
     running, pid = _replay_probe()
     cfg: dict = {}
@@ -85,7 +103,7 @@ async def replay_status():
     }
 
 
-@router.post("/api/replay/start")
+@app.post("/api/replay/start")
 async def replay_start():
     result = await _to_thread(_run_controller, "--start")
     if result.returncode != 0:
@@ -93,7 +111,7 @@ async def replay_start():
     return {"ok": True, "message": result.stdout.strip()}
 
 
-@router.post("/api/replay/start-with-reset")
+@app.post("/api/replay/start-with-reset")
 async def replay_start_with_reset():
     result = await _to_thread(_run_controller, "--start", "--with-reset")
     if result.returncode != 0:
@@ -101,7 +119,7 @@ async def replay_start_with_reset():
     return {"ok": True, "message": result.stdout.strip()}
 
 
-@router.post("/api/replay/stop")
+@app.post("/api/replay/stop")
 async def replay_stop():
     result = await _to_thread(_run_controller, "--stop")
     if result.returncode != 0:
@@ -109,7 +127,7 @@ async def replay_stop():
     return {"ok": True, "message": result.stdout.strip()}
 
 
-@router.post("/api/replay/reset")
+@app.post("/api/replay/reset")
 async def replay_reset():
     result = await _to_thread(_run_controller, "--reset")
     if result.returncode != 0:
@@ -120,26 +138,22 @@ async def replay_reset():
 _hard_reset_proc: subprocess.Popen | None = None
 
 
-@router.post("/api/system/hard-reset")
+@app.post("/api/system/hard-reset")
 async def start_hard_reset():
     global _hard_reset_proc
     if _hard_reset_proc is not None and _hard_reset_proc.poll() is None:
         raise HTTPException(status_code=409, detail="A hard reset is already in progress.")
 
-    HARD_RESET_LOG.parent.mkdir(parents=True, exist_ok=True)
-    log_fh = open(HARD_RESET_LOG, "a", encoding="utf-8")
-
-    _hard_reset_proc = subprocess.Popen(
+    _hard_reset_proc = timestamped_popen(
         [str(VENV_PYTHON), str(RUN_PY), "--reset", "--keep-dashboard", "--skip-preflight"],
         cwd=str(ROOT_DIR),
-        stdout=log_fh,
-        stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL,
+        env=None,
+        log_path=HARD_RESET_LOG,
     )
     return {"ok": True, "message": "Hard reset started.", "pid": _hard_reset_proc.pid}
 
 
-@router.get("/api/system/hard-reset/status")
+@app.get("/api/system/hard-reset/status")
 async def hard_reset_status():
     in_progress = _hard_reset_proc is not None and _hard_reset_proc.poll() is None
     services_up = 0
@@ -152,3 +166,7 @@ async def hard_reset_status():
         "services_up": services_up,
         "services_total": len(HARD_RESET_PORTS),
     }
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8010)

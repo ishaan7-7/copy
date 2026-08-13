@@ -228,13 +228,6 @@ except Exception as _import_err:
     import logging as _log
     _log.getLogger(__name__).warning(f"Automotive endpoints not loaded: {_import_err}")
 
-try:
-    from replay_control import router as replay_control_router
-    app.include_router(replay_control_router)
-except Exception as _import_err:
-    import logging as _log
-    _log.getLogger(__name__).warning(f"Replay control endpoints not loaded: {_import_err}")
-
 @app.on_event("startup")
 async def _start_background_tasks():
     if _automotive_loop_fn is not None:

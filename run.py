@@ -5,8 +5,10 @@ import sys
 import time
 import shutil
 import subprocess
+import threading
 import uuid
 import webbrowser
+from pathlib import Path
 
 ROOT_DIR         = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON      = os.path.join(ROOT_DIR, ".venv", "Scripts", "python.exe")
@@ -28,6 +30,8 @@ except ImportError:
     print(f"Fix: {VENV_PYTHON} -m pip install -r {os.path.join(ROOT_DIR, 'requirements.txt')}")
     print("Then re-run setup.bat to verify everything else is in place too.")
     sys.exit(1)
+
+from common.log_pipe import timestamped_popen, prune_loop
 
 os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
@@ -68,6 +72,7 @@ SERVICE_MAP = {
     "api_inference":    ([VENV_PYTHON, r"inference_service\api.py"],                           False, ROOT_DIR),
     "api_writer":       ([VENV_PYTHON, r"writer_service\api.py"],                              False, ROOT_DIR),
     "api_dtc":          ([VENV_PYTHON, r"dtc_service\api.py"],                                 False, ROOT_DIR),
+    "api_replay_control": ([VENV_PYTHON, r"replay_control_service\api.py"],                    False, ROOT_DIR),
 
     "engine_alerts":    ([VENV_PYTHON, r"alerts_service\start_alerts.py"],                      False, ROOT_DIR),
     "engine_gold":      ([VENV_PYTHON, r"gold_service\start_gold.py"],                        False, ROOT_DIR),
@@ -91,7 +96,6 @@ RESET_SCRIPTS = [
 API_PORTS = (set(range(8001, 8010)) - {8005})
 
 running_processes = []
-open_log_files    = []
 HEAD_MODE         = False
 
 
@@ -108,10 +112,7 @@ def _make_env():
 def run_background_task(cmd_list, name, cwd_path, wait_time=0):
     log_path = os.path.join(LOGS_DIR, f"{name}.log")
     print(f"--- Starting {name} (Logs: {log_path}) ---")
-    log_file = open(log_path, "a", encoding="utf-8")
-    open_log_files.append(log_file)
-    proc = subprocess.Popen(cmd_list, cwd=cwd_path, stdout=log_file, stderr=subprocess.STDOUT,
-                            stdin=subprocess.DEVNULL, env=_make_env())
+    proc = timestamped_popen(cmd_list, cwd=cwd_path, env=_make_env(), log_path=Path(log_path))
     running_processes.append({"proc": proc, "name": name, "detached": False})
     if wait_time > 0:
         time.sleep(wait_time)
@@ -169,17 +170,18 @@ def launch_master_frontend():
     env["npm_config_cache"] = NPM_CACHE
 
     log_path = os.path.join(LOGS_DIR, "Master_Dash_Frontend.log")
-    log_file = open(log_path, "a", encoding="utf-8")
-    open_log_files.append(log_file)
 
     if not os.path.exists(node_modules):
         print("   node_modules not found — running npm install (this takes ~1 min on first run)...")
-        result = subprocess.run(
-            f'"{npm_cmd}" install --legacy-peer-deps',
-            shell=True, cwd=frontend_dir,
-            stdout=log_file, stderr=subprocess.STDOUT,
-            env=env,
-        )
+        os.makedirs(LOGS_DIR, exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as install_log:
+            install_log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] npm install --legacy-peer-deps\n")
+            result = subprocess.run(
+                f'"{npm_cmd}" install --legacy-peer-deps',
+                shell=True, cwd=frontend_dir,
+                stdout=install_log, stderr=subprocess.STDOUT,
+                env=env,
+            )
         if result.returncode != 0:
             print(f"   ERROR: npm install failed — check {log_path}")
             return
@@ -200,13 +202,7 @@ def launch_master_frontend():
         )
         running_processes.append({"proc": proc, "name": "Master_Dash_Frontend", "detached": True})
     else:
-        proc = subprocess.Popen(
-            vite_cmd,
-            shell=True, cwd=frontend_dir,
-            stdout=log_file, stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL,
-            env=env,
-        )
+        proc = timestamped_popen(vite_cmd, cwd=frontend_dir, env=env, log_path=Path(log_path), shell=True)
         running_processes.append({"proc": proc, "name": "Master_Dash_Frontend", "detached": False})
 
     print("   Waiting for Vite to compile (6s)...")
@@ -399,10 +395,6 @@ def cleanup():
 
     print("   ✅ All orchestrated processes terminated.")
 
-    for f in open_log_files:
-        try: f.close()
-        except: pass
-
     hunt_and_kill_port(5173, "Node/Vite")
     hunt_and_kill_port(9001, "Replay Metrics")
     hunt_zombie_replay_workers(auto_kill=True)
@@ -534,6 +526,8 @@ def _interactive_loop():
 
 def main(args):
     interactive = not any([args.reset, args.start, args.backend, args.dashboard])
+
+    threading.Thread(target=prune_loop, args=(Path(LOGS_DIR),), kwargs={"max_age_hours": 24.0, "interval_seconds": 3600.0}, daemon=True).start()
 
     if not args.skip_preflight:
         print("\n--- Preflight Validation ---")
