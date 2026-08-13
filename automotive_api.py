@@ -5,7 +5,7 @@ import sys
 import json
 import time
 from threading import Lock
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi import APIRouter, HTTPException, Query
 
 _PROJECT_ROOT_FOR_IMPORT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -1960,31 +1960,40 @@ def _sync_refresh_automotive_cache() -> None:
         print(f"Automotive cache refresh failed, will retry next cycle: {e}")
 
 
+def _precompute_one_vehicle_live_detail(vid: str):
+    kpi_snapshot = {mod: {"sensors": _fetch_kpi_sensors(mod, vid, _DELTA_ROOT)} for mod in _VEHICLE_MODULES}
+    odometer_km = _fetch_odometer_km(vid, _DELTA_ROOT)
+    next_service_in_km = None
+    if odometer_km is not None:
+        next_service_in_km = round(_SERVICE_INTERVAL_KM - (odometer_km % _SERVICE_INTERVAL_KM), 1)
+    return {
+        "kpi_snapshot": kpi_snapshot,
+        "service_info": {"odometer_km": odometer_km, "next_service_in_km": next_service_in_km},
+    }
+
+
 def _precompute_vehicle_live_details() -> None:
     fleet_live = _get_live("fleet-summary")
     if not fleet_live:
         print("Live detail precompute: no fleet-summary cached yet, skipping this cycle")
         return
-    vehicle_ids = [v.get("vehicle_id") for v in fleet_live.get("vehicles", [])]
+    vehicle_ids = [v.get("vehicle_id") for v in fleet_live.get("vehicles", []) if v.get("vehicle_id")]
     ok_count = 0
     fail_count = 0
-    for vid in vehicle_ids:
-        if not vid:
-            continue
+    futures = {
+        _SUMMARY_EXECUTOR.submit(_precompute_one_vehicle_live_detail, vid): vid
+        for vid in vehicle_ids
+    }
+    for future in as_completed(futures):
+        vid = futures[future]
         try:
-            kpi_snapshot = {mod: {"sensors": _fetch_kpi_sensors(mod, vid, _DELTA_ROOT)} for mod in _VEHICLE_MODULES}
-            odometer_km = _fetch_odometer_km(vid, _DELTA_ROOT)
-            next_service_in_km = None
-            if odometer_km is not None:
-                next_service_in_km = round(_SERVICE_INTERVAL_KM - (odometer_km % _SERVICE_INTERVAL_KM), 1)
-            _set_live(f"vehicle-live-{vid}", {
-                "kpi_snapshot": kpi_snapshot,
-                "service_info": {"odometer_km": odometer_km, "next_service_in_km": next_service_in_km},
-            })
-            ok_count += 1
+            result = future.result()
         except Exception as e:
             fail_count += 1
             print(f"Live detail precompute failed for {vid}: {e}")
+            continue
+        _set_live(f"vehicle-live-{vid}", result)
+        ok_count += 1
     if fail_count and not ok_count:
         print(f"Live detail precompute: ALL {fail_count} vehicles failed this cycle")
 

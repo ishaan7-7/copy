@@ -73,19 +73,32 @@ class ReplayService:
     # Internal thread target
     # -------------------------------------------------
     def _run_source(self, source):
+        source_id = source.get("source_id", "unknown")
+        retry_delay = 5
         try:
-            run_worker(
-                source=source,
-                schema_validator=self.schema_validator,
-                checkpoint_store=self.checkpoint_store,
-                dlq_writer=self.dlq_writer,
-                http_client=self.http_client,
-                replay_mode=self.replay_mode,
-                shutdown_event=self._shutdown_event,
-                rows_per_second=self.rows_per_second,
-                batch_size=self.batch_size,
-                batch_interval_seconds=self.batch_interval_seconds,
-            )
+            while not self._shutdown_event.is_set():
+                try:
+                    run_worker(
+                        source=source,
+                        schema_validator=self.schema_validator,
+                        checkpoint_store=self.checkpoint_store,
+                        dlq_writer=self.dlq_writer,
+                        http_client=self.http_client,
+                        replay_mode=self.replay_mode,
+                        shutdown_event=self._shutdown_event,
+                        rows_per_second=self.rows_per_second,
+                        batch_size=self.batch_size,
+                        batch_interval_seconds=self.batch_interval_seconds,
+                    )
+                    break
+                except Exception as e:
+                    print(
+                        f"[replay] source={source_id} worker crashed: "
+                        f"{type(e).__name__}: {e} — retrying in {retry_delay}s"
+                    )
+                    if self._shutdown_event.wait(timeout=retry_delay):
+                        break
+                    retry_delay = min(retry_delay * 2, 60)
         finally:
             active_sources.dec()
 
