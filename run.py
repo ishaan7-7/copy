@@ -98,6 +98,39 @@ API_PORTS = (set(range(8001, 8010)) - {8005})
 running_processes = []
 HEAD_MODE         = False
 
+PID_REGISTRY_FILE = os.path.join(ROOT_DIR, ".orchestrated_pids.json")
+_registry_lock = threading.Lock()
+
+
+def _load_pid_registry():
+    try:
+        with open(PID_REGISTRY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def _save_pid_registry(entries):
+    try:
+        with open(PID_REGISTRY_FILE, "w", encoding="utf-8") as f:
+            json.dump(entries, f)
+    except Exception:
+        pass
+
+
+def _registry_add(name, pid, detached):
+    with _registry_lock:
+        entries = _load_pid_registry()
+        entries.append({"name": name, "pid": pid, "detached": detached})
+        _save_pid_registry(entries)
+
+
+def _registry_remove(pid):
+    with _registry_lock:
+        entries = _load_pid_registry()
+        entries = [e for e in entries if e.get("pid") != pid]
+        _save_pid_registry(entries)
+
 
 JDK_PATH = r"C:\jdk-11.0.28+6"
 
@@ -114,6 +147,7 @@ def run_background_task(cmd_list, name, cwd_path, wait_time=0):
     print(f"--- Starting {name} (Logs: {log_path}) ---")
     proc = timestamped_popen(cmd_list, cwd=cwd_path, env=_make_env(), log_path=Path(log_path))
     running_processes.append({"proc": proc, "name": name, "detached": False})
+    _registry_add(name, proc.pid, False)
     if wait_time > 0:
         time.sleep(wait_time)
 
@@ -127,6 +161,7 @@ def run_detached_console(cmd_str, name, cwd_path, wait_time=0):
         env=_make_env(),
     )
     running_processes.append({"proc": proc, "name": name, "detached": True})
+    _registry_add(name, proc.pid, True)
     if wait_time > 0:
         time.sleep(wait_time)
 
@@ -201,9 +236,11 @@ def launch_master_frontend():
             env=env,
         )
         running_processes.append({"proc": proc, "name": "Master_Dash_Frontend", "detached": True})
+        _registry_add("Master_Dash_Frontend", proc.pid, True)
     else:
         proc = timestamped_popen(vite_cmd, cwd=frontend_dir, env=env, log_path=Path(log_path), shell=True)
         running_processes.append({"proc": proc, "name": "Master_Dash_Frontend", "detached": False})
+        _registry_add("Master_Dash_Frontend", proc.pid, False)
 
     print("   Waiting for Vite to compile (6s)...")
     time.sleep(6)
@@ -239,6 +276,8 @@ def kill_process(p_info):
                 print(f"   ✅ Force-closed {name}.")
         except Exception:
             pass
+
+    _registry_remove(pid)
 
 
 def hunt_and_kill_port(port, name):
@@ -382,6 +421,22 @@ def _stop_replay():
             pass
 
 
+def _cleanup_orphaned_registry():
+    known_pids = {p["proc"].pid for p in running_processes}
+    with _registry_lock:
+        entries = _load_pid_registry()
+        for e in entries:
+            pid = e.get("pid")
+            if pid in known_pids or not psutil.pid_exists(pid):
+                continue
+            print(f"   Terminating orphaned {e.get('name')} (PID {pid}) from a previous session...")
+            try:
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+        _save_pid_registry([])
+
+
 def cleanup():
     print("\n" + "=" * 40)
     print("SHUTDOWN SEQUENCE INITIATED")
@@ -394,6 +449,8 @@ def cleanup():
         kill_process(p_info)
 
     print("   ✅ All orchestrated processes terminated.")
+
+    _cleanup_orphaned_registry()
 
     hunt_and_kill_port(5173, "Node/Vite")
     hunt_and_kill_port(9001, "Replay Metrics")
