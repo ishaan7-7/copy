@@ -68,9 +68,8 @@ export default function FleetAlertsPopup({
   const [filter, setFilter] = useState<AlertsPopupFilter>(initialFilter);
   const [search, setSearch] = useState("");
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
-  // Dialog uses keepMounted (below) so this scroll container's DOM node is
-  // never removed on close — its native scrollTop persists across
-  // open/close by itself, no manual save/restore needed.
+  
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -79,21 +78,14 @@ export default function FleetAlertsPopup({
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
-  // Resolve is optimistic (below) but the underlying alert cache only
-  // refreshes every 5s server-side — a background refetch landing inside
-  // that window can briefly report the alert as still OPEN and clobber the
-  // optimistic patch. resolvedIds pins the locally-resolved state so the
-  // badge/section placement can't flicker back, for the life of this popup.
+  
+  
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
-  // Decoupled from resolveAlertMutation.isPending on purpose — that reflects
-  // the raw network promise, which can vary with backend load. A short,
-  // bounded local timer keeps the "Resolving…" → resolved transition
-  // predictable regardless of how long the actual request takes underneath.
+  
+  
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
-  // Each open of the popup can come from a different stat (Critical / Warning
-  // / Resolved / the card body itself for "all") — resync the filter every
-  // time it opens rather than only on first mount.
+  
   useEffect(() => {
     if (open) setFilter(initialFilter);
   }, [open, initialFilter]);
@@ -114,9 +106,8 @@ export default function FleetAlertsPopup({
       axios.post(`${PIPELINE_API}/api/alerts/resolve/${encodeURIComponent(alert.alert_id)}`, null, {
         params: { source_id: alert.source_id, module: alert.module },
       }),
-    // Optimistic, matching the same pattern used on Fleet Health / Vehicle
-    // Deep Dive — the backend's own alert cache refresh cycle can lag well
-    // behind a manual resolve on a device with a large alert backlog.
+    
+    
     onMutate: async (alert: any) => {
       await queryClient.cancelQueries({ queryKey: ["alertsMetrics"] });
       const previous = queryClient.getQueryData<any>(["alertsMetrics"]);
@@ -136,10 +127,7 @@ export default function FleetAlertsPopup({
     },
   });
 
-  // The whole point of this popup (vs. the Monitoring-role flow, which
-  // navigates to /dtc for the ML investigation view) is that an executive
-  // never leaves this dialog — the DTC inference runs entirely backend-side
-  // and the result is stitched back into the same row once it's done.
+  
   const handleInvestigate = async (alert: any) => {
     setAnalyzingId(alert.alert_id);
     try {
@@ -147,15 +135,8 @@ export default function FleetAlertsPopup({
         params: { source_id: alert.source_id, module: alert.module, peak_ts: alert.peak_anomaly_ts },
         timeout: 70000,
       });
-      // /api/alerts/metrics is a plain in-memory cache refreshed by a 5s
-      // background loop on the alerts service — refetching it right after
-      // analyze almost always lands inside that gap and returns the alert
-      // still unanalyzed, making the button look like it did nothing until
-      // a second click. The analyze response already carries the triggers,
-      // so patch them into the cache directly instead of waiting on the loop.
-      // Deliberately no invalidateQueries here — that would immediately
-      // refetch this same still-stale endpoint and clobber the patch below
-      // with the pre-analysis data; the existing 20s poll reconciles later.
+      
+      
       if (data?.success) {
         queryClient.setQueryData<any>(["alertsMetrics"], (prev: any) => {
           if (!prev) return prev;
@@ -165,12 +146,8 @@ export default function FleetAlertsPopup({
             );
           return { ...prev, open_alerts: patch(prev.open_alerts), closed_alerts: patch(prev.closed_alerts) };
         });
-        // If a Vehicle Deep Dive popup for this same vehicle is open (or
-        // opens next), its Recent DTC card reads last_dtc off the
-        // vehicle-summary cache — patch it directly so the result isn't
-        // stuck waiting on that popup's own poll. Merge (prepend) rather
-        // than replace, so an earlier investigated fault isn't wiped out
-        // by this run coming back clean.
+        
+        
         queryClient.setQueryData<any>(["vehSummaryPopup", alert.source_id], (prev: any) => {
           if (!prev) return prev;
           const prevTriggers: any[] = prev.last_dtc?.triggers ?? [];
@@ -185,8 +162,8 @@ export default function FleetAlertsPopup({
         });
       }
     } catch {
-      // Swallow — the row just stays unanalyzed and the button re-enables
-      // so the user can retry, no need for a toast in this dense a view.
+      
+      
     } finally {
       setAnalyzingId(null);
     }

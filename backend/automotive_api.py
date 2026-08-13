@@ -15,17 +15,14 @@ from common import duck_reader as dr
 try:
     from common import alert_resolutions
 except ImportError as _alert_res_err:
-    # Deployment gap on some device (file not yet copied over), not a reason
-    # to take down every /api/automotive/* route via main_v2.py's blanket
-    # import-failure catch — degrade to "manual resolve does nothing" and
-    # keep the rest of the dashboard fully functional.
+
+
     print(f"WARNING: common/alert_resolutions.py not importable ({_alert_res_err}); "
           f"manual alert-resolve will no-op, everything else unaffected.")
 
     class _AlertResolutionsStub:
-        # Deliberately a path that can never exist, so every
-        # os.path.exists(alert_resolutions.RESOLVED_ALERTS_FILE) check
-        # elsewhere in this file stays False instead of raising.
+
+
         RESOLVED_ALERTS_FILE = os.path.join(_PROJECT_ROOT_FOR_IMPORT, "data", "_alert_resolutions_unavailable")
 
         @staticmethod
@@ -40,19 +37,13 @@ except ImportError as _alert_res_err:
 
 router = APIRouter()
 
-# ---------------------------------------------------------------------------
-# SSE client registry — push-based real-time stream for scatter / timeline.
-# Each connected browser gets its own asyncio.Queue. The background precompute
-# loop deposits delta payloads via call_soon_threadsafe (thread-safe bridge
-# from the executor thread to the event loop). The SSE endpoint drains the
-# queue into the response stream.
-# ---------------------------------------------------------------------------
+
 from fastapi.responses import StreamingResponse
 
-_sse_clients: list = []          # list[asyncio.Queue]
+_sse_clients: list = []
 _sse_clients_lock = Lock()
-_sse_event_loop = None           # captured at startup, used for threadsafe put
-_sse_last_ts: dict = {}          # vehicle_id -> last broadcast ts (delta tracking)
+_sse_event_loop = None
+_sse_last_ts: dict = {}
 
 def _sse_broadcast(payload: str) -> None:
     """Thread-safe: deposit SSE payload into every connected client queue."""
@@ -63,14 +54,7 @@ def _sse_broadcast(payload: str) -> None:
     for q in clients:
         _sse_event_loop.call_soon_threadsafe(q.put_nowait, payload)
 
-# ---------------------------------------------------------------------------
-# Background precompute cache — same pattern as WRITER_METRICS_CACHE,
-# GOLD_METRICS_CACHE, ALERTS_METRICS_CACHE in the microservices. A
-# background loop refreshes every LIVE_CACHE_INTERVAL_SEC so every endpoint
-# is a sub-millisecond dict lookup rather than an on-demand DuckDB query.
-# On-demand TTL caching (old approach) meant each poll could trigger a slow
-# cold DuckDB scan; with precompute the data is always ready.
-# ---------------------------------------------------------------------------
+
 _LIVE_CACHE_INTERVAL_SEC = 3.0
 _LIVE_CACHE: dict = {}
 _LIVE_CACHE_LOCK = Lock()
@@ -83,8 +67,7 @@ def _get_live(key: str):
     with _LIVE_CACHE_LOCK:
         return _LIVE_CACHE.get(key)
 
-# Legacy per-request TTL cache kept for endpoints not yet covered by the
-# background loop (sensor-history, decomposition, etc.)
+
 _response_cache: dict = {}
 _cache_lock = Lock()
 _RESPONSE_TTL = 5.0
@@ -146,8 +129,6 @@ async def get_config_manifest():
         "enabled_modules": _VEHICLE_MODULES,
     }
 
-
-# ── Demo / Presentation Mode state ──────────────────────────────────────────
 
 _PRESENTATION_MODE_ACTIVE: bool = False
 _DEMO_SEED_CACHE: dict = {}
@@ -223,7 +204,6 @@ _SILVER_TOP_FEATURES: dict = {
     "tyre":         ["tyre_pressure_fl_psi", "tyre_pressure_fr_psi", "tyre_wear_fl_pct", "tyre_temp_fl_c"],
 }
 
-# ── Demo data generators ─────────────────────────────────────────────────────
 
 def _generate_sensor_history(vehicle_id: str, module: str, n_points: int = 960) -> list:
     import pandas as pd
@@ -339,11 +319,6 @@ def _seed_all_demo_data() -> None:
         _DEMO_VEHICLE_HEALTH_CACHE[vid] = _generate_vehicle_health_history(_DEMO_SILVER_CACHE[vid])
 
 
-# ── Single-vehicle query helper ──────────────────────────────────────────────
-# Pushes the source_id filter into SQL (DuckDB only scans/transfers matching
-# rows) and re-applies it in pandas afterward as a no-op-on-the-fast-path
-# safety net for query_df()'s unfiltered fallback if DuckDB errors on a file.
-
 def _query_vehicle_df(directory: str, vehicle_id: str, max_files: int, hive: bool = False):
     import pandas as pd
     files = (
@@ -359,8 +334,6 @@ def _query_vehicle_df(directory: str, vehicle_id: str, max_files: int, hive: boo
         df = df[df["source_id"] == vehicle_id]
     return df
 
-
-# ── Bronze partition iterator — reads Hive-partitioned source_id=X dirs ──────
 
 def _iter_bronze_by_vehicle(module: str, max_files_per_vehicle: int = 10, columns=None):
     bronze_path = os.path.join(_DELTA_ROOT, module)
@@ -378,8 +351,6 @@ def _iter_bronze_by_vehicle(module: str, max_files_per_vehicle: int = 10, column
     for vid, grp in df.groupby("source_id"):
         yield str(vid), grp.reset_index(drop=True)
 
-
-# ── Mileage join helper ───────────────────────────────────────────────────────
 
 _BODY_CACHE: dict = {}
 _BODY_CACHE_TTL = 30.0
@@ -414,10 +385,8 @@ def _get_body_frame(vehicle_id: str):
                         .drop_duplicates("_body_ts")
                         .reset_index(drop=True)
                     )
-                    # Enforce monotonically increasing odometer regardless of source data quality:
-                    # sort the odometer values independently so the smallest maps to the earliest
-                    # timestamp and the largest to the latest. This is a no-op on already-correct
-                    # data and a safe repair on noisy/random synthetic data.
+
+
                     body_merged["odometer_reading"] = sorted(body_merged["odometer_reading"].values)
 
     with _BODY_CACHE_LOCK:
@@ -457,8 +426,6 @@ def _attach_mileage(combined, vehicle_id: str):
         combined["mileage"] = [round(odo_base + total * i / max(n - 1, 1), 1) for i in range(n)]
     return combined
 
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/api/automotive/demo/activate")
 def activate_presentation_mode():
@@ -567,10 +534,8 @@ def get_automotive_fleet_summary():
         if not gdf.empty:
             if "gold_window_ts" in gdf.columns and "source_id" in gdf.columns:
                 gdf["gold_window_ts"] = pd.to_datetime(gdf["gold_window_ts"])
-                # Gold is append-only — ties on gold_window_ts (same window
-                # touched more than once) must be broken by actual write
-                # order, not left to sort stability, or .last() can return a
-                # stale duplicate instead of the most recently written one.
+
+
                 sort_cols = ["gold_window_ts"]
                 if "gold_write_ts" in gdf.columns:
                     sort_cols.append("gold_write_ts")
@@ -759,11 +724,8 @@ def get_automotive_vehicle_health_history(
     if not combined.empty:
         if "gold_window_ts" in combined.columns:
             combined["gold_window_ts"] = pd.to_datetime(combined["gold_window_ts"])
-            # Gold is append-only — the same (source_id, window) gets a
-            # new row every time that window's state is touched, not just
-            # once. Without dedup the scatter/timeline plots show multiple
-            # stacked points per window instead of one (confirmed on real
-            # data: 337 rows for only 98 unique windows).
+
+
             sort_col = "gold_write_ts" if "gold_write_ts" in combined.columns else "gold_window_ts"
             combined = combined.sort_values(sort_col).drop_duplicates(subset=["gold_window_ts"], keep="last")
             combined = combined.sort_values("gold_window_ts")
@@ -948,9 +910,8 @@ def get_vehicle_alerts(vehicle_id: str):
         vehicle_df = _query_vehicle_df(_GOLD_ALERTS_DIR, vehicle_id, max_files=100)
     if vehicle_df.empty:
         return {"vehicle_id": vehicle_id, "open": [], "closed": []}
-    # Alerts is upsert-style (same alert_id rewritten on every status
-    # transition); compaction dedups periodically, but reads must also dedup
-    # for whatever's accumulated in the not-yet-compacted recent files.
+
+
     if "alert_id" in vehicle_df.columns and "last_updated_ts" in vehicle_df.columns:
         vehicle_df = (
             vehicle_df.sort_values("last_updated_ts")
@@ -958,13 +919,8 @@ def get_vehicle_alerts(vehicle_id: str):
         )
     for col in vehicle_df.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
         vehicle_df[col] = vehicle_df[col].astype(str)
-    # Compacted vs not-yet-compacted alert files can briefly disagree on a
-    # column's inferred type (e.g. max_composite_score as float64 in one file,
-    # int-like in another) — DuckDB's union_by_name resolves that per-query,
-    # which can leave a numeric column as a nullable Int dtype. A blanket
-    # fillna("") then throws TypeError on that column (confirmed live: a
-    # single request failed with "Invalid value '' for dtype 'Int32'"), so
-    # fill object/string columns with "" and numeric columns with 0 separately.
+
+
     obj_cols = vehicle_df.select_dtypes(include=["object"]).columns
     vehicle_df[obj_cols] = vehicle_df[obj_cols].fillna("")
     num_cols = vehicle_df.select_dtypes(include=["number"]).columns
@@ -1050,11 +1006,8 @@ def get_fleet_position(vehicle_id: str):
         return cached
     try:
         import urllib.request as _urllib_req
-        # 5s to match the gateway's generic proxy_request timeout to the same
-        # fleet simulator — a tighter timeout here meant this endpoint alone
-        # went blank under exactly the transient slowness every other path
-        # hitting port 8009 tolerated fine (e.g. the vehicle .../behavior
-        # call via main_v2.py's proxy).
+
+
         _req = _urllib_req.urlopen(f"http://127.0.0.1:8009/api/fleet/vehicle/{vehicle_id}", timeout=5)
         result = json.loads(_req.read())
     except Exception as e:
@@ -1116,21 +1069,9 @@ def get_vehicle_bronze_stats(vehicle_id: str):
     return result
 
 
-# get_vehicle_summary fans its I/O out across this pool instead of running the
-# ~12 blocking network/parquet calls below one after another — DuckDB's reader
-# is explicitly documented as safe for concurrent use from FastAPI's own
-# threadpool (common/duck_reader.py: "each query gets its own cursor... 7
-# concurrent vehicle queries... now complete in ~80ms total"), and the two
-# fleet_sim_server calls are independent plain HTTP requests. Shared across
-# requests (not one pool per call) to avoid thread-creation overhead on what's
-# a frequently-polled endpoint.
 _SUMMARY_EXECUTOR = ThreadPoolExecutor(max_workers=16, thread_name_prefix="vehicle-summary")
 
-# Top Anomaly Drivers only needs a recent window to reflect *current* anomaly
-# patterns, not the full live history — scanning all _SILVER_MAX_FILES (200)
-# per module x 5 modules against unpartitioned live silver files (which hold
-# every vehicle's rows, filtered down to one source_id per query) was the
-# single most expensive part of this endpoint for active vehicles.
+
 _TOP_DRIVERS_MAX_FILES = 30
 
 
@@ -1262,10 +1203,7 @@ def get_vehicle_summary(vehicle_id: str):
     is_historical = vehicle_id in _HISTORICAL_IDS
     _bronze_root = _BATCH_BRONZE_ROOT if is_historical else _DELTA_ROOT
 
-    # Fan out every independent I/O call at once. Only trip_data (step 7)
-    # genuinely depends on another call's result (fleet_sim's status), so it's
-    # submitted in a second wave once fleet_sim resolves — everything else
-    # runs fully concurrently in _SUMMARY_EXECUTOR.
+
     fleet_sim_future = _SUMMARY_EXECUTOR.submit(_fetch_fleet_sim, vehicle_id)
     kpi_futures = {
         mod: _SUMMARY_EXECUTOR.submit(_fetch_kpi_sensors, mod, vehicle_id, _bronze_root)
@@ -1280,7 +1218,7 @@ def get_vehicle_summary(vehicle_id: str):
     fleet_sim: dict = fleet_sim_future.result()
     trip_future = _SUMMARY_EXECUTOR.submit(_fetch_trip_data, vehicle_id, fleet_sim)
 
-    # ── 1. Health snapshot from live cache ────────────────────────────────────
+
     health_snapshot: dict = {
         "health_score": None,
         "status": "UNKNOWN",
@@ -1307,11 +1245,7 @@ def get_vehicle_summary(vehicle_id: str):
                     health_snapshot["fleet_rank"] = rank
                     break
 
-    # Historical vehicles never appear in the live "fleet-summary" cache (it's
-    # sourced from the live gold stream, which only currently-active vehicles
-    # write to) — fleet_sim_server already resolves last-known module health
-    # correctly for them via its own precomputed last_state cache, so fall
-    # back to that instead of duplicating a batch-gold-parquet read here.
+
     if not health_snapshot.get("module_contribs") or not any(health_snapshot["module_contribs"].values()):
         sim_module_health = fleet_sim.get("module_health") or {}
         if sim_module_health:
@@ -1330,10 +1264,10 @@ def get_vehicle_summary(vehicle_id: str):
                 "module_contribs": {mod: sim_module_health.get(mod) for mod in _VEHICLE_MODULES},
             }
 
-    # ── 2. KPI snapshot (latest bronze sensor values per module) ──────────────
+
     kpi_snapshot: dict = {mod: {"sensors": kpi_futures[mod].result()} for mod in _VEHICLE_MODULES}
 
-    # ── 2b. Tyre RL/RR temp — derived from FL/FR (rear axle runs hotter) ────────
+
     _tyre_sensors = kpi_snapshot.get("tyre", {}).get("sensors", [])
     _tyre_vals    = {s["key"]: s["value"] for s in _tyre_sensors}
     _tyre_specs   = _KEY_SENSOR_SPECS.get("tyre", {})
@@ -1352,7 +1286,7 @@ def get_vehicle_summary(vehicle_id: str):
             "range_hi": _spec[1] if _spec else None,
         })
 
-    # ── 3. Service info (odometer from body bronze) ───────────────────────────
+
     odometer_km: float | None = odometer_future.result()
     next_service_in_km: float | None = None
     if odometer_km is not None:
@@ -1364,7 +1298,7 @@ def get_vehicle_summary(vehicle_id: str):
         "service_interval_km": _SERVICE_INTERVAL_KM,
     }
 
-    # ── 4. Top anomaly drivers (cross-module, per-vehicle silver top_features) ─
+
     feature_scores: dict = {}
     feature_modules: dict = {}
     for mod in _VEHICLE_MODULES:
@@ -1374,9 +1308,7 @@ def get_vehicle_summary(vehicle_id: str):
             if f not in feature_modules:
                 feature_modules[f] = mod
 
-    # Top 3 per module (not top 5 overall) so every module is represented —
-    # a flat cross-module top-N let 1-2 high-magnitude modules crowd out the
-    # rest, leaving the panel sparse and most modules invisible.
+
     _TOP_N_PER_MODULE = 3
     _drivers_by_module: dict[str, list[dict]] = {}
     for f, s in feature_scores.items():
@@ -1388,7 +1320,7 @@ def get_vehicle_summary(vehicle_id: str):
         mod_drivers = sorted(_drivers_by_module.get(mod, []), key=lambda x: x["score"], reverse=True)
         top_anomaly_drivers.extend(mod_drivers[:_TOP_N_PER_MODULE])
 
-    # ── 5. DTC runs for this vehicle ──────────────────────────────────────────
+
     last_dtc = None
     if os.path.exists(_DTC_HISTORY_FILE):
         try:
@@ -1397,12 +1329,8 @@ def get_vehicle_summary(vehicle_id: str):
             vehicle_runs = [r for r in all_runs if r.get("source_id") == vehicle_id]
             vehicle_runs.sort(key=lambda r: r.get("run_ts", ""), reverse=True)
             if vehicle_runs:
-                # Investigate appends one run per alert analyzed, and a run
-                # with no triggers (a clean window) is a valid outcome — so
-                # taking only vehicle_runs[0] discarded every earlier fault
-                # the moment a newer, unrelated investigation came back
-                # clean. Merge triggers across this vehicle's recent runs
-                # (newest first) instead, so investigated faults accumulate.
+
+
                 merged_triggers: list = []
                 for r in vehicle_runs[:_DTC_HISTORY_MERGE_MAX]:
                     merged_triggers.extend(r.get("triggers") or [])
@@ -1414,11 +1342,7 @@ def get_vehicle_summary(vehicle_id: str):
         except Exception:
             pass
 
-    # Historical vehicles have no dtc_history.json entry until someone
-    # manually clicks Investigate on one of their alerts — fall back to the
-    # precomputed synthetic DTC layer so the Recent DTC card isn't empty by
-    # default, reshaped into the same {code, severity, message} trigger shape
-    # the frontend already renders for live-analyzed runs.
+
     if last_dtc is None and is_historical:
         _hist_dtcs = _load_historical_layer(vehicle_id, "dtcs") or []
         if _hist_dtcs:
@@ -1435,7 +1359,7 @@ def get_vehicle_summary(vehicle_id: str):
                 ],
             }
 
-    # ── 6. Alerts summary from live cache ────────────────────────────────────
+
     alerts_live = _get_live(f"alerts-{vehicle_id}")
     open_alerts: list = alerts_live.get("open", []) if alerts_live else []
     closed_alerts: list = alerts_live.get("closed", []) if alerts_live else []
@@ -1445,11 +1369,7 @@ def get_vehicle_summary(vehicle_id: str):
         "recent_open": open_alerts[:8],
     }
 
-    # ── 7. Trip data — submitted above once fleet_sim's status was known.
-    # Active vehicles get their in-progress trip; historical vehicles get
-    # their most recent completed trip from the dedicated /last-trip route
-    # (which reads fleet_sim_server's own precomputed cache — same source
-    # last_state's module_health came from) instead of leaving trip_data empty.
+
     trip_data, last_trip_data = trip_future.result()
 
     result = {
@@ -1594,9 +1514,8 @@ def _precompute_module_fleet_health(module: str) -> None:
             return
         result = _compute_module_fleet_health(module)
         _set_live(f"module-fleet-health-{module}", result)
-        # Only recorded once the compute+cache-write above succeeded — if it
-        # throws, the guard stays put and the next cycle retries this module
-        # instead of freezing it silently forever.
+
+
         _loop_dir_mtimes[f"silver-{module}"] = current_mtime
     except Exception as e:
         print(f"Module fleet-health precompute failed for {module}, will retry next cycle: {e}")
@@ -1604,7 +1523,7 @@ def _precompute_module_fleet_health(module: str) -> None:
 
 @router.get("/api/automotive/module-fleet-health/{module}")
 def get_module_fleet_health(module: str):
-    # Live cache populated by background loop every LIVE_CACHE_INTERVAL_SEC.
+
     live = _get_live(f"module-fleet-health-{module}")
     if live is not None:
         return live
@@ -1894,14 +1813,6 @@ def get_dtc_master_data():
         return {"modules": {}}
 
 
-# ---------------------------------------------------------------------------
-# Background precompute loop
-# Runs every LIVE_CACHE_INTERVAL_SEC, reads Gold + Alerts ONCE per cycle,
-# precomputes all fleet-summary, per-vehicle health histories, and per-vehicle
-# alerts. Endpoints below serve from _LIVE_CACHE — always sub-ms, always fresh.
-# Mirrors exactly how WRITER_METRICS_CACHE / GOLD_METRICS_CACHE work.
-# ---------------------------------------------------------------------------
-
 _loop_dir_mtimes: dict = {}
 
 
@@ -1930,7 +1841,7 @@ def _sync_refresh_automotive_cache() -> None:
     if current_mtime > 0 and current_mtime <= _loop_dir_mtimes.get("gold", 0.0):
         return
     try:
-        # ── Gold: read once, shared across all vehicle computations ──────────
+
         gold_df = pd.DataFrame()
         if os.path.exists(_GOLD_ROOT):
             gfiles = dr.list_files(_GOLD_ROOT, max_files=_GOLD_MAX_FILES)
@@ -1944,7 +1855,7 @@ def _sync_refresh_automotive_cache() -> None:
                         .drop_duplicates(subset=["source_id", "gold_window_ts"], keep="last")
                     )
 
-        # ── Fleet summary ─────────────────────────────────────────────────────
+
         vehicles_out: list = []
         if not gold_df.empty and "source_id" in gold_df.columns:
             sort_cols = ["gold_window_ts"]
@@ -1978,7 +1889,7 @@ def _sync_refresh_automotive_cache() -> None:
         }
         _set_live("fleet-summary", fleet_summary)
 
-        # ── Per-vehicle health history ─────────────────────────────────────────
+
         vehicle_ids = [v["vehicle_id"] for v in vehicles_out]
         for vid in vehicle_ids:
             try:
@@ -2007,7 +1918,7 @@ def _sync_refresh_automotive_cache() -> None:
             except Exception:
                 pass
 
-        # ── Per-vehicle alerts ────────────────────────────────────────────────
+
         if os.path.exists(_GOLD_ALERTS_DIR):
             afiles = dr.list_files(_GOLD_ALERTS_DIR, max_files=100)
             if afiles:
@@ -2043,12 +1954,7 @@ def _sync_refresh_automotive_cache() -> None:
                 except Exception as e:
                     print(f"Automotive cache refresh: per-vehicle alerts failed: {e}")
 
-        # Only mark this mtime as handled once every section above has run
-        # without an uncaught exception escaping to here — if fleet-summary
-        # itself threw before reaching this line, the guard stays at its old
-        # value and the next 3s cycle retries the exact same data instead of
-        # silently freezing the cache forever (see per-vehicle blocks above
-        # for the narrower, already-isolated failure mode this doesn't cover).
+
         _loop_dir_mtimes["gold"] = current_mtime
     except Exception as e:
         print(f"Automotive cache refresh failed, will retry next cycle: {e}")
@@ -2058,10 +1964,8 @@ async def automotive_live_loop() -> None:
     global _sse_event_loop
     _sse_event_loop = asyncio.get_event_loop()
     while True:
-        # Run main cache refresh + all 5 module fleet-health precomputes
-        # concurrently so total cycle time = max(single op), not their sum.
-        # Each module read is an independent Silver DuckDB scan that doesn't
-        # share state with the others or with the main refresh.
+
+
         await asyncio.gather(
             asyncio.to_thread(_sync_refresh_automotive_cache),
             *[asyncio.to_thread(_precompute_module_fleet_health, mod)
@@ -2107,8 +2011,6 @@ def _compute_and_broadcast_sse_delta() -> None:
     _sse_broadcast(payload)
 
 
-# ── Historical vehicle read-only endpoints ────────────────────────────────────
-
 @router.get("/api/automotive/vehicle/{vehicle_id}/is-historical")
 def check_historical(vehicle_id: str):
     return {"vehicle_id": vehicle_id, "is_historical": vehicle_id in _HISTORICAL_IDS}
@@ -2140,10 +2042,8 @@ def get_historical_events(vehicle_id: str, limit: int = Query(default=200, ge=1,
 
 @router.get("/api/automotive/vehicle/{vehicle_id}/dtcs")
 def get_historical_dtcs(vehicle_id: str):
-    # DTCs are derived purely from module_health (mechanical condition), not
-    # from the trip/route layer — they must stay identical regardless of
-    # which region's map/trip data the dashboard is currently displaying, so
-    # this always reads the India computed root (the canonical health data).
+
+
     data = _load_historical_layer(vehicle_id, "dtcs")
     if data is None:
         raise HTTPException(status_code=404, detail="No computed data for vehicle")
@@ -2171,10 +2071,8 @@ def _dtc_master_lookup() -> dict[str, dict]:
 
 @router.get("/api/automotive/vehicle/{vehicle_id}/live-dtcs")
 def get_live_dtcs(vehicle_id: str):
-    # Active vehicles have no precomputed dtcs.json (that layer only exists
-    # for the 15 historical vehicles) — their real DTCs are whatever the
-    # live dtc_service has actually analyzed and recorded for this vehicle's
-    # own alerts in dtc_history.json, not a synthetic snapshot.
+
+
     entries = []
     if os.path.exists(DTC_HISTORY_FILE):
         try:
@@ -2207,8 +2105,8 @@ def get_live_dtcs(vehicle_id: str):
 
 @router.get("/api/automotive/vehicle/{vehicle_id}/alerts")
 def get_historical_alerts(vehicle_id: str):
-    # Same reasoning as /dtcs above — alerts are health-pipeline output tied
-    # to module_health, not the region-switchable trip/route layer.
+
+
     data = _load_historical_layer(vehicle_id, "alerts")
     if data is None:
         raise HTTPException(status_code=404, detail="No computed data for vehicle")

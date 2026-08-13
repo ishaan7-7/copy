@@ -139,9 +139,8 @@ export default function DtcInvestigation({ isActive = true }: { isActive?: boole
   );
   const setGlobalSelectedVehicle = useStore((s) => s.setSelectedVehicle);
   const setGlobalSelectedModule = useStore((s) => s.setSelectedModule);
-  // Mirror this page's own selection into the shared store so the globally
-  // mounted FleetChatAssistant knows which vehicle/module is currently in
-  // view without needing its own duplicate selection UI.
+  
+  
   useEffect(() => {
     setGlobalSelectedVehicle(selectedVehicle || null);
   }, [selectedVehicle, setGlobalSelectedVehicle]);

@@ -295,7 +295,6 @@ function rowChip(label: string, color: string, isDark: boolean) {
   );
 }
 
-// ── RAW JSON PANEL ──────────────────────────────────────────────────────────
 
 function RawJsonPanel({ isDark, data, label = "RAW JSON" }: { isDark: boolean; data: any; label?: string }) {
   const [open, setOpen] = useState(false);
@@ -347,7 +346,6 @@ function RawJsonPanel({ isDark, data, label = "RAW JSON" }: { isDark: boolean; d
   );
 }
 
-// ── SHARED INSPECTOR PRIMITIVES ────────────────────────────────────────────
 
 function InspectorToolbar({ isDark, children }: { isDark: boolean; children: React.ReactNode }) {
   return (
@@ -396,7 +394,6 @@ function InspectorGrid({ isDark, rowData, colDefs }: { isDark: boolean; rowData:
   );
 }
 
-// ── MODULE JSON VIEWER ──────────────────────────────────────────────────────
 
 function ModuleJsonViewer({ isDark }: { isDark: boolean }) {
   const { data, isLoading, refetch } = useQuery({
@@ -535,7 +532,6 @@ function ModuleJsonViewer({ isDark }: { isDark: boolean }) {
   );
 }
 
-// ── INSPECTOR CONTENTS ──────────────────────────────────────────────────────
 
 function highlightJson(json: string, isDark: boolean): string {
   const safe = json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1144,7 +1140,6 @@ function FleetInspector({
   );
 }
 
-// ── NODE CARD ───────────────────────────────────────────────────────────────
 
 interface NodeCardProps {
   id: string;
@@ -1260,7 +1255,6 @@ function NodeCard({
   );
 }
 
-// ── CONNECTORS ──────────────────────────────────────────────────────────────
 
 function HConnector({ topLabel, btmLabel, isDark }: { topLabel?: string; btmLabel?: string; isDark: boolean }) {
   const stroke = isDark ? alpha("#7dd3fc", 0.38) : alpha("#005071", 0.32);
@@ -1318,7 +1312,6 @@ function DlqBranch({
   );
 }
 
-// ── INSPECTOR DRAWER ────────────────────────────────────────────────────────
 
 const NODE_LABELS: Record<string, string> = {
   vehicles: "Vehicle Fleet",
@@ -1478,7 +1471,6 @@ function InspectorDrawer({
   );
 }
 
-// ── FLEET INTELLIGENCE SECTION ──────────────────────────────────────────────
 
 function SectionHeader({ isDark, title, accent }: {
   isDark: boolean; title: string; accent: string;
@@ -1720,7 +1712,6 @@ function FleetIntelligenceSection({ isDark, writerData, inferenceData, goldData,
   );
 }
 
-// ── PIPELINE OBSERVABILITY SECTION ─────────────────────────────────────────
 
 function PipelineColumn({
   accent, badge, isDark, borderRight, children, empty,
@@ -1965,7 +1956,6 @@ function PipelineObservabilitySection({ isDark, writerData, inferenceData, obser
   );
 }
 
-// ── WEIGHT LAB ───────────────────────────────────────────────────────────────
 
 interface WeightPanelProps {
   isDark: boolean;
@@ -2569,7 +2559,6 @@ function WeightLabSection({ isDark, vehicleList, isActive }: {
   );
 }
 
-// ── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 export default function DataScience({ isActive = true }: { isActive?: boolean }) {
   const theme = useTheme();

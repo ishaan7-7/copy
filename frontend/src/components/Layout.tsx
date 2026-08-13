@@ -34,6 +34,7 @@ import AutomotiveDive from "../pages/AutomotiveDive";
 import DtcInvestigation from "../pages/DtcInvestigation";
 import DataScience from "../pages/DataScience";
 import KnowledgeRepo from "../pages/KnowledgeRepo";
+import ReplayControl from "../pages/ReplayControl";
 import FleetChatAssistant from "./FleetChatAssistant";
 import ErrorBoundary from "./ErrorBoundary";
 
@@ -119,6 +120,7 @@ export default function Layout() {
   const isDtc = location.pathname.startsWith("/dtc");
   const isDataScience = location.pathname.startsWith("/datascience");
   const isKnowledgeRepo = location.pathname.startsWith("/knowledge-repo");
+  const isReplayControl = location.pathname.startsWith("/replay-control");
 
   const { data: notificationData } = useQuery({
     queryKey: ["layout-alert-notifications"],
@@ -584,6 +586,13 @@ export default function Layout() {
           <Box data-app-page-scroll="" sx={{ ...hide(isKnowledgeRepo), height: "100%", minHeight: 0, overflow: "auto" }}>
             <ErrorBoundary active={isKnowledgeRepo} darkMode={darkMode}>
               <KnowledgeRepo />
+            </ErrorBoundary>
+          </Box>
+        )}
+        {visited("/replay-control") && (
+          <Box data-app-page-scroll="" sx={{ ...hide(isReplayControl), height: "100%", minHeight: 0, overflow: "auto" }}>
+            <ErrorBoundary active={isReplayControl} darkMode={darkMode}>
+              <ReplayControl isActive={isReplayControl} />
             </ErrorBoundary>
           </Box>
         )}

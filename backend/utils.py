@@ -10,11 +10,11 @@ def sanitize_dataframe(df: pd.DataFrame) -> list:
     if df.empty:
         return []
         
-    # Convert datetimes to strings
+
     for col in df.select_dtypes(include=['datetime64[ns, UTC]', 'datetime64[ns]', '<M8[ns]']).columns:
         df[col] = df[col].astype(str)
         
-    # Replace Infinity and NaN with None (which becomes null in JSON)
+
     cleaned_df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
     return cleaned_df.to_dict(orient="records")
 

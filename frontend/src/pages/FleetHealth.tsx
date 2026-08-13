@@ -605,13 +605,8 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
       axios.post(`${API}/api/alerts/resolve/${encodeURIComponent(alert.alert_id)}`, null, {
         params: { source_id: alert.source_id, module: alert.module },
       }),
-    // Optimistic: the backend cache this reads from (alerts_service's own
-    // 5s-cycle _LIVE_CACHE-equivalent) can take much longer than 5s to
-    // actually reflect a resolve on a device with a large accumulated alert
-    // backlog — without this, the button looked like it did nothing for
-    // tens of seconds. Patch the cache locally first so the UI moves the
-    // alert to Resolved immediately; the query's own refetchInterval
-    // reconciles with the real server state a bit later regardless.
+    
+    
     onMutate: async (alert: AlertEntry) => {
       await queryClient.cancelQueries({ queryKey: ["alertsMetrics"] });
       const previous = queryClient.getQueryData<AlertsMetrics>(["alertsMetrics"]);
@@ -839,16 +834,8 @@ export default function FleetHealth({ isActive }: { isActive: boolean }) {
   useEffect(() => { setAlertsPage(0); }, [alertsFeedTab, alertsSearch]);
 
   const alertCoverage = useMemo(() => {
-    // Count each open alert individually using the backend-computed
-    // `analyzed` field already on every AlertEntry (alerts_service/api.py's
-    // own dtc_history.json lookup, refreshed every 5s server-side and
-    // polled every 20s here — the same freshness the Alerts Feed table's
-    // own "Unanalyzed" column already relies on). Previously this recomputed
-    // "analyzed" independently client-side from a separate dtcHistQuery
-    // that only refreshes every 120s, so right after running a batch (or
-    // as new alerts arrived) this count and the feed's own count could
-    // disagree for up to two minutes even though both ultimately read the
-    // same underlying data.
+    
+    
     const analyzed = openAlerts.filter((a: any) => a.analyzed).length;
     return { analyzed, total: openAlerts.length, remaining: openAlerts.length - analyzed };
   }, [openAlerts]);

@@ -279,15 +279,8 @@ export default function FleetChatAssistant({
   } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const pageTopics = useMemo(() => topicsFor(pageKey, assistantRole), [pageKey, assistantRole]);
-  // `fleetPositions` (fleet_sim_server) is a static, hand-authored seed value
-  // that never changes at runtime — CockpitView.tsx already treats it as a
-  // fallback only, preferring the live gold-computed health score
-  // (`useGoldStream`) whenever a vehicle is actively streaming. The chatbot
-  // previously read `fleetPositions.health` directly, so its numbers could
-  // silently disagree with every other page for the same active vehicle at
-  // the same moment. Merging gold data in here — once, at the context
-  // boundary — fixes every topic that reads `ctx.fleetPositions` without
-  // touching their individual logic.
+  
+  
   const goldHealthMap = useMemo(() => {
     const map = new Map<string, (typeof vehicles)[number]>();
     for (const v of vehicles) map.set(v.vehicle_id, v);
@@ -550,11 +543,7 @@ export default function FleetChatAssistant({
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing, open]);
 
-  // Keeps the active chat's saved copy in sync with what's on screen, so
-  // reopening it later (or just reloading the page) picks up right where it
-  // left off. Runs on every message change — cheap, and simpler than a
-  // separate explicit "save" step scattered across every place messages
-  // change (ask, askPageTopic, pushAssistantAnswer, session switches).
+  
   useEffect(() => {
     window.localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
     setSessions((current) => {
@@ -568,15 +557,10 @@ export default function FleetChatAssistant({
       persistSessions(next);
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [messages, activeSessionId]);
 
-  // `run.py --reset` can't reach into the browser's localStorage on its
-  // own — it only kills processes and clears server-side files — so this is
-  // the bridge: check once on load whether the backend's reset token has
-  // moved past what we last saw, and if so, wipe every saved chat session
-  // (including the one currently on screen) rather than leaving stale
-  // pre-reset conversations sitting in the browser indefinitely.
+  
   useEffect(() => {
     let cancelled = false;
     axios
@@ -600,7 +584,7 @@ export default function FleetChatAssistant({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
 
@@ -646,10 +630,8 @@ export default function FleetChatAssistant({
         }
       });
       if (embeddedPageScrolled) return true;
-      // Only the page's own designated scroll containers count — not every
-      // scrollable descendant of <main>, which previously also matched small
-      // internal widgets (e.g. the AI Executive Summary's own scroll box),
-      // wrongly showing this button when only a widget was scrolled.
+      
+      
       return Array.from(document.querySelectorAll<HTMLElement>("[data-app-page-scroll]")).some(
         (element) => element.scrollTop > 120
       );
@@ -807,10 +789,8 @@ export default function FleetChatAssistant({
         : unavailable;
     }
     if (normalized.includes("safety") && normalized.includes("score")) {
-      // There is no distinct "safety_score" field anywhere in the backend —
-      // driver_score already IS the safety-behavior metric (built from harsh
-      // braking/accel/cornering rates upstream), so treat them as the same
-      // real number instead of returning a "not provided" dead-end.
+      
+      
       const scored = (fleetPositions ?? [])
         .map((p) => ({ id: String(p.vehicle_id ?? p["id"] ?? ""), driver: String(p.driver ?? "Unassigned"), score: Number(p.driver_score) }))
         .filter((p) => Number.isFinite(p.score));
@@ -877,9 +857,7 @@ export default function FleetChatAssistant({
 
   const minDelay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-  // Runs a page-aware topic: resolves its data fetch (shared across repeat
-  // questions via the query cache, so a suggested chip clicked twice in a
-  // row doesn't re-hit the backend) then formats the answer from real data.
+  
   const runTopic = async (
     topic: AssistantTopic,
     ctx: TopicContext
@@ -926,12 +904,8 @@ export default function FleetChatAssistant({
         },
       });
     }
-    // Current page's own topics win first — a bare "full briefing" should
-    // mean *this* page's briefing, not whichever other page's topic happens
-    // to share the same generic trigger words. Only once nothing local
-    // matches do we search every topic on every page/role, so a distinctly-
-    // worded question (a DTC code, "recent trips", "workshop queue", etc.)
-    // still resolves correctly no matter where you're standing.
+    
+    
     const localMatch = pageTopics.find(
       (t): t is AssistantTopic => typeof t !== "string" && t.match(normalized)
     );
@@ -1066,12 +1040,7 @@ export default function FleetChatAssistant({
     setDetailLoading(false);
   };
 
-  // Switching sessions or starting a new one while an answer is still in
-  // flight would let that pending answer land in whichever session happens
-  // to be active by the time it resolves — the hamburger button and its menu
-  // items are disabled while typing (below) so this can't actually happen,
-  // but these still guard defensively since they're plain functions, not
-  // disabled JSX themselves.
+  
   const startNewChat = () => {
     if (typing) return;
     const freshId = makeSessionId();

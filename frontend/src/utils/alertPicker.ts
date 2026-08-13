@@ -42,13 +42,13 @@ export function pickFour(pool: AlertPoolItem[], n = 4): DisplayAlert[] {
     usedMsgs.add(item.msg);
   };
 
-  // P1: source_id, module, message all distinct
+  
   for (const item of pool) {
     if (out.length >= n) break;
     if (!usedSims.has(item.source_id) && !usedMods.has(item.module) && !usedMsgs.has(item.msg)) add(item);
   }
 
-  // P2: source_id+module combo new, message can repeat
+  
   if (out.length < n) {
     for (const item of pool) {
       if (out.length >= n) break;
@@ -56,7 +56,7 @@ export function pickFour(pool: AlertPoolItem[], n = 4): DisplayAlert[] {
     }
   }
 
-  // P3: source_id new, module can repeat
+  
   if (out.length < n) {
     for (const item of pool) {
       if (out.length >= n) break;
@@ -64,7 +64,7 @@ export function pickFour(pool: AlertPoolItem[], n = 4): DisplayAlert[] {
     }
   }
 
-  // P4: not exact duplicate (source_id + module + message)
+  
   if (out.length < n) {
     const exact = new Set(out.map((r) => `${r.source_id}|${r.module}|${r.dtcMessage}`));
     for (const item of pool) {

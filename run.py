@@ -58,9 +58,7 @@ with open(os.path.join(ROOT_DIR, "config", "pipeline_config.json"), encoding="ut
 
 os.makedirs(LOGS_DIR, exist_ok=True)
 
-# --- Service Map ---
 
-# Format: "key": ([cmd_list_or_string], is_always_detached, cwd)
 FLEET_SIM_DIR = os.path.join(ROOT_DIR, "tools", "fleet_simulator")
 
 SERVICE_MAP = {
@@ -70,13 +68,13 @@ SERVICE_MAP = {
     "api_inference":    ([VENV_PYTHON, r"inference_service\api.py"],                           False, ROOT_DIR),
     "api_writer":       ([VENV_PYTHON, r"writer_service\api.py"],                              False, ROOT_DIR),
     "api_dtc":          ([VENV_PYTHON, r"dtc_service\api.py"],                                 False, ROOT_DIR),
-    # "api_analytics":    ([VENV_PYTHON, r"analytics_service\api.py"],                           False, ROOT_DIR),
+
     "engine_alerts":    ([VENV_PYTHON, r"alerts_service\start_alerts.py"],                      False, ROOT_DIR),
     "engine_gold":      ([VENV_PYTHON, r"gold_service\start_gold.py"],                        False, ROOT_DIR),
     "engine_inference": ([VENV_PYTHON, r"inference_service\start_inference_cluster.py"],       False, ROOT_DIR),
     "engine_writer":    ([VENV_PYTHON, r"writer_service\src\start_writer_cluster.py"],         False, ROOT_DIR),
     "fleet_simulator":  ([VENV_PYTHON, "start_fleet_sim.py"],                                  False, FLEET_SIM_DIR),
-    # Ingest remains detached so its FastAPI logs are always visible in a cmd window
+
     "ingest": (f"{VENV_PYTHON} -m uvicorn ingest.app.main:app --port 8000 --reload", True, ROOT_DIR),
 }
 
@@ -86,19 +84,16 @@ RESET_SCRIPTS = [
     r"tools\reset_inference.py",
     r"tools\reset_writer.py",
     r"tools\reset_replay.py",
-    r"tools\reset_dashboard_cache.py",  # Integrated RAM wipe
+    r"tools\reset_dashboard_cache.py",
 ]
 
-# Ports owned by the API services (excludes 8000=ingest, 8005=dashboard backend)
-# 8001=writer, 8002=inference, 8003=gold, 8004=alerts, 8006=observer, 8007=dtc, 8008=analytics, 8009=fleet_sim
+
 API_PORTS = (set(range(8001, 8010)) - {8005})
 
 running_processes = []
 open_log_files    = []
-HEAD_MODE         = False  # overridden from --head flag before main() is called
+HEAD_MODE         = False
 
-
-# --- Helpers ---
 
 JDK_PATH = r"C:\jdk-11.0.28+6"
 
@@ -109,8 +104,6 @@ def _make_env():
     env["PATH"] = JDK_PATH + r"\bin;" + env.get("PATH", "")
     return env
 
-
-# --- Execution Primitives ---
 
 def run_background_task(cmd_list, name, cwd_path, wait_time=0):
     log_path = os.path.join(LOGS_DIR, f"{name}.log")
@@ -147,8 +140,6 @@ def launch_service(cmd, name, cwd, delay=0, always_detach=False):
         run_background_task(cmd_list, name, cwd, delay)
 
 
-# --- Master Dashboard Launchers ---
-
 def launch_master_backend():
     cmd      = [DASH_VENV_PYTHON, "-m", "uvicorn", "backend.main_v2:app", "--port", "8005"]
     dash_dir = os.path.join(ROOT_DIR, "master_dashboard")
@@ -159,10 +150,8 @@ def launch_master_backend():
 
 
 def launch_master_frontend():
-    # NOTE: static-build serving (tools/build_frontend.py + main_v2.py's
-    # StaticFiles mount) is deliberately not wired into the normal flow here
-    # for now — always use the Vite dev server. The static-build path still
-    # works if invoked manually; revisit hooking it back into run.py later.
+
+
     frontend_dir = os.path.join(ROOT_DIR, "master_dashboard", "frontend")
 
     print("--- Starting Master Dashboard Frontend (React/Vite) ---")
@@ -225,8 +214,6 @@ def launch_master_frontend():
     print("   Opening browser at http://localhost:5173")
     webbrowser.open("http://localhost:5173")
 
-
-# --- Process Management ---
 
 def kill_process(p_info):
     """Graceful terminate for background processes; force-kill for detached CMD windows."""
@@ -423,8 +410,6 @@ def cleanup():
     print("\nStream offline. All background services and detached windows closed safely.")
 
 
-# --- Flow Phases ---
-
 def _check_api_liveness():
     try:
         conns = psutil.net_connections(kind="inet")
@@ -447,7 +432,7 @@ def _boot_infra():
     run_detached_console(r"tools\kafka\start_kafka.bat", "Kafka", ROOT_DIR, 30)
 
 
-def _do_hard_reset(infra_is_running):
+def _do_hard_reset(infra_is_running, keep_dashboard=False):
     if infra_is_running:
         print("Force closing Kafka/ZK to allow log deletion...")
         for port in [2181, 9092]:
@@ -455,10 +440,15 @@ def _do_hard_reset(infra_is_running):
         time.sleep(2)
 
     print("\n--- Hard Resetting Infrastructure ---")
-    print("Clearing in-memory API and frontend caches (Ports 8000-8009, 5173)...")
-    for port in range(8000, 8010):
+    reset_ports = set(range(8000, 8010)) - ({8005} if keep_dashboard else set())
+    if keep_dashboard:
+        print("Clearing in-memory API caches (Ports 8000-8009 excl. 8005 — dashboard untouched)...")
+    else:
+        print("Clearing in-memory API and frontend caches (Ports 8000-8009, 5173)...")
+    for port in sorted(reset_ports):
         hunt_and_kill_port(port, f"API Port {port}")
-    hunt_and_kill_port(5173, "Node/Vite")
+    if not keep_dashboard:
+        hunt_and_kill_port(5173, "Node/Vite")
     time.sleep(2)
 
     for label, log_dir in [("Kafka", KAFKA_LOG_DIR), ("Zookeeper", ZK_LOG_DIR)]:
@@ -509,11 +499,7 @@ def _do_hard_reset(infra_is_running):
         os.remove(REPLAY_PID_FILE)
         print("   ✅ Replay PID file cleared.")
 
-    # Bumps a token the dashboard frontend checks on load — the browser's
-    # chat-history localStorage survives a backend/process reset entirely on
-    # its own (it's client-side state, untouched by killing ports or deleting
-    # server-side files), so this is the only way a --reset here can also
-    # clear the Fleet Assistant's saved chat sessions in the browser.
+
     os.makedirs(os.path.dirname(SESSION_RESET_FILE), exist_ok=True)
     with open(SESSION_RESET_FILE, "w", encoding="utf-8") as fh:
         json.dump({"reset_token": str(uuid.uuid4())}, fh)
@@ -523,7 +509,7 @@ def _do_hard_reset(infra_is_running):
 def _start_all_services():
     for service_key, (cmd, is_detached, cwd) in SERVICE_MAP.items():
         service_name = f"Service_{service_key}"
-        # APIs start quickly; engines load models/spark contexts and need more time
+
         delay = 5 if (is_detached or service_key.startswith("engine_")) else 1
         launch_service(cmd, service_name, cwd, delay, always_detach=is_detached)
 
@@ -546,8 +532,6 @@ def _interactive_loop():
             print(f"Unknown service '{target}'. Please choose from the list above.")
 
 
-# --- Main Entrypoint ---
-
 def main(args):
     interactive = not any([args.reset, args.start, args.backend, args.dashboard])
 
@@ -558,7 +542,7 @@ def main(args):
             print("\nPreflight failed. Fix the issues above, or rerun with --skip-preflight to bypass.")
             return
 
-    # Dashboard-only mode
+
     if args.dashboard:
         print("\n--- Dashboard Mode ---")
         _check_api_liveness()
@@ -568,7 +552,7 @@ def main(args):
         _interactive_loop()
         return
 
-    # Infra state detection
+
     print("\nChecking Infrastructure State...")
     try:
         _infra_conns = psutil.net_connections(kind="inet")
@@ -585,17 +569,23 @@ def main(args):
             infra_is_running = False
             time.sleep(2)
 
-    # Automated --reset always kills infra first so log dirs can be deleted cleanly
+
     if args.reset and infra_is_running:
         for port in [2181, 9092]:
             hunt_and_kill_port(port, f"Kafka/ZK Port {port}")
         infra_is_running = False
         time.sleep(2)
 
-    # Reset phase
+
     do_reset = args.reset or (interactive and input("\nReset stream files and topics (Hard Reset)? (y/n): ").lower() == "y")
     if do_reset:
-        _do_hard_reset(infra_is_running)
+        _do_hard_reset(infra_is_running, keep_dashboard=args.keep_dashboard)
+        if args.reset and args.keep_dashboard:
+            print("\n--- Relaunching backend services (dashboard was not touched) ---")
+            _start_all_services()
+            print("Hard reset complete — backend services are relaunching.")
+            print("Data will show zeroes for ~10-15s while they initialize.")
+            os._exit(0)
         if args.reset and not args.start:
             print("\nReset complete. Kafka and Zookeeper are running. Exiting.")
             return
@@ -605,14 +595,14 @@ def main(args):
         else:
             print("\n--- Resuming Existing Infrastructure ---")
 
-    # Dashboard phase — starts first so the UI is available while backends load
+
     start_dashboard = args.start or (not args.backend and (interactive and input("\nStart Master Dashboard? (y/n): ").lower() == "y"))
     if start_dashboard:
         launch_master_backend()
         time.sleep(4)
         launch_master_frontend()
 
-    # Services phase — ask after dashboard is already running
+
     do_start_services = args.start or args.backend or (interactive and input("\nStart Backend Services? (y/n): ").lower() == "y")
     if do_start_services:
         _start_all_services()
@@ -637,6 +627,10 @@ if __name__ == "__main__":
     parser.add_argument("--dashboard", action="store_true", help="Start master dashboard only (warns if APIs are not running)")
     parser.add_argument("--head",      action="store_true", help="Launch all services in visible terminal windows instead of log files")
     parser.add_argument("--skip-preflight", action="store_true", dest="skip_preflight", help="Skip config/data preflight validation")
+    parser.add_argument("--keep-dashboard", action="store_true", dest="keep_dashboard",
+                         help="With --reset: hard-reset every backend service except the dashboard "
+                              "(8005) and frontend (5173), then relaunch them and exit — for triggering "
+                              "a hard reset from a live dashboard session without killing it.")
     args = parser.parse_args()
 
     HEAD_MODE = args.head

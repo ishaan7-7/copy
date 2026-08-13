@@ -9,7 +9,6 @@ echo.
 set "ROOT=%~dp0"
 set "ROOT=%ROOT:~0,-1%"
 
-REM ── Step 0: Check Python ──
 echo [STEP 0] Checking Python...
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -22,7 +21,6 @@ if errorlevel 1 (
 for /f "tokens=2 delims= " %%v in ('python --version 2^>^&1') do set PYVER=%%v
 echo   Found Python %PYVER%
 
-REM ── Step 1: Check extras folder ──
 echo.
 echo [STEP 1] Checking extras folder...
 if not exist "%ROOT%\extras" (
@@ -47,7 +45,6 @@ if "%JAVA_ZIP%"=="" echo   WARNING: No java .zip found in extras\
 if "%NODE_ZIP%"=="" echo   WARNING: No node .zip found in extras\
 echo   Extras check complete.
 
-REM ── Step 2: Create .venv (pipeline) ──
 echo.
 echo [STEP 2] Creating .venv (pipeline)...
 if not exist "%ROOT%\.venv\Scripts\python.exe" (
@@ -71,7 +68,6 @@ if errorlevel 1 (
 )
 echo   Pipeline dependencies installed.
 
-REM ── Step 3: Create .venv_dash (dashboard backend) ──
 echo.
 echo [STEP 3] Creating .venv_dash (dashboard backend)...
 if not exist "%ROOT%\master_dashboard\.venv_dash\Scripts\python.exe" (
@@ -92,14 +88,12 @@ if errorlevel 1 (
 )
 echo   Dashboard dependencies installed.
 
-REM ── Step 4: Extract Kafka ──
 echo.
 echo [STEP 4] Extracting Kafka...
 if not "%KAFKA_TGZ%"=="" (
     if not exist "%ROOT%\kafka" (
         echo   Extracting %KAFKA_TGZ%...
         "%ROOT%\.venv\Scripts\python.exe" -c "import tarfile,sys; t=tarfile.open(sys.argv[1],'r:gz'); t.extractall(sys.argv[2]); t.close()" "%KAFKA_TGZ%" "%ROOT%"
-        REM Rename extracted folder to kafka
         for /d %%d in ("%ROOT%\kafka_2*") do (
             rename "%%d" "kafka"
         )
@@ -111,7 +105,6 @@ if not "%KAFKA_TGZ%"=="" (
     echo   SKIPPED: No kafka .tgz in extras\.
 )
 
-REM ── Step 5: Patch Kafka config for Windows ──
 echo.
 echo [STEP 5] Patching Kafka config...
 if exist "%ROOT%\kafka\config\server.properties" (
@@ -123,7 +116,6 @@ if exist "%ROOT%\kafka\config\zookeeper.properties" (
     echo   zookeeper.properties patched: dataDir=C:/tmp/zookeeper-data
 )
 
-REM ── Step 6: Extract Java ──
 echo.
 echo [STEP 6] Extracting Java...
 if not "%JAVA_ZIP%"=="" (
@@ -140,7 +132,6 @@ if not "%JAVA_ZIP%"=="" (
     echo   SKIPPED: No java .zip in extras\.
 )
 
-REM ── Step 7: Extract Node.js ──
 echo.
 echo [STEP 7] Extracting Node.js...
 if not "%NODE_ZIP%"=="" (
@@ -155,14 +146,12 @@ if not "%NODE_ZIP%"=="" (
     echo   SKIPPED: No node .zip in extras\.
 )
 
-REM ── Step 8: Create tmp directories ──
 echo.
 echo [STEP 8] Creating tmp directories...
 if not exist "%ROOT%\tmp\kafka-logs" mkdir "%ROOT%\tmp\kafka-logs"
 if not exist "%ROOT%\tmp\zookeeper-data" mkdir "%ROOT%\tmp\zookeeper-data"
 echo   tmp\kafka-logs\ and tmp\zookeeper-data\ created.
 
-REM ── Step 9: Create data directories ──
 echo.
 echo [STEP 9] Creating data directories...
 if not exist "%ROOT%\data\delta\bronze" mkdir "%ROOT%\data\delta\bronze"
@@ -182,7 +171,6 @@ if not exist "%ROOT%\replay\dlq" mkdir "%ROOT%\replay\dlq"
 if not exist "%ROOT%\replay\checkpoints" mkdir "%ROOT%\replay\checkpoints"
 echo   All data directories created.
 
-REM ── Step 10: npm install for frontend ──
 echo.
 echo [STEP 10] Installing frontend dependencies...
 if exist "%ROOT%\tools\node\npm.cmd" (
@@ -203,7 +191,6 @@ if exist "%ROOT%\tools\node\npm.cmd" (
     echo   SKIPPED: tools\node\npm.cmd not found. Extract Node.js first.
 )
 
-REM ── Step 11: Verify the install actually works ──
 echo.
 echo [STEP 11] Verifying installation...
 set VERIFY_FAILED=0

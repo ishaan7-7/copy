@@ -110,7 +110,7 @@ import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import ExpandMoreOutlinedIcon from "@mui/icons-material/ExpandMoreOutlined";
 import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import DraggableLib from "react-draggable";
-// react-draggable type definitions require all props; cast to avoid noise since defaults handle them at runtime
+
 const Draggable = DraggableLib as unknown as React.ComponentType<{ children: React.ReactElement; handle?: string; cancel?: string }>;
 import { useStore, Region } from "../store";
 import FleetAlertsPopup from "../components/executive/FleetAlertsPopup";
@@ -134,10 +134,7 @@ const VEHICLE_COLORS = [
   "#a855f7",
 ];
 
-// Single source of truth for the Maintenance Forecast windows: bucket
-// assignment, the bar-chart tooltip text, and the popup's explanation
-// banner all derive their numbers from this list. Edit maxHealth here to
-// change the ranges — nothing else needs to change to stay in sync.
+
 type MaintenanceTierKey = "within_1_week" | "weeks_1_2" | "weeks_3_4" | "over_1_month";
 const MAINTENANCE_TIERS: {
   key: MaintenanceTierKey;
@@ -152,10 +149,7 @@ const MAINTENANCE_TIERS: {
   { key: "over_1_month", label: "> 1 Month", maxHealth: Infinity, color: "#06b6d4", action: "healthy vehicles — group into routine monthly maintenance cycle" },
 ];
 
-// Grabs the first real sentence out of a longer detail string, for use in
-// short-form summaries. Requires the char right before the punctuation to be
-// lowercase/digit/paren so single-capital abbreviations (e.g. "R. Sharma")
-// don't get mistaken for a sentence boundary.
+
 function firstSentence(text: string): string {
   const m = text.match(/^.*?[a-z0-9)][.!?](?=\s|$)/);
   return m ? m[0] : text;
@@ -948,11 +942,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
       {
         type: "pie",
 
-        // radius: ["55%", "80%"],
-
-        // center: ["50%", "50%"],
-
-        // avoidLabelOverlap: true,
+        
         radius: ["55%", "80%"],
         center: ["50%", "50%"],
         avoidLabelOverlap: false,
@@ -1027,10 +1017,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
         flexDirection: "column",
         gap: 1,
 
-        // "&:hover": {
-        //   boxShadow: 3,
-        //   transform: "translateY(-2px)",
-        // },
+        
       }}
     >
       {/* Header */}
@@ -1563,273 +1550,6 @@ function SpeedByRoad({ data }: { data: BehaviorData }) {
   );
 }
 
-// function ScatterChart({ vehicles }: { vehicles: CockpitVehicle[] }) {
-//   const VEHICLE_COLORS = [
-//     "#e57373",
-//     "#ffb74d",
-//     "#81c784",
-//     "#ba68c8",
-//     "#4dd0e1",
-//     "#42a5f5",
-//     "#ff8a65",
-//     "#90a4ae",
-//     "#f48fb1",
-//     "#aed581",
-//   ];
-
-//   const hasData =
-//     fleetHealthScatter && fleetHealthScatter.some((v) => v.data.length > 0);
-
-//   let fleetScatterOption = {};
-
-//   if (hasData) {
-//     const allTs = new Set();
-
-//     fleetHealthScatter.forEach((vh) =>
-//       vh.data.forEach((r) => allTs.add(r.ts || r.timestamp || ""))
-//     );
-
-//     const sortedTs = Array.from(allTs).sort();
-
-//     const series = fleetHealthScatter.map((vehicle, idx) => ({
-//       name: vehicle.vehicle_id,
-
-//       type: "scatter",
-
-//       symbol: "circle",
-
-//       z: 1,
-//       zlevel: 1,
-
-//       data: vehicle.data.map((r) => [r.ts || r.timestamp, r.health ?? 0]),
-
-//       symbolSize: (val) => Math.max(8, (val[1] / 100) * 14),
-
-//       itemStyle: {
-//         color: VEHICLE_COLORS[idx % VEHICLE_COLORS.length],
-
-//         opacity: 0.72,
-
-//         borderWidth: 1,
-
-//         borderColor: "#fff",
-
-//         shadowBlur: 3,
-
-//         shadowColor: VEHICLE_COLORS[idx % VEHICLE_COLORS.length],
-//       },
-
-//       emphasis: {
-//         scale: 1.15,
-//       },
-//     }));
-
-//     fleetScatterOption = {
-//       animation: false,
-
-//       tooltip: {
-//         trigger: "item",
-
-//         textStyle: {
-//           fontSize: 10,
-//         },
-
-//         formatter: (p) => `
-//       <b>${p.seriesName}</b>
-//       <br/>
-//       ${p.data[0]}
-//       <br/>
-//       Health: ${p.data[1]}%
-//     `,
-//       },
-
-//       grid: commonGrid,
-
-//       xAxis: {
-//         ...commonXAxis,
-
-//         data: sortedTs,
-
-//         axisLabel: {
-//           ...commonXAxis.axisLabel,
-
-//           formatter: (v) => String(v).slice(5, 16).replace("T", " "),
-//         },
-//       },
-
-//       yAxis: {
-//         ...commonYAxis,
-//       },
-
-//       dataZoom: [
-//         {
-//           type: "inside",
-//         },
-
-//         {
-//           type: "slider",
-
-//           height: 22,
-
-//           bottom: 10,
-
-//           moveHandleSize: 8,
-
-//           handleSize: "90%",
-//         },
-//       ],
-
-//       series: [
-//         ...series,
-
-//         {
-//           type: "line",
-
-//           data: [[]],
-
-//           silent: true,
-
-//           lineStyle: {
-//             opacity: 0,
-//           },
-
-//           markLine: {
-//             silent: true,
-
-//             symbol: ["none", "none"],
-
-//             data: [
-//               {
-//                 yAxis: 60,
-
-//                 label: {
-//                   formatter: "CRITICAL",
-
-//                   color: "#d32f2f",
-
-//                   position: "insideStartBottom",
-
-//                   offset: [12, 10],
-
-//                   fontSize: "10px",
-//                 },
-
-//                 position: "insideStartBottom",
-
-//                 lineStyle: {
-//                   color: "#d32f2f",
-
-//                   width: 5,
-
-//                   type: "dotted",
-//                 },
-//               },
-
-//               {
-//                 yAxis: 80,
-
-//                 label: {
-//                   formatter: "WARNING",
-
-//                   color: "#ed6c02",
-
-//                   position: "insideStartBottom",
-
-//                   offset: [12, 10],
-
-//                   fontSize: "10px",
-//                 },
-
-//                 position: "insideStartBottom",
-
-//                 lineStyle: {
-//                   color: "#ed6c02",
-
-//                   width: 7,
-
-//                   type: "dotted",
-//                 },
-//               },
-//             ],
-//           },
-//         },
-//       ],
-//     };
-//   }
-//   return (
-//     <>
-//       <Box
-//         sx={{
-//           display: "flex",
-//           gap: 1,
-//           flexWrap: "wrap",
-//           justifyContent: "center",
-//           mb: 1,
-//         }}
-//       >
-//         {fleetHealthScatter?.map((v, i) => (
-//           <Box
-//             key={v.vehicle_id}
-//             sx={{
-//               display: "flex",
-//               alignItems: "center",
-//               gap: 0.5,
-//             }}
-//           >
-//             <Box
-//               sx={{
-//                 width: 8,
-//                 height: 8,
-//                 borderRadius: "50%",
-
-//                 bgcolor: VEHICLE_COLORS[i % 10],
-//               }}
-//             />
-
-//             <Typography
-//               sx={{
-//                 fontSize: 10,
-//               }}
-//             >
-//               {v.vehicle_id}
-//             </Typography>
-//           </Box>
-//         ))}
-//       </Box>
-
-//       {/* GRAPH */}
-//       <Box
-//         sx={{
-//           flex: 1,
-//           minHeight: 0,
-//         }}
-//       >
-//         {hasData ? (
-//           <ReactECharts
-//             option={fleetScatterOption}
-//             style={{
-//               width: "100%",
-//               height: "100%",
-//             }}
-//           />
-//         ) : (
-//           <Box
-//             sx={{
-//               height: "100%",
-//               display: "flex",
-//               alignItems: "center",
-//               justifyContent: "center",
-//             }}
-//           >
-//             <Typography variant="caption">
-//               Waiting for pipeline backend
-//             </Typography>
-//           </Box>
-//         )}
-//       </Box>
-//     </>
-//   );
-// }
 
 function TimelineChart({ history }: { history: HealthHistoryRow[] }) {
   const theme = useTheme();
@@ -1980,7 +1700,7 @@ function RecentAlerts({
           }))
       );
     } catch {
-      // Retain previous displayed on error
+      
     } finally {
       setLoading(false);
       setPhase("");
@@ -2162,84 +1882,6 @@ function RecentAlerts({
   );
 }
 
-// function AiSummary({ summary }: { summary: FleetSummary }) {
-//   const criticalCount = positions?.filter((v) => {
-//     const h =
-//       v.status === "active"
-//         ? getVehicleHealth(v.vehicle_id, v.health)
-//         : v.health;
-
-//     return h < 40;
-//   }).length;
-
-//   const warningCount = positions?.filter((v) => {
-//     const h =
-//       v.status === "active"
-//         ? getVehicleHealth(v.vehicle_id, v.health)
-//         : v.health;
-
-//     return h >= 40 && h < 70;
-//   }).length;
-
-//   const items = [
-//     [
-//       `Fleet health is stable at ${summary?.avg_health?.toFixed(1)}%.`,
-//       "active",
-//     ],
-//     [`${criticalCount} vehicles require immediate attention.`, "critical"],
-//     ["Vehicle DL07 shows recurring battery degradation.", "warning"],
-//     ["Tire pressure anomalies increased 12% vs yesterday.", "warning"],
-//     [
-//       "Recommend scheduling maintenance for 3 vehicles within 48 hours.",
-//       "parked",
-//     ],
-//   ] as const;
-//   return (
-//     <Card sx={{ p: 1, height: "100%" }}>
-//       <SectionTitle
-//         title="AI Fleet Summary"
-//         action={
-//           <Button
-//             size="small"
-//             variant="outlined"
-//             sx={{ fontSize: "10px", p: "0px" }}
-//           >
-//             View All
-//           </Button>
-//         }
-//       />
-//       <Stack spacing={0.5} sx={{ mt: 0.3 }}>
-//         {items.map(([text, severity]) => (
-//           <Stack key={text} direction="row" spacing={1} alignItems="center">
-//             <Box
-//               sx={{
-//                 width: 7,
-//                 height: 7,
-//                 mt: 0.45,
-//                 borderRadius: "50%",
-//                 bgcolor: statusMeta[severity].color,
-//                 boxShadow: `0 0 0 4px ${alpha(
-//                   statusMeta[severity].color,
-//                   0.13
-//                 )}`,
-//                 flex: "0 0 auto",
-//               }}
-//             />
-//             <Typography
-//               sx={{
-//                 fontSize: "10px",
-//                 lineHeight: "12px",
-//                 color: "text.secondary",
-//               }}
-//             >
-//               {text}
-//             </Typography>
-//           </Stack>
-//         ))}
-//       </Stack>
-//     </Card>
-//   );
-// }
 
 function FleetTable({ vehicles }: { vehicles: CockpitVehicle[] }) {
   const rows = vehicles;
@@ -2556,7 +2198,7 @@ function MapController({
     hadTripRef.current = false;
     map.stop();
     map.setView(REGION_MAP_CENTER[region], REGION_MAP_ZOOM[region], { animate: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [resetToken]);
 
   useEffect(() => {
@@ -2568,7 +2210,7 @@ function MapController({
     hadTripRef.current = false;
     map.stop();
     map.flyTo(REGION_MAP_CENTER[region], REGION_MAP_ZOOM[region], { duration: 0.8 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [region]);
 
   useEffect(() => {
@@ -2613,14 +2255,7 @@ function MapController({
     }
   }, [selectedVehicle, livePosition, map, region]);
 
-  // The vehicle-selection effect above zooms to street-level (12) around
-  // the vehicle's CURRENT position — correct for just selecting a vehicle,
-  // but a loaded last trip can span hundreds of km from that position (e.g.
-  // a cross-city trip ending where the vehicle is now parked). Without
-  // re-fitting, only whatever sliver of the route falls inside that
-  // street-level view is visible — which looked like "no route/most events
-  // missing" when in fact the full polyline and every event were rendering
-  // correctly, just almost entirely off-screen.
+  
   useEffect(() => {
     const hasTrip = !!(tripPolyline && tripPolyline.length >= 2);
     if (hasTrip && !hadTripRef.current) {
@@ -2907,13 +2542,13 @@ function HealthRing({ score, isDark }: { score: number; isDark: boolean }) {
 const FLEET_TABLE_COLUMNS = [
   { id: "name", label: "Vehicle Name", sortable: true },
   { id: "type", label: "Type", sortable: true },
-  // { id: "status", label: "Status", sortable: true },
-  // { id: "speed", label: "Speed", sortable: true },
+  
+  
   { id: "health_status", label: "Health Status", sortable: true },
   { id: "health", label: "Health Score", sortable: true },
-  // { id: "driver", label: "Driver", sortable: true },
+  
   { id: "driver_score", label: "Driver Score", sortable: true },
-  // { id: "road_type", label: "Road Type", sortable: false },
+  
   { id: "route_name", label: "Route", sortable: false },
 ] as const;
 
@@ -2931,10 +2566,8 @@ export default function CockpitViewExecutive({
   const [vehiclePopoverAnchor, setVehiclePopoverAnchor] = useState<HTMLElement | null>(null);
 
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
-  // Bounding rect of whichever map instance (inline or the fullscreen "Fleet
-  // Map" dialog) the marker click came from, captured at click time — the
-  // vehicle card anchors off this map panel's left edge instead of the click
-  // point, so it always opens beside the map instead of over it.
+  
+  
   const [mapPanelRect, setMapPanelRect] = useState<DOMRect | null>(null);
 
   const [drawerTab, setDrawerTab] = useState(0);
@@ -2950,11 +2583,8 @@ export default function CockpitViewExecutive({
   const [alertsPopupOpen, setAlertsPopupOpen] = useState(false);
   const [alertsPopupFilter, setAlertsPopupFilter] = useState<"all" | "critical" | "warning" | "resolved">("all");
   const [vehicleSummaryPopupId, setVehicleSummaryPopupId] = useState<string | null>(null);
-  // Fired on Fleet Table row hover so the popup's dominant, slowest query
-  // (vehicle-summary — see VehicleSummaryPopup.tsx) is already in flight or
-  // cached by the time the user actually clicks the vehicle name. Same query
-  // key/fn as the popup's own useQuery so it lands in the same cache entry;
-  // prefetchQuery no-ops if a fresh-enough entry already exists.
+  
+  
   const prefetchVehicleSummary = (vehicleId: string) => {
     queryClient.prefetchQuery({
       queryKey: ["vehSummaryPopup", vehicleId],
@@ -2976,15 +2606,11 @@ export default function CockpitViewExecutive({
     | "critical"
   >("all");
   const [healthScoreFilter, setHealthScoreFilter] = useState("all");
-  // Top-priority "Health" range filter (dropdown, bucketed against
-  // getHealthStatus's own thresholds). Column-header filters below apply
-  // on top of this and the status dropdown — every filter stacks as an
-  // AND, per column filters never override the top-level ones.
+  
+  
   const [healthRangeFilter, setHealthRangeFilter] = useState<[number, number]>([0, 100]);
 
-  // Column-header ("Excel-style") filters — each stacks as an additional AND
-  // on top of the statusFilter/healthRangeFilter dropdowns above. Empty
-  // Set = no restriction from that column.
+  
   const [colFilterAnchor, setColFilterAnchor] = useState<{ colId: FleetTableColId; el: HTMLElement } | null>(null);
   const [nameSearchColFilter, setNameSearchColFilter] = useState("");
   const [statusColFilter, setStatusColFilter] = useState<Set<string>>(new Set());
@@ -3023,10 +2649,8 @@ export default function CockpitViewExecutive({
   const [statusFilterMap, setStatusFilterMap] = useState("all");
   const [vehicleType, setVehicleType] = useState("all");
   const [showHistTripOverlay, setShowHistTripOverlay] = useState(false);
-  // Lets a user see just the route shape without the event-marker clutter.
-  // Active vehicles' routes are always on screen, so their toggle is always
-  // usable; parked/in-service vehicles only have a route once "Load Last
-  // Trip" has been clicked, so their toggle stays disabled until then.
+  
+  
   const [showActiveTripEvents, setShowActiveTripEvents] = useState(true);
   const [showHistTripEvents, setShowHistTripEvents] = useState(true);
   const [selectedPlant, setSelectedPlant] = useState("all");
@@ -3053,22 +2677,7 @@ export default function CockpitViewExecutive({
     },
   });
 
-  // The fleet simulator's active region is a single shared value in the
-  // backend's memory — a page refresh or revisit never resets it, and never
-  // switches it either. Without this, refreshing the page (or navigating
-  // away and back) left the region toggle showing whatever this session's
-  // persisted choice was while the backend (and therefore every vehicle
-  // position/route on the map) quietly stayed on whatever region it was
-  // last switched to, making the map look empty since its markers fell
-  // outside the other region's map bounds.
-  //
-  // This must key off isActive, not run once on mount: Layout.tsx keeps
-  // already-visited pages mounted (just hidden) when you navigate to a
-  // different page, so a plain mount-only effect never re-fired on
-  // "navigate away and back" — only a genuine remount (switching between
-  // the Executive and Monitoring roles swaps in a different component)
-  // triggered it. isActive flips true on every one of those return visits,
-  // so reconciling here covers all of them.
+  
   useEffect(() => {
     if (!isActive) return;
     let cancelled = false;
@@ -3083,22 +2692,14 @@ export default function CockpitViewExecutive({
     return () => {
       cancelled = true;
     };
-    // Deliberately keyed on isActive alone — this reconciles a possibly-
-    // stale backend against the persisted region whenever this page becomes
-    // the visible one, it must not re-fire every time the toggle itself
-    // changes region (that path already invalidates the relevant queries
-    // via regionMutation's own onSuccess).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
+    
   }, [isActive]);
 
   const { vehicles: sseVehicles, ringBuffer } = useGoldStream();
   const wasActiveRef = useRef(false);
 
-  // Vehicle-popover drag is applied imperatively (ref + direct style writes,
-  // rAF-throttled) rather than through React state — this component re-
-  // renders a lot of state on every change, so driving the drag transform
-  // through setState fired jank on every pixel of mouse movement. Nothing
-  // else reads the drag offset, so there's no need for it to live in state.
+  
   const popoverPaperRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const dragRafRef = useRef<number | null>(null);
@@ -3158,9 +2759,7 @@ export default function CockpitViewExecutive({
     setPage(0);
   };
 
-  // Parses a typed min/max box for a 0-100 range filter, clamping it into
-  // bounds and never letting min cross above max (or max below min) so the
-  // slider stays in sync with whatever was typed.
+  
   const clampRangeInput = (raw: string, otherBound: number, isMin: boolean): number => {
     let v = Number(raw);
     if (!Number.isFinite(v)) v = isMin ? 0 : 100;
@@ -3203,9 +2802,7 @@ export default function CockpitViewExecutive({
     document.body.style.cursor = "grabbing";
   }, []);
 
-  // rAF-throttled: the raw mousemove rate can outpace the display's refresh
-  // rate, so this only ever commits the most recent pointer position once
-  // per frame instead of writing to the DOM on every single event.
+  
   const handleDragMove = useCallback(
     (e: MouseEvent) => {
       if (!dragging.current) return;
@@ -3281,7 +2878,7 @@ export default function CockpitViewExecutive({
     { id: "speed", label: "Speed", width: 75 },
     { id: "heading", label: "Health Status", width: 105 },
     { id: "health", label: "Health Score", width: 100 },
-    // { id: "driver", label: "Driver", width: 80 },
+    
     { id: "driver_score", label: "Driver Score", width: 130 },
     { id: "road_type", label: "Road Type", width: 95 },
     { id: "route_name", label: "Route", width: 260 },
@@ -3322,8 +2919,7 @@ export default function CockpitViewExecutive({
     }
   };
 
-  //   const vehicles = fleetData;
-
+  
   const filteredVehicles = positions?.filter((v) => {
     const text = search.toLowerCase();
 
@@ -3405,13 +3001,7 @@ export default function CockpitViewExecutive({
       refetchInterval: isActive && autoRefresh ? 8000 : false,
     });
 
-  // True whenever the pipeline (Bronze/Silver/Gold-derived) fleet summary
-  // has come back empty. Covers both cases: positions/status still real
-  // from the fleet simulator but health/driver scores running on hardcoded
-  // per-vehicle fallbacks (`?? 75` etc.), and the harder outage where
-  // `positions` itself is also empty and the page falls back to
-  // `fallbackVehicles`' entirely fabricated demo fleet. Surfaced as a
-  // visible banner instead of failing silently either way.
+  
   const pipelineDataMissing = (pipelineFleet?.vehicles?.length ?? 0) === 0;
 
   const { data: alertsMetrics } = useQuery({
@@ -3421,9 +3011,7 @@ export default function CockpitViewExecutive({
     staleTime: 8000,
   });
 
-  // Shared with Fleet Health / the chat assistant's own "worst module" and
-  // "DTC distribution" topics — same endpoints, same cache keys, so opening
-  // either page doesn't trigger a duplicate fetch.
+  
   const { data: automotiveFleetSummary } = useQuery({
     queryKey: ["fh-fleet-summary"],
     queryFn: () => axios.get(`${PIPELINE_API}/api/automotive/fleet-summary`).then((r) => r.data),
@@ -3436,9 +3024,8 @@ export default function CockpitViewExecutive({
     refetchInterval: isActive && autoRefresh ? 120000 : false,
     staleTime: 30000,
   });
-  // Static DTC contract — used only to enrich fault codes in the AI
-  // Executive Summary with a plain-English description, so a row can say
-  // "P0217 (Engine Coolant Over Temperature)" instead of a bare code.
+  
+  
   const { data: dtcMasterContract } = useQuery({
     queryKey: ["dtc-master-contract"],
     queryFn: () => axios.get(`${PIPELINE_API}/api/automotive/dtc-master`).then((r) => r.data),
@@ -3518,29 +3105,7 @@ export default function CockpitViewExecutive({
     });
   }, [pipelineFleet?.vehicles, positions, positionsUpdatedAt]);
 
-  //   const summary = useMemo<FleetSummary>(() => {
-  //     const base = summary || fallbackSummary;
-  //     const pipelineStats = pipelineFleet?.fleet_stats;
-  //     return {
-  //       ...base,
-  //       total: pipelineStats?.total_vehicles || base.total || vehicles.length,
-  //       avg_health: pipelineStats?.avg_health || base.avg_health,
-  //       severity_counts: {
-  //         normal:
-  //           base.severity_counts?.normal ??
-  //           vehicles.filter((v) => v.status === "active").length,
-  //         warning:
-  //           pipelineStats?.warning_count ??
-  //           base.severity_counts?.warning ??
-  //           vehicles.filter((v) => v.status === "warning").length,
-  //         critical:
-  //           pipelineStats?.critical_count ??
-  //           base.severity_counts?.critical ??
-  //           vehicles.filter((v) => v.status === "critical").length,
-  //       },
-  //     };
-  //   }, [pipelineFleet?.fleet_stats, summary, vehicles]);
-
+  
   const [healthTimelineVehicle, setHealthTimelineVehicle] =
     useState<string>("sim001");
   const [timelineXAxis, setTimelineXAxis] = useState<"timestamp" | "mileage">(
@@ -3836,12 +3401,7 @@ export default function CockpitViewExecutive({
     [positions, selectedVehicle]
   );
 
-  // positions (and therefore liveSelectedPosition) only ever contains active
-  // vehicles — for parked/in_service vehicles it's always null. Anything
-  // that needs "where is the selected vehicle right now" (map auto-centering,
-  // the last-trip overlay anchor) must fall back to vehicleDetail's lat/lng
-  // (sourced from last_state.json for those statuses) or it silently no-ops
-  // for every non-active vehicle.
+  
   const selectedVehicleAnchor = useMemo(() => {
     if (liveSelectedPosition) {
       return { lat: liveSelectedPosition.lat, lng: liveSelectedPosition.lng };
@@ -3884,11 +3444,8 @@ export default function CockpitViewExecutive({
   });
 
   const historicalRouteOverlay = useMemo(() => {
-    // isLastTripPlaceholder guards against React Query's global
-    // keepPreviousData default: right after switching the selected vehicle,
-    // lastTripData can still hold the PREVIOUS vehicle's cached trip while
-    // the new fetch is in flight — rendering it here would draw the wrong
-    // vehicle's route on the map.
+    
+    
     if (!showHistTripOverlay || isLastTripPlaceholder || !lastTripData?.last_trip || !selectedVehicleAnchor) return null;
     const trip = lastTripData.last_trip;
     const anchorLat = selectedVehicleAnchor.lat;
@@ -3930,22 +3487,7 @@ export default function CockpitViewExecutive({
 
   const SERVICE_INTERVAL_KM = 15000;
 
-  // isTripDataPlaceholder guards the same keepPreviousData staleness as
-  // lastTripData/vehicleDetail: right after switching between two active
-  // vehicles, tripData can still hold the PREVIOUS vehicle's route while the
-  // new fetch is in flight, which would draw the wrong vehicle's
-  // completed/remaining route and events on the map.
-  //
-  // Routes are simulated back-and-forth (the vehicle bounces off either
-  // endpoint and reverses), not one-way. route[0..completed_index] is only
-  // "already driven" while the vehicle is still on its very first forward
-  // pass — once it has bounced at least once (has_reversed), it has by
-  // definition already covered the entire route, so the whole thing renders
-  // solid instead of splitting off a "remaining" tail. Without this, the
-  // stretch the vehicle drove during its first pass got permanently
-  // relabeled "not yet covered" the moment it turned around, which is what
-  // put event markers from that earlier pass on a dotted/unvisited-looking
-  // line.
+  
   const completedRoute = useMemo(() => {
     if (!tripData || isTripDataPlaceholder) return [];
     const points = tripData.has_reversed
@@ -4057,10 +3599,7 @@ export default function CockpitViewExecutive({
     }
   }, [healthTimelineVehicle, timelineVehicleIds]);
 
-  // Column-header ("Excel-style") predicate — each flag lets a cascading
-  // options computation skip that one condition, so a column's own popover
-  // can show options based on every OTHER active filter without being
-  // narrowed by its own current selection.
+  
   const passesColumnFilters = (
     v: VehiclePosition,
     opts: {
@@ -4135,10 +3674,7 @@ export default function CockpitViewExecutive({
     ]
   );
 
-  // Cascading option sets for each column popover — computed from data that's
-  // already passed the top-level dropdowns and every OTHER column filter, so
-  // (like Excel) a column's own checkboxes only ever offer choices that are
-  // still reachable given what's currently selected elsewhere.
+  
   const cascadeBase = useMemo(
     () =>
       (filteredPositions ?? []).filter((v) => {
@@ -4280,21 +3816,12 @@ export default function CockpitViewExecutive({
       });
   }, [allPositions, pipelineHealthMap, search, worstPerformerSort]);
 
-  // Fleet-monitoring view: surface the vehicles that most need attention
-  // first (lowest health / driver score), not the best performers — same
-  // scoring as topPerformingRows, just ascending. topPerformingRows itself
-  // stays best-first since the AI Executive Summary's "Top driver
-  // performance" insight relies on topPerformingRows[0] being the best.
+  
   const worstPerformingRows = useMemo(() => {
     return [...topPerformingRows].reverse();
   }, [topPerformingRows]);
 
-  // "Worst Performing" is a re-ordering of the SAME already-filtered rows
-  // (tableRows), not a separate unfiltered view — so it respects every
-  // active Status/Health/column filter exactly like the normal sort does.
-  // topPerformingRows/worstPerformingRows above stay untouched since the AI
-  // Executive Summary relies on topPerformingRows[0] as the fleet-wide best
-  // driver, independent of whatever's filtered in the table right now.
+  
   const worstFirstTableRows = useMemo(() => {
     const scoreOf = (v: (typeof tableRows)[number]) =>
       worstPerformerSort === "health"
@@ -4318,10 +3845,7 @@ export default function CockpitViewExecutive({
     return h >= 50 && h < 80;
   }).length;
 
-  // Maintenance-window buckets: same 4 tiers the backend forecast used to
-  // return, but computed here from each vehicle's real live health (the
-  // same value shown in its popup) instead of the static per-vehicle
-  // "health" baked into fleet_config.py, which never changes at runtime.
+  
   const maintenanceVehicleBuckets = useMemo(() => {
     const buckets: Record<MaintenanceTierKey, (VehiclePosition & { liveHealth: number })[]> = {
       within_1_week: [],
@@ -4351,13 +3875,8 @@ export default function CockpitViewExecutive({
     const riskIndex = total
       ? Math.round(((criticalCount * 1.8 + warningCount * 0.75) / total) * 100)
       : 0;
-    // predictedFailures forecasts NEW vehicles likely to need service beyond
-    // what's already known — so it must only look at vehicles not already
-    // in the workshop. criticalCount/warningCount above are fleet-wide
-    // (including in_service vehicles, which are almost always unhealthy by
-    // definition), so reusing them here would double-count: a vehicle
-    // already sitting in serviceCount would also be counted again through
-    // criticalCount/warningCount, inflating maintenanceForecast.
+    
+    
     const nonServicePositions = allPositions.filter((v) => v.status !== "in_service");
     const nonServiceCritical = nonServicePositions.filter((v) => getLiveHealth(v) < 50).length;
     const nonServiceWarning = nonServicePositions.filter((v) => {
@@ -4608,9 +4127,8 @@ export default function CockpitViewExecutive({
 
   const topDriverVehicle = topPerformingRows[0];
   const MODULE_KEYS_FLEET = ["engine", "transmission", "battery", "body", "tyre"];
-  // Cross-reference helpers reused across the AI Executive Summary rows so
-  // each row can pull in a specific vehicle's own module/DTC/alert context
-  // instead of restating the same fleet-wide averages every time.
+  
+  
   const vehicleModuleEntry = (vehicleId: string | undefined) =>
     vehicleId
       ? ((automotiveFleetSummary as any)?.vehicles ?? []).find((v: any) => v.vehicle_id === vehicleId)
@@ -4717,12 +4235,7 @@ export default function CockpitViewExecutive({
       : `Overall health ${Math.round(getLiveHealth(priorityVehicle))}%`
     : "No immediate-care issue detected";
 
-  // The live fleet-wide alerts feed (openAlerts, above) only ever has data
-  // for vehicles that are actively streaming — a parked/in-service vehicle
-  // showing "no open alert" there is silent, not clean. Both rows below that
-  // name a specific vehicle fall back to that vehicle's own historical
-  // record when it isn't active, the same pattern already used by the chat
-  // assistant's equivalent topics.
+  
   const { data: worstVehicleHistAlerts } = useQuery({
     queryKey: ["vehicle-hist-alerts", lowestHealthVehicle?.vehicle_id],
     queryFn: () =>
@@ -4738,10 +4251,7 @@ export default function CockpitViewExecutive({
     staleTime: 60000,
   });
 
-  // Cross-referenced context reused by more than one row below, so a fact
-  // discovered once (e.g. the underperforming vehicle's own weakest module)
-  // can echo consistently wherever it's relevant, the same "read together"
-  // pattern the chat assistant's topics use.
+  
   const worstVehicleModule = extremeModuleFor(lowestHealthVehicle?.vehicle_id, "weakest");
   const worstVehicleAlert = lowestHealthVehicle
     ? openAlerts.find((a: any) => String(a.source_id) === lowestHealthVehicle.vehicle_id)
@@ -4765,10 +4275,8 @@ export default function CockpitViewExecutive({
   const priorityInWithinWeek = priorityVehicle
     ? maintenanceVehicleBuckets.within_1_week.some((v) => v.vehicle_id === priorityVehicle.vehicle_id)
     : false;
-  // priorityVehicle (health < 50) very often falls inside the within_1_week
-  // bucket (health < 40) too, since it's the single worst-health vehicle
-  // fleet-wide. Naming/counting the "rest of the queue" must exclude it —
-  // otherwise it gets sequenced a second time behind itself.
+  
+  
   const within1WeekOthers = maintenanceVehicleBuckets.within_1_week.filter(
     (v) => !priorityVehicle || v.vehicle_id !== priorityVehicle.vehicle_id
   );
@@ -4782,10 +4290,7 @@ export default function CockpitViewExecutive({
   const within2WeeksNotYetInService = within2WeeksVehicles.filter((v) => v.status !== "in_service");
   const within2WeeksAlreadyInService = within2WeeksVehicles.length - within2WeeksNotYetInService.length;
 
-  // Speed violations: no dedicated backend event exists for this, but every
-  // active vehicle's current speed + road_type is already in allPositions,
-  // so violations against a per-road-type limit can be computed live without
-  // any extra calls.
+  
   const ROAD_SPEED_LIMITS_KMH: Record<string, number> = {
     urban: 50,
     primary: 80,
@@ -4801,21 +4306,7 @@ export default function CockpitViewExecutive({
     .filter((v): v is NonNullable<typeof v> => v != null && v.overBy > 0)
     .sort((a, b) => b.overBy - a.overBy);
 
-  // Overheating caution. Ground truth first: contracts/DTC_master.json has
-  // exactly one genuine over-temperature DTC per module —
-  //   engine: P0217 "Engine Coolant Over Temperature" (critical/Thermal)
-  //   transmission: P0218 "Transmission Fluid Over Temperature" (critical/Hydraulic)
-  // Two lookalikes were deliberately excluded: P0128 is also "Thermal" for
-  // engine but describes the coolant running too COLD (opposite condition —
-  // no slow-down caution applies), and P0741 (transmission TCC stuck off)
-  // mentions "higher transmission temps" as a side-effect but its root fault
-  // is mechanical, not thermal, so it isn't a reliable overheating signal.
-  // If a matching DTC has actually been triggered by analysis on an open
-  // alert, that's used (and named in the sentence) over the fallback below.
-  // Only once an alert hasn't been analyzed yet do we fall back to the same
-  // top_10_features anomaly-attribution proxy as before (biggest driver of
-  // the alert is a temperature sensor). Multiple qualifying vehicles per
-  // module keep only the most severe (highest composite score).
+  
   const OVERHEAT_DTC_BY_MODULE = {
     engine: "P0217",
     transmission: "P0218",
@@ -4854,7 +4345,7 @@ export default function CockpitViewExecutive({
               }
             }
           } catch {
-            // skip — treated as no qualifying feature below
+            
           }
         }
         return { alert: a, topFeature };
@@ -5396,9 +4887,9 @@ export default function CockpitViewExecutive({
         <Box
           sx={{
             display: "grid",
-            // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
+            
             gap: "var(--app-gap)",
-            // alignItems: "stretch",
+            
             flex: 1,
             minHeight: 0,
             overflow: "hidden",
@@ -5429,9 +4920,8 @@ export default function CockpitViewExecutive({
                       position: "relative",
                       minHeight: 0,
                       height: "100%",
-                      // Deepens state/country border lines (and other basemap
-                      // linework) in light mode only — dark mode's own invert
-                      // filter chain below is untouched.
+                      
+                      
                       ...(!isDark && {
                         "& .leaflet-tile-pane": {
                           filter: "contrast(1.2) saturate(1.05)",
@@ -6875,17 +6365,8 @@ export default function CockpitViewExecutive({
               anchorPosition={
                 popoverPosition
                   ? (() => {
-                      // The Executive layout's map sits on the right side of
-                      // the screen (unlike Monitoring's, on the left). The
-                      // card used to anchor off the click point itself,
-                      // which — even after flipping left near the viewport
-                      // edge — still landed on top of the map most of the
-                      // time, since the click is by definition inside the
-                      // map's own bounds. Anchor off the map panel's left
-                      // edge instead (captured at click time in
-                      // handleVehicleMarkerClick) so the card always opens
-                      // beside the map, never over it, regardless of where
-                      // in the map the marker sits.
+                      
+                      
                       const vw = window.innerWidth;
                       const popupWidthPx = selectedIsActive ? vw * 0.36 : 310;
                       const gap = 16;
@@ -6927,56 +6408,52 @@ export default function CockpitViewExecutive({
 
                     bgcolor: "background.paper",
 
-                    // Initial position only — dragging updates this element's
-                    // transform imperatively (see applyDragTransform) rather
-                    // than through React state, to keep the drag smooth.
+                    
                     transform: "translate(0px, 0px)",
 
-                    /* ---------- GLOBAL TYPOGRAPHY ---------- */
-
-                    /* Default text */
+                    
                     "& .MuiTypography-root": {
                       fontSize: "10px",
                     },
 
-                    /* Headings */
+                    
                     "& h1, & h2, & h3, & h4, & h5, & h6": {
                       fontSize: "16px !important",
                       fontWeight: 700,
                     },
 
-                    /* Explicit heading typography */
+                    
                     '& .MuiTypography-root[font-weight="700"]': {
                       fontSize: "16px",
                     },
 
-                    /* Numeric values */
+                    
                     "& .metric-value, & .number-value": {
                       fontSize: "18px !important",
                       fontWeight: 800,
                     },
 
-                    /* Tabs */
+                    
                     "& .MuiTab-root": {
                       fontSize: "10px !important",
                     },
 
-                    /* Chips */
+                    
                     "& .MuiChip-label": {
                       fontSize: "10px",
                     },
 
-                    /* Buttons */
+                    
                     "& .MuiButtonBase-root": {
                       fontSize: "10px",
                     },
 
-                    /* Captions */
+                    
                     "& .MuiTypography-caption": {
                       fontSize: "10px",
                     },
 
-                    /* Graph text */
+                    
                     "& .recharts-text": {
                       fontSize: "10px !important",
                     },
@@ -7055,7 +6532,7 @@ export default function CockpitViewExecutive({
                           )
                         : vehicleDetail.module_health || {};
 
-                    // ── INACTIVE VEHICLE CARD ──────────────────────────────
+                    
                     if (vehicleDetail.status !== "active") {
                       const inactiveStatusMeta: Record<
                         string,
@@ -7746,7 +7223,7 @@ export default function CockpitViewExecutive({
                         </>
                       );
                     }
-                    // ── END INACTIVE CARD ──────────────────────────────────
+                    
 
                     return (
                       <>
@@ -7887,7 +7364,7 @@ export default function CockpitViewExecutive({
                               }}
                             >
                               <Typography
-                                // className="number-value"
+                                
                                 sx={{
                                   color: healthColor(h),
                                   lineHeight: 1,
@@ -7925,7 +7402,7 @@ export default function CockpitViewExecutive({
                                   }}
                                 >
                                   <Typography
-                                    // className="number-value"
+                                    
                                     sx={{
                                       color: healthColor(val),
                                       lineHeight: 1,
@@ -7958,7 +7435,7 @@ export default function CockpitViewExecutive({
                               sx={{
                                 minHeight: 25,
                                 height: 25,
-                                // mt: 1,
+                                
                                 bgcolor: isDark ? "#0f172a" : "#EEF9FD",
 
                                 borderBottom: `1px solid ${
@@ -8592,7 +8069,7 @@ export default function CockpitViewExecutive({
                                       display: "flex",
                                       gap: 1,
                                       height: "60%",
-                                      // alignItems: "stretch",
+                                      
                                     }}
                                   >
                                     {/* DRIVER SCORE */}
@@ -8950,7 +8427,7 @@ export default function CockpitViewExecutive({
       <Box
         sx={{
           display: "grid",
-          // gridTemplateColumns: { xs: "1fr", xl: "1.9fr 1fr 0.8fr" },
+          
           gap: 1,
           alignItems: "stretch",
           flex: 1,
@@ -9602,7 +9079,7 @@ export default function CockpitViewExecutive({
                               justifyContent: "space-between",
                               alignItems: "center",
                               mb: 1,
-                              // flexWrap: "wrap",
+                              
                               gap: 0.5,
                             }}
                           >
@@ -11281,7 +10758,7 @@ export default function CockpitViewExecutive({
                                         fontWeight: 600,
                                         color: "text.secondary",
                                         whiteSpace: "nowrap",
-                                        // ml: "2px",
+                                        
                                       }}
                                     >
                                       Road Type:

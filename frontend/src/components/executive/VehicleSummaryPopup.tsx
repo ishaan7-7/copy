@@ -95,26 +95,16 @@ export default function VehicleSummaryPopup({
   const queryClient = useQueryClient();
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [xAxisMode, setXAxisMode] = useState<"timestamp" | "mileage">("timestamp");
-  // Resolve is optimistic (below) but the underlying alert caches only
-  // refresh every 3-5s server-side — a background refetch landing inside
-  // that window can briefly report the alert as still OPEN and clobber the
-  // optimistic patch. resolvedIds pins the locally-resolved state so the
-  // badge/section placement can't flicker back, for the life of this popup.
+  
+  
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
-  // Decoupled from resolveMutation.isPending on purpose — that reflects the
-  // raw network promise, which can vary with backend load. A short, bounded
-  // local timer keeps the "Resolving…" → resolved transition predictable
-  // regardless of how long the actual request takes underneath.
+  
+  
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const enabled = open && !!vehicleId;
 
-  // isPlaceholderData guards against React Query's global keepPreviousData
-  // default (main.tsx): right after switching the selected vehicle, each of
-  // these queries can still hold the PREVIOUS vehicle's cached data while its
-  // new fetch is in flight — every isXPending flag below folds that in
-  // alongside isLoading so the UI shows a loading state instead of ever
-  // rendering one vehicle's data under another vehicle's popup.
+  
   const summaryQuery = useQuery({
     queryKey: ["vehSummaryPopup", vehicleId],
     queryFn: () => axios.get(`${API}/api/automotive/vehicle-summary/${vehicleId}`).then((r) => r.data),
@@ -189,9 +179,8 @@ export default function VehicleSummaryPopup({
         params: { source_id: vehicleId, module: alert.module, peak_ts: alert.peak_anomaly_ts },
         timeout: 70000,
       });
-      // Patch the analyze response straight into the dtc-history cache
-      // instead of relying on a refetch landing after the write — same fix
-      // as FleetAlertsPopup, so the row updates on the first click.
+      
+      
       if (data?.success) {
         const norm = (ts: string) => String(ts || "").slice(0, 16).replace(" ", "T");
         queryClient.setQueryData<any>(["vehDtcHistoryPopup", vehicleId], (prev: any) => {
@@ -208,11 +197,8 @@ export default function VehicleSummaryPopup({
           };
           return { ...(prev ?? {}), runs: [newRun, ...filtered] };
         });
-        // Recent DTC reads last_dtc off the vehicle-summary cache, not the
-        // dtc-history cache above — patch it directly too so the card
-        // updates the instant analysis completes instead of waiting on the
-        // next poll. Merge (prepend) rather than replace, so an earlier
-        // investigated fault isn't wiped out by this run coming back clean.
+        
+        
         queryClient.setQueryData<any>(["vehSummaryPopup", vehicleId], (prev: any) => {
           if (!prev) return prev;
           const prevTriggers: any[] = prev.last_dtc?.triggers ?? [];
@@ -226,11 +212,10 @@ export default function VehicleSummaryPopup({
           };
         });
       }
-      // No invalidateQueries here — same reasoning as FleetAlertsPopup: an
-      // immediate refetch risks racing the write and clobbering the patch
-      // above; the existing 15s poll reconciles with the server later.
+      
+      
     } catch {
-      // Swallow — row stays unanalyzed, button re-enables for retry
+      
     } finally {
       setAnalyzingId(null);
     }
@@ -269,10 +254,8 @@ export default function VehicleSummaryPopup({
   const lastTripData: any = summaryData?.last_trip_data ?? null;
   const isVehicleActive = fleetSimData?.status === "active";
   const lastDtc: any = summaryData?.last_dtc ?? null;
-  // Investigate can run the same alert's peak window more than once, and the
-  // precomputed historical DTC layer can repeat a code across modules-worth
-  // of entries — de-dupe by code so the same fault doesn't eat two of the
-  // card's two visible rows.
+  
+  
   const dtcTriggers: any[] = useMemo(() => {
     const raw: any[] = lastDtc?.triggers ?? [];
     const seen = new Set<string>();
@@ -289,18 +272,15 @@ export default function VehicleSummaryPopup({
   const topDrivers: any[] = (summaryData?.top_anomaly_drivers ?? []).filter((d: any) =>
     TOP_DRIVER_MODULES.includes(d.module)
   );
-  // One driver per module (its highest-scoring feature), scaled against the
-  // other two modules' top score — so at most one row ever reads 100%,
-  // instead of every module's own top driver saturating its own bar.
+  
+  
   const topDriversFlat = useMemo(() => {
     const best = TOP_DRIVER_MODULES.map((mod) => {
       const inMod = topDrivers.filter((d) => d.module === mod).sort((a, b) => b.score - a.score);
       return inMod[0] ?? null;
     }).filter(Boolean) as any[];
-    // Raw anomaly magnitude can differ by orders of magnitude across
-    // modules, so a linear ratio against the max routinely rounded the
-    // smaller two down to a visually-dead 0%. log1p compresses that range
-    // so all three read as meaningfully non-zero, with a floor as a backstop.
+    
+    
     const maxLog = Math.max(...best.map((d) => Math.log1p(d.score)), 1e-6);
     return best.map((d) => ({ ...d, pct: maxLog > 0 ? Math.max(4, (Math.log1p(d.score) / maxLog) * 100) : 0 }));
   }, [topDrivers]);

@@ -8,14 +8,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# --- Logging Setup ---
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("API_Gateway")
 
-# --- App Definition ---
+
 app = FastAPI(
     title="Master Dashboard API Gateway",
     description="Routes React frontend requests to isolated backend microservices"
@@ -29,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Microservice Registry ---
+
 SERVICES = {
     "writer":    "http://127.0.0.1:8001",
     "inference": "http://127.0.0.1:8002",
@@ -40,7 +40,7 @@ SERVICES = {
     "fleet":     "http://127.0.0.1:8009",
 }
 
-# --- Shared HTTP Session ---
+
 _http_session: aiohttp.ClientSession | None = None
 
 async def _get_session() -> aiohttp.ClientSession:
@@ -58,14 +58,10 @@ async def shutdown_session():
     if _http_session and not _http_session.closed:
         await _http_session.close()
 
-# --- Circuit Breaker ---
-# Prevents request pileup when a microservice is down or slow.
-# After _CB_THRESHOLD consecutive failures, the circuit opens for
-# _CB_OPEN_SEC and every request returns the last cached response
-# immediately (< 1 ms) instead of blocking for the full timeout.
+
 _CB_THRESHOLD  = 3
 _CB_OPEN_SEC   = 10.0
-_cb: dict = {}   # service_key -> {failures, open_until, last_ok}
+_cb: dict = {}
 
 def _cb_state(key: str) -> dict:
     if key not in _cb:
@@ -88,13 +84,12 @@ def _cb_open(key: str) -> bool:
     return time.monotonic() < _cb_state(key)["open_until"]
 
 
-# --- Generic Proxy Forwarder ---
 async def proxy_request(service_key: str, endpoint: str, request: Request, fallback_data: dict, timeout: int = 8, skip_cb: bool = False):
     base_url = SERVICES.get(service_key)
     if not base_url:
         return JSONResponse(status_code=500, content={"error": "Service routing not configured"})
 
-    # Circuit open — return last successful response or fallback immediately.
+
     if not skip_cb and _cb_open(service_key):
         cached = _cb_state(service_key)["last_ok"]
         return cached if cached is not None else fallback_data
@@ -135,13 +130,12 @@ async def proxy_request(service_key: str, endpoint: str, request: Request, fallb
         cached = _cb_state(service_key)["last_ok"]
         return cached if cached is not None else fallback_data
 
-# --- Gateway Routes ---
 
 @app.get("/health")
 def health_check():
     return {"status": "Master Gateway V2 is Online", "port": 8005}
 
-# 1. Writer Ops
+
 @app.get("/api/writer/metrics")
 async def get_writer_metrics(request: Request):
     return await proxy_request("writer", "/api/writer/metrics", request, fallback_data={})
@@ -150,7 +144,7 @@ async def get_writer_metrics(request: Request):
 async def get_writer_inspector(module: str, request: Request):
     return await proxy_request("writer", f"/api/writer/inspector/{module}", request, fallback_data={"data": []}, timeout=60)
 
-# 2. Inference Ops
+
 @app.get("/api/inference/metrics")
 async def get_inference_metrics(request: Request):
     fallback = {
@@ -163,7 +157,7 @@ async def get_inference_metrics(request: Request):
 async def get_inference_tail(module: str, request: Request):
     return await proxy_request("inference", f"/api/inference/tail/{module}", request, fallback_data={"data": []}, timeout=60)
 
-# 3. Gold Health
+
 @app.get("/api/gold/metrics")
 async def get_gold_metrics(request: Request):
     fallback = {"active_sims": [], "total_gold_rows": 0, "processing_lags": {}, "global_max_lag": 0, "fleet_vehicle_health_pct": None}
@@ -177,7 +171,7 @@ async def get_gold_config(request: Request):
 async def get_gold_history(sim_id: str, request: Request):
     return await proxy_request("gold", f"/api/gold/history/{sim_id}", request, fallback_data={"data": []}, timeout=60)
 
-# 4. Alerts & DTC
+
 @app.get("/api/alerts/metrics")
 async def get_alerts_metrics(request: Request):
     fallback = {"active_alerts_count": 0, "critical_vehicles": 0, "processing_lag": 0, "open_alerts": [], "closed_alerts": []}
@@ -187,7 +181,7 @@ async def get_alerts_metrics(request: Request):
 async def analyze_dtc(request: Request):
     return await proxy_request("dtc", "/api/dtc/analyze", request, fallback_data={"error": "DTC Service Offline"}, timeout=120, skip_cb=True)
 
-# 5. Telemetry Observer
+
 @app.get("/api/observer/snapshot")
 async def get_observer_snapshot(request: Request):
     fallback = {
@@ -197,8 +191,7 @@ async def get_observer_snapshot(request: Request):
     }
     return await proxy_request("observer", "/api/observer/snapshot", request, fallback_data=fallback)
 
-# 6. Fleet Simulator proxy — gives FleetCenter a gateway fallback instead
-#    of calling port 8009 directly with no error handling.
+
 @app.get("/api/fleet/{path:path}")
 async def proxy_fleet(path: str, request: Request):
     fallbacks: dict = {
@@ -209,10 +202,7 @@ async def proxy_fleet(path: str, request: Request):
     return await proxy_request("fleet", f"/api/fleet/{path}", request,
                                fallback_data=fallbacks.get(key, {}), timeout=5)
 
-# 7. Chat session reset token — bumped by `run.py --reset`. The Fleet
-#    Assistant checks this once on load and clears its own saved chat
-#    history (browser localStorage) if it doesn't match the last-seen value,
-#    since a backend reset can't reach into the browser on its own.
+
 _SESSION_RESET_FILE = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "data", "session_reset_token.json")
 )
@@ -237,6 +227,13 @@ try:
 except Exception as _import_err:
     import logging as _log
     _log.getLogger(__name__).warning(f"Automotive endpoints not loaded: {_import_err}")
+
+try:
+    from replay_control import router as replay_control_router
+    app.include_router(replay_control_router)
+except Exception as _import_err:
+    import logging as _log
+    _log.getLogger(__name__).warning(f"Replay control endpoints not loaded: {_import_err}")
 
 @app.on_event("startup")
 async def _start_background_tasks():

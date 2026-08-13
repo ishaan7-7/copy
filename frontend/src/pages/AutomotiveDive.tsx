@@ -693,9 +693,8 @@ export default function AutomotiveDive({
   const [selectedModule, setSelectedModule] = useState<string>(
     ALL_MODULES.includes(_initModule) ? _initModule : "engine"
   );
-  // Mirror this page's own selection into the shared store so the globally
-  // mounted FleetChatAssistant knows which vehicle/module is currently in
-  // view without needing its own duplicate selection UI.
+  
+  
   useEffect(() => {
     setGlobalSelectedVehicle(selectedVehicle || null);
   }, [selectedVehicle, setGlobalSelectedVehicle]);
@@ -776,12 +775,7 @@ export default function AutomotiveDive({
     wasActiveRef.current = isActive;
   }, [isActive]);
 
-  // isPlaceholderData guards against React Query's global keepPreviousData
-  // default (main.tsx): right after switching the selected vehicle, a query
-  // keyed on selectedVehicle can still hold the PREVIOUS vehicle's cached
-  // data while its new fetch is in flight. Every isXPending flag below folds
-  // that in alongside isLoading so derived data resets to empty/undefined
-  // instead of briefly rendering one vehicle's data under another's view.
+  
   const sensorQuery = useQuery({
     queryKey: ["autoSensorHistory", selectedVehicle, selectedModule],
     queryFn: () =>
@@ -850,7 +844,7 @@ export default function AutomotiveDive({
   const isVehicleDecompPending = vehicleDecompQuery.isLoading || vehicleDecompQuery.isPlaceholderData;
   const vehicleDecompSafeData = isVehicleDecompPending ? undefined : vehicleDecompQuery.data;
 
-  // Module analysis cross-fleet (Bronze stats per vehicle per module)
+  
   const crossfleetQuery = useQuery({
     queryKey: ["autoCrossfleet", analysisModule],
     queryFn: () =>
@@ -877,13 +871,8 @@ export default function AutomotiveDive({
       axios.post(`${API}/api/alerts/resolve/${encodeURIComponent(alert.alert_id)}`, null, {
         params: { source_id: selectedVehicle, module: alert.module },
       }),
-    // Optimistic: get_vehicle_alerts's own live cache only refreshes on its
-    // background loop's cadence, which can lag far more than a few seconds
-    // on a device with a large accumulated alert backlog — without this the
-    // Resolve button looked like it did nothing until that cache caught up.
-    // Patch this vehicle's query locally first so the row flips to Resolved
-    // immediately; other pages reading the same alert reconcile with the
-    // real server state via their own poll intervals shortly after.
+    
+    
     onMutate: async (alert: any) => {
       const key = ["autoVehicleAlerts", selectedVehicle];
       await queryClient.cancelQueries({ queryKey: key });
@@ -935,7 +924,7 @@ export default function AutomotiveDive({
     dtcRunMap[`${r.module}|${normPeakTs(r.peak_ts)}`] = r;
   }
 
-  // Module tab sensor timeline  -  separate from vehicle tab's sensorQuery
+  
   const moduleTimelineQuery = useQuery({
     queryKey: ["autoModuleTimeline", selectedVehicle, analysisModule],
     queryFn: () =>
@@ -1005,9 +994,8 @@ export default function AutomotiveDive({
     enabled: !!selectedVehicle && viewMode === "summary" && !isHistorical,
     refetchInterval: isActive && autoRefresh && viewMode === "summary" && !isHistorical ? 5000 : false,
   });
-  // Not vehicle-keyed (queryKey has no selectedVehicle) — a genuine fleet-wide
-  // snapshot, so keepPreviousData here is fine as-is; no pending flag needed.
-
+  
+  
   const bronzeStatsQuery = useQuery({
     queryKey: ["vehicleBronzeStats", selectedVehicle],
     queryFn: () =>
@@ -1158,7 +1146,7 @@ export default function AutomotiveDive({
   })();
   const fleetStats = fleetQuery.data?.fleet_stats || {};
 
-  // BRONZE derived
+  
   const SERVICE_INTERVAL_KM = 15000;
   const sensorData: any[] = isSensorPending ? [] : sensorQuery.data?.data || [];
   const latestBronzeRow: any =
@@ -1177,7 +1165,7 @@ export default function AutomotiveDive({
     return sampled.map((r: any) => ({ ...r, mileage: convertDistance(r.mileage ?? 0, region) }));
   }, [sensorData, region]);
 
-  // SILVER derived
+  
   const moduleHealthData: any[] = useMemo(() => {
     const raw: any[] = moduleHealthSafeData?.data || [];
     const factor = Math.max(1, Math.floor(raw.length / 400));
@@ -1216,7 +1204,7 @@ export default function AutomotiveDive({
       ? "#eab308"
       : "#22c55e";
 
-  // GOLD derived
+  
   const healthRaw = useMemo(() => {
     const base: any[] = vehicleHealthSafeData?.data || [];
     if (!sseConnected || isHistorical || !selectedVehicle) return base;
@@ -1271,11 +1259,8 @@ export default function AutomotiveDive({
   const nextServiceKm: number | null = summaryData?.service_info?.next_service_in_km ?? null;
   const summaryServiceProgress = odometerKm != null ? Math.min(100, ((odometerKm % 15000) / 15000) * 100) : 0;
   const topDrivers: any[] = summaryData?.top_anomaly_drivers ?? [];
-  // Backend now returns top-3-per-module (not top-5 overall) so every
-  // module gets a slot instead of 1-2 high-magnitude modules crowding out
-  // the rest. Scale each row's bar against its OWN module's max, not the
-  // global max — otherwise modules with naturally smaller feature
-  // magnitudes render as near-empty bars even for their worst driver.
+  
+  
   const groupedTopDrivers = useMemo(() => {
     const groups = new Map<string, any[]>();
     for (const d of topDrivers) {
@@ -1343,7 +1328,7 @@ export default function AutomotiveDive({
 
   const histMaxDriverScore = histTopDrivers.length > 0 ? Math.max(...histTopDrivers.map((d) => d.score)) : 1;
 
-  // Fleet/module analysis derived
+  
   const fleetChartData = useMemo(
     () =>
       vehicles.map((v: any) => ({
@@ -1375,7 +1360,7 @@ export default function AutomotiveDive({
       {
         field: "health_score",
         headerName: "HEALTH",
-        // width: 95,
+        
         flex: 1.3,
         cellStyle: (params) => ({
           fontWeight: 700,
@@ -1403,7 +1388,7 @@ export default function AutomotiveDive({
       {
         field: "data_source",
         headerName: "SOURCE",
-        // width: 90,
+        
         flex: 1.3,
         cellRenderer: (params: any) => (
           <Chip

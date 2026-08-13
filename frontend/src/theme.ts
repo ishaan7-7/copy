@@ -236,7 +236,7 @@ export const darkTheme = createTheme({
       selected: alpha(cockpitDark.blue, 0.14),
       disabledBackground: alpha("#ffffff", 0.06),
     },
-    // divider: "#1e2433",
+    
   },
   typography: baseTypography,
   shape: { borderRadius: 8 },

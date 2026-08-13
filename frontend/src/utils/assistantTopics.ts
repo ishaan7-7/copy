@@ -1,10 +1,4 @@
-// Page-aware suggested topics for FleetChatAssistant. Each page/role gets
-// 4-5 curated topics, each one deliberately fusing 2+ real backend sources
-// into a single dense, analyst-style answer — the kind of thing you'd
-// otherwise have to visit several dashboard sections to piece together
-// yourself. Every number is fetched live; only the narrative structure
-// (headline -> synthesis -> named evidence -> comparison -> recommendation)
-// is authored. See the plan this was built from for the full endpoint audit.
+
 
 export type AssistantRole = "executive" | "monitoring" | "engineering";
 export type PageKey = "cockpit-view" | "fleet-health" | "automotive" | "dtc" | "datascience";
@@ -32,9 +26,7 @@ export interface AssistantTopic {
   respond: (data: Record<string, any>, ctx: TopicContext) => string;
 }
 
-// A plain string entry reuses the existing fleet-wide keyword matcher already
-// in FleetChatAssistant.tsx instead of duplicating that logic here — the
-// label IS the question text sent through the legacy matcher.
+
 export type TopicEntry = AssistantTopic | string;
 
 const PIPELINE_API = "http://127.0.0.1:8005";
@@ -43,11 +35,6 @@ const MODULE_KEYS = ["engine", "transmission", "battery", "body", "tyre"];
 const NO_VEHICLE_MSG =
   "Select a vehicle on this page first, then ask me again and I'll look at that vehicle specifically.";
 
-// ---------------------------------------------------------------------------
-// House-style narrative helpers — reused across every topic so the voice is
-// consistent: a plain number, then an honest read of whether it's good or
-// bad against a real threshold, never just a bare fact.
-// ---------------------------------------------------------------------------
 
 function liveHealthOf(v: any): number {
   return Number(v?.health ?? 0);
@@ -92,11 +79,7 @@ function withArticle(word: string): string {
   return `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
 }
 
-// Vehicles not currently "active" (parked/in_service) have no live telemetry
-// feeding the real-time alert/DTC pipelines, but the backend keeps a
-// precomputed historical layer (data/computed/{id}/*.json) for exactly
-// these vehicles — richer than the live-only sources, and only these
-// vehicles have it (active vehicles 404 on the historical endpoints).
+
 function vehicleStatusOf(ctx: TopicContext): string | undefined {
   return (ctx.fleetPositions ?? []).find((v) => v.vehicle_id === ctx.selectedVehicle)?.status;
 }
@@ -105,9 +88,7 @@ function worstAtRiskVehicle(positions: any[]): any {
   return [...positions].filter((v) => liveHealthOf(v) < 50).sort((a, b) => liveHealthOf(a) - liveHealthOf(b))[0];
 }
 
-// ---------------------------------------------------------------------------
-// Executive @ Cockpit View
-// ---------------------------------------------------------------------------
+
 const executiveCockpit: TopicEntry[] = [
   {
     key: "todays-priority",
@@ -244,9 +225,7 @@ const executiveCockpit: TopicEntry[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Monitoring @ Cockpit View
-// ---------------------------------------------------------------------------
+
 const monitoringCockpit: TopicEntry[] = [
   {
     key: "workshop-queue",
@@ -255,12 +234,8 @@ const monitoringCockpit: TopicEntry[] = [
     fetches: (ctx) => {
       const inService = (ctx.fleetPositions ?? []).filter((v) => v.status === "in_service");
       const specs: FetchSpec[] = [{ key: "alerts", url: `${PIPELINE_API}/api/alerts/metrics` }];
-      // Every vehicle in this queue is, by definition, off the road — the
-      // live fleet-wide alerts feed has nothing to say about vehicles that
-      // aren't streaming, so "0 have a live alert" would otherwise silently
-      // read as "these are all fine," which is wrong: they're in the
-      // workshop for a documented reason sitting in their own historical
-      // record.
+      
+      
       for (const v of inService) {
         specs.push({ key: `hist_${v.vehicle_id}`, url: `${PIPELINE_API}/api/automotive/vehicle/${v.vehicle_id}/alerts` });
       }
@@ -343,9 +318,7 @@ const monitoringCockpit: TopicEntry[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Monitoring @ Fleet Health
-// ---------------------------------------------------------------------------
+
 const monitoringFleetHealth: TopicEntry[] = [
   {
     key: "worst-module",
@@ -465,9 +438,7 @@ const monitoringFleetHealth: TopicEntry[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Monitoring @ Vehicle Deep Dive (automotive)
-// ---------------------------------------------------------------------------
+
 const monitoringAutomotive: TopicEntry[] = [
   {
     key: "this-vehicle-health",
@@ -640,9 +611,7 @@ const monitoringAutomotive: TopicEntry[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Monitoring @ DTC Investigation
-// ---------------------------------------------------------------------------
+
 const monitoringDtc: TopicEntry[] = [
   "DTC P0217",
   {
@@ -740,9 +709,7 @@ const monitoringDtc: TopicEntry[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Engineering @ Systems Ops (DataScience)
-// ---------------------------------------------------------------------------
+
 const engineeringDatascience: TopicEntry[] = [
   "Backend data availability",
   {
@@ -854,12 +821,7 @@ export function topicsFor(pageKey: PageKey | null, role: AssistantRole): TopicEn
   return PAGE_TOPICS[pageKey]?.[role] ?? [];
 }
 
-// Every real topic across every page and role, flattened — used so a typed
-// question can be answered from wherever the user actually is, not just the
-// page it was designed for. Page/role still fully controls which topics show
-// up as suggested chips (topicsFor above); this only widens what typed text
-// can resolve to. Plain-string aliases are excluded — they already resolve
-// via the universal answerFor()/DTC-knowledge fallback regardless of page.
+
 export const ALL_TOPICS: AssistantTopic[] = Object.values(PAGE_TOPICS).flatMap((byRole) =>
   Object.values(byRole ?? {}).flatMap((topics) =>
     (topics ?? []).filter((t): t is AssistantTopic => typeof t !== "string")

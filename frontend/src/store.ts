@@ -119,11 +119,8 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'telemetrix-app-store',
-      // Only the region survives a refresh — it's the one piece of state
-      // that also lives on the backend (the fleet simulator's active
-      // region), so losing it client-side while the backend keeps whatever
-      // it had is exactly what produced the toggle/map mismatch after a
-      // refresh or revisit. Everything else here is per-session UI state.
+      
+      
       partialize: (state) => ({ region: state.region }),
     }
   )

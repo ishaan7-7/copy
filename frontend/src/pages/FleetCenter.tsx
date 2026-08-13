@@ -308,24 +308,6 @@ function MapController({
   return null;
 }
 
-//   useEffect(() => {
-//     if (
-//       selectedVehicle &&
-//       tripData &&
-//       tripData.route.length > 0 &&
-//       lastFittedVehicle.current !== selectedVehicle
-//     ) {
-//       lastFittedVehicle.current = selectedVehicle;
-//       const bounds = L.latLngBounds(tripData.route.map((p) => [p.lat, p.lng]));
-//       map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 7, duration: 1.2 });
-//     }
-//     if (!selectedVehicle) {
-//       lastFittedVehicle.current = null;
-//       map.flyTo([39.8, -98.5], 4, { duration: 0.8 });
-//     }
-//   }, [selectedVehicle, tripData, map]);
-//   return null;
-// }
 
 const CHART_FONT = '"Inter", "Segoe UI", Roboto, Arial, sans-serif';
 
@@ -365,11 +347,7 @@ function KpiCard({
         gap: 0.7,
         transition: "0.2s ease",
 
-        // "&:hover": {
-        //   transform: "translateY(-2px)",
-        //   boxShadow: 3,
-        //   bgcolor: alpha(color, 0.12),
-        // },
+        
       }}
     >
       {/* Top Row → Icon + Title */}
@@ -456,7 +434,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
       radius: ["55%", "80%"],
       center: ["50%", "50%"],
       avoidLabelOverlap: false,
-      // confine: true,
+      
 
       extraCssText: `
         white-space: nowrap;
@@ -497,11 +475,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
       {
         type: "pie",
 
-        // radius: ["55%", "80%"],
-
-        // center: ["50%", "50%"],
-
-        // avoidLabelOverlap: true,
+        
         radius: ["55%", "80%"],
         center: ["50%", "50%"],
         avoidLabelOverlap: false,
@@ -576,10 +550,7 @@ function DistributionChart({ summary }: { summary: FleetSummary }) {
         flexDirection: "column",
         gap: 1,
 
-        // "&:hover": {
-        //   boxShadow: 3,
-        //   transform: "translateY(-2px)",
-        // },
+        
       }}
     >
       {/* Header */}
@@ -1009,11 +980,7 @@ export default function FleetCenter() {
 
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
 
-  // const handleCloseVehicle = () => {
-  //   setSelectedVehicle(null);
-  //   setPopoverPosition(null);
-  // };
-
+  
   const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
   const dragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -1390,7 +1357,7 @@ export default function FleetCenter() {
         display: "flex",
         flexDirection: "column",
         gap: 1.5,
-        // overflow: "auto",
+        
       }}
     >
       <style>{`
@@ -1428,7 +1395,7 @@ export default function FleetCenter() {
               <Box
                 sx={{
                   flex: 1,
-                  // position: "relative",
+                  
                   minHeight: 0,
                   p: 1,
                 }}
@@ -1539,8 +1506,8 @@ export default function FleetCenter() {
             <Paper
               sx={{
                 height: "445px",
-                // overflow: "hidden",
-                // position: "relative",
+                
+                
                 border: `1px solid ${theme.palette.divider}`,
                 display: "flex",
                 flexDirection: "column",
@@ -2464,51 +2431,49 @@ export default function FleetCenter() {
 
               transform: `translate(${dragPos.x}px, ${dragPos.y}px) !important`,
 
-              /* ---------- GLOBAL TYPOGRAPHY ---------- */
-
-              /* Default text */
+              
               "& .MuiTypography-root": {
                 fontSize: "10px",
               },
 
-              /* Headings */
+              
               "& h1, & h2, & h3, & h4, & h5, & h6": {
                 fontSize: "16px !important",
                 fontWeight: 700,
               },
 
-              /* Explicit heading typography */
+              
               '& .MuiTypography-root[font-weight="700"]': {
                 fontSize: "16px",
               },
 
-              /* Numeric values */
+              
               "& .metric-value, & .number-value": {
                 fontSize: "18px !important",
                 fontWeight: 800,
               },
 
-              /* Tabs */
+              
               "& .MuiTab-root": {
                 fontSize: "10px !important",
               },
 
-              /* Chips */
+              
               "& .MuiChip-label": {
                 fontSize: "10px",
               },
 
-              /* Buttons */
+              
               "& .MuiButtonBase-root": {
                 fontSize: "10px",
               },
 
-              /* Captions */
+              
               "& .MuiTypography-caption": {
                 fontSize: "10px",
               },
 
-              /* Graph text */
+              
               "& .recharts-text": {
                 fontSize: "10px !important",
               },
@@ -2544,7 +2509,7 @@ export default function FleetCenter() {
               sx={{
                 fontWeight: 700,
                 fontSize: "14px !important",
-                // color: "text.secondary",
+                
               }}
             >
               Vehicle Insights
@@ -2710,7 +2675,7 @@ export default function FleetCenter() {
                         }}
                       >
                         <Typography
-                          // className="number-value"
+                          
                           sx={{
                             color: healthColor(h),
                             lineHeight: 1,
@@ -2748,7 +2713,7 @@ export default function FleetCenter() {
                             }}
                           >
                             <Typography
-                              // className="number-value"
+                              
                               sx={{
                                 color: healthColor(val),
                                 lineHeight: 1,
@@ -2781,7 +2746,7 @@ export default function FleetCenter() {
                         sx={{
                           minHeight: 25,
                           height: 25,
-                          // mt: 1,
+                          
                           bgcolor: "#EEF9FD", // overall light background
 
                           borderBottom: `1px solid #CDECF5`,
@@ -3349,7 +3314,7 @@ export default function FleetCenter() {
                                 display: "flex",
                                 gap: 1,
                                 height: "60%",
-                                // alignItems: "stretch",
+                                
                               }}
                             >
                               {/* DRIVER SCORE */}
