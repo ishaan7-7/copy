@@ -1963,8 +1963,11 @@ def _sync_refresh_automotive_cache() -> None:
 def _precompute_vehicle_live_details() -> None:
     fleet_live = _get_live("fleet-summary")
     if not fleet_live:
+        print("Live detail precompute: no fleet-summary cached yet, skipping this cycle")
         return
     vehicle_ids = [v.get("vehicle_id") for v in fleet_live.get("vehicles", [])]
+    ok_count = 0
+    fail_count = 0
     for vid in vehicle_ids:
         if not vid:
             continue
@@ -1978,8 +1981,12 @@ def _precompute_vehicle_live_details() -> None:
                 "kpi_snapshot": kpi_snapshot,
                 "service_info": {"odometer_km": odometer_km, "next_service_in_km": next_service_in_km},
             })
-        except Exception:
-            pass
+            ok_count += 1
+        except Exception as e:
+            fail_count += 1
+            print(f"Live detail precompute failed for {vid}: {e}")
+    if fail_count and not ok_count:
+        print(f"Live detail precompute: ALL {fail_count} vehicles failed this cycle")
 
 
 async def automotive_live_loop() -> None:

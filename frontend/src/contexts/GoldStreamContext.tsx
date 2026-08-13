@@ -116,7 +116,9 @@ export function GoldStreamProvider({ children }: { children: React.ReactNode }) 
               for (const pt of pts) appendRing(vid, pt);
             }
           }
-          if (payload.vehicle_live) setVehicleLive(payload.vehicle_live);
+          if (payload.vehicle_live && Object.keys(payload.vehicle_live).length > 0) {
+            setVehicleLive((prev) => ({ ...prev, ...payload.vehicle_live }));
+          }
         } catch {}
       };
 

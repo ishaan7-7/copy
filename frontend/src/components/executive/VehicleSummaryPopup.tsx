@@ -106,7 +106,7 @@ export default function VehicleSummaryPopup({
 
   const enabled = open && !!vehicleId;
   const { vehicles: sseVehicles, ringBuffer, vehicleLive } = useGoldStream();
-  const { behavior: sseBehavior } = useFleetBehaviorStream();
+  const { behavior: sseBehavior, trip: sseTrip } = useFleetBehaviorStream();
 
 
   const summaryQuery = useQuery({
@@ -266,7 +266,18 @@ export default function VehicleSummaryPopup({
   const nextServiceKm: number | null = liveDetail?.service_info?.next_service_in_km ?? summaryData?.service_info?.next_service_in_km ?? null;
   const serviceProgress = odometerKm != null ? Math.min(100, ((odometerKm % 15000) / 15000) * 100) : 0;
   const fleetSimData: any = summaryData?.fleet_sim ?? {};
-  const tripData: any = summaryData?.trip_data ?? null;
+  const liveTrip = vehicleId ? sseTrip[vehicleId] : undefined;
+  const restTripData: any = summaryData?.trip_data ?? null;
+  const tripData: any = liveTrip
+    ? {
+        ...restTripData,
+        progress_pct: liveTrip.progress_pct ?? restTripData?.progress_pct,
+        distance_completed_km: liveTrip.distance_completed_km ?? restTripData?.distance_completed_km,
+        distance_total_km: liveTrip.distance_total_km ?? restTripData?.distance_total_km,
+        origin: liveTrip.origin ?? restTripData?.origin,
+        destination: liveTrip.destination ?? restTripData?.destination,
+      }
+    : restTripData;
   const lastTripData: any = summaryData?.last_trip_data ?? null;
   const isVehicleActive = fleetSimData?.status === "active";
   const lastDtc: any = summaryData?.last_dtc ?? null;

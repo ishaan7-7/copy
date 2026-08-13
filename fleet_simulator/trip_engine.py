@@ -43,6 +43,7 @@ class VehicleState:
     route: DenseRoute
     position_index: int = 0
     direction: int = 1
+    segment_progress_m: float = 0.0
     has_reversed: bool = False
     elapsed_km: float = 0.0
     current_speed: float = 0.0
@@ -406,7 +407,7 @@ class TripEngine:
             prev_pt = pts[state.position_index]
 
             steps_to_advance = 0
-            remaining_m = distance_m
+            remaining_m = state.segment_progress_m + distance_m
             check_idx = state.position_index
 
             while remaining_m > 0:
@@ -428,16 +429,20 @@ class TripEngine:
                 else:
                     break
 
+            state.segment_progress_m = remaining_m
+
             new_idx = state.position_index + (steps_to_advance * state.direction)
             if new_idx >= len(pts) - 1:
                 state.direction = -1
                 state.has_reversed = True
                 state.behavior.reset_leg()
+                state.segment_progress_m = 0.0
                 new_idx = len(pts) - 2
             elif new_idx <= 0:
                 state.direction = 1
                 state.has_reversed = True
                 state.behavior.reset_leg()
+                state.segment_progress_m = 0.0
                 new_idx = 1
 
             state.position_index = new_idx
@@ -603,13 +608,15 @@ class TripEngine:
                 "road_type": p.road_type,
             })
 
-        progress = st.position_index / max(n_pts - 1, 1)
+        base_km = pts[st.position_index].cumulative_km if st.direction == 1 else st.route.total_km - pts[st.position_index].cumulative_km
+        distance_completed_km = base_km + (st.segment_progress_m / 1000.0)
+        progress = distance_completed_km / max(st.route.total_km, 0.001)
 
         return {
             "route": route_coords,
             "completed_index": min(completed_sampled, len(route_coords) - 1),
-            "progress_pct": round(progress * 100, 1),
-            "distance_completed_km": round(pts[st.position_index].cumulative_km if st.direction == 1 else st.route.total_km - pts[st.position_index].cumulative_km, 1),
+            "progress_pct": round(min(max(progress * 100, 0.0), 100.0), 1),
+            "distance_completed_km": round(distance_completed_km, 2),
             "distance_total_km": round(st.route.total_km, 1),
             # True once the vehicle has bounced off either route end at least
             # once — the completed/remaining split below only makes sense for

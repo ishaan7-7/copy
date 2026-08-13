@@ -16,13 +16,23 @@ export interface VehicleBehavior {
   trip_distance_km: number;
 }
 
+export interface VehicleTripProgress {
+  progress_pct: number | null;
+  distance_completed_km: number | null;
+  distance_total_km: number | null;
+  origin: string | null;
+  destination: string | null;
+}
+
 interface FleetBehaviorStreamState {
   behavior: Record<string, VehicleBehavior>;
+  trip: Record<string, VehicleTripProgress>;
   connected: boolean;
 }
 
 const FleetBehaviorStreamContext = createContext<FleetBehaviorStreamState>({
   behavior: {},
+  trip: {},
   connected: false,
 });
 
@@ -32,6 +42,7 @@ export function useFleetBehaviorStream() {
 
 export function FleetBehaviorStreamProvider({ children }: { children: React.ReactNode }) {
   const [behavior, setBehavior] = useState<Record<string, VehicleBehavior>>({});
+  const [trip, setTrip] = useState<Record<string, VehicleTripProgress>>({});
   const [connected, setConnected] = useState(false);
   const esRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,6 +63,9 @@ export function FleetBehaviorStreamProvider({ children }: { children: React.Reac
           const payload = JSON.parse(e.data);
           if (payload.behavior) {
             setBehavior((prev) => ({ ...prev, ...payload.behavior }));
+          }
+          if (payload.trip) {
+            setTrip((prev) => ({ ...prev, ...payload.trip }));
           }
         } catch {}
       };
@@ -75,7 +89,7 @@ export function FleetBehaviorStreamProvider({ children }: { children: React.Reac
   }, []);
 
   return (
-    <FleetBehaviorStreamContext.Provider value={{ behavior, connected }}>
+    <FleetBehaviorStreamContext.Provider value={{ behavior, trip, connected }}>
       {children}
     </FleetBehaviorStreamContext.Provider>
   );

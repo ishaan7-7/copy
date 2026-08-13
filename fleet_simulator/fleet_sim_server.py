@@ -107,12 +107,22 @@ def _broadcast_behavior_snapshot() -> None:
     if not _sse_clients:
         return
     behavior: dict = {}
+    trip: dict = {}
     for vid in list(engine.active_vehicles.keys()):
         data = engine.get_behavior_data(vid)
         if data:
             behavior[vid] = data
-    if behavior:
-        _sse_broadcast(json.dumps({"type": "behavior_delta", "behavior": behavior}))
+        trip_data = engine.get_trip_data(vid)
+        if trip_data:
+            trip[vid] = {
+                "progress_pct": trip_data.get("progress_pct"),
+                "distance_completed_km": trip_data.get("distance_completed_km"),
+                "distance_total_km": trip_data.get("distance_total_km"),
+                "origin": trip_data.get("origin"),
+                "destination": trip_data.get("destination"),
+            }
+    if behavior or trip:
+        _sse_broadcast(json.dumps({"type": "behavior_delta", "behavior": behavior, "trip": trip}))
 
 
 async def _init_and_run():
