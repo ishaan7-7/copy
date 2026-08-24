@@ -1,0 +1,655 @@
+PlantCode,FixedAssetNo,AssetDesc,AcqValue,Manufacturer
+P1010,000020000001,Torque Application Unit,40946.19,DMG MORI
+P1010,000020000002,Vision Inspection Station,25758.17,Yaskawa
+P1010,000020000003,Adhesive Dispensing Unit,71408.79,ABB Robotics
+P1010,000020000004,Riveting Station,38911.90,KUKA AG
+P1010,000020000005,Coil Winding Machine,165682.88,Haas Automation
+P1010,000020000006,Stamping Press,513455.99,Hexagon AB
+P1010,000020000007,Injection Molding Machine,243745.10,Dematic
+P1010,000020000008,Automated Guided Vehicle,60301.88,Lincoln Electric
+P1010,000020000009,Overhead Gantry Loader,106076.65,Ingersoll
+P1010,000020000010,Torque Application Unit,25046.09,Mazak Corporation
+P1010,000020000011,Robotic Welding Cell,146244.23,KUKA
+P1010,000020000012,Robotic Welding Cell,211683.81,Yaskawa Motoman
+P1010,000020000013,Paint Application Robot,344016.80,Mazak
+P1010,000020000014,Ultrasonic Welding Station,32611.29,Bosch Rexroth
+P1010,000020000015,Leak Test Station,54875.80,Yaskawa Motoman
+P1010,000020000016,Riveting Station,61187.04,FANUC
+P1010,000020000017,Automated Guided Vehicle,117220.87,KUKA AG
+P1010,000020000018,Final Functional Test Bench,126729.51,KUKA AG
+P1010,000020000019,Palletizing Robot,169819.99,DMG MORI
+P1010,000020000020,Vision Inspection Station,38043.11,Miller Electric
+P1010,000020000021,Torque Application Unit,41123.30,schuler group
+P1010,000020000022,Riveting Station,33605.85,KUKA AG
+P1010,000020000023,Robotic Welding Cell,213431.44,Schuler Group
+P1010,000020000024,Leak Test Station,20017.18,Durr AG
+P1010,000020000025,Ultrasonic Welding Station,44742.52,Lincoln Electric
+P1010,000020000026,Vision Inspection Station,73694.24,Lincoln Electric
+P1010,000020000027,Wheel Alignment Rig,65648.05,KUKA AG
+P1010,000020000028,Assembly Torque Wrench Station,14072.43,miller electric
+P1010,000020000029,Coil Winding Machine,183818.85,dmg mori
+P1010,000020000030,Leak Test Station,55646.22,KUKA
+P1010,000020000031,Vision Inspection Station,38173.50,Atlas Copco
+P1010,000020000032,Ultrasonic Welding Station,34290.96,Kuka Ag
+P1010,000020000033,Vision Inspection Station,57279.91,KUKA
+P1010,000020000034,Final Functional Test Bench,160631.95,Lincoln
+P1010,000020000035,Hydraulic Press,155405.43,Kuka Ag
+P1010,000020000036,Paint Application Robot,223650.43,Mazak
+P1010,000020000037,Assembly Torque Wrench Station,18861.02,Carl Zeiss Industrial Metrology
+P1010,000020000038,Ultrasonic Welding Station,30219.06,FANUC Corporation
+P1010,000020000039,Induction Heating Unit,75162.55,comau
+P1010,000020000040,Coil Winding Machine,208153.27,Mazak Corporation
+P1010,000020000041,Screw Fastening Station,13869.53,KUKA
+P1010,000020000042,Automated Guided Vehicle,43199.88,AIDA
+P1010,000020000043,Hydraulic Press,160472.73,Yaskawa Motoman
+P1010,000020000044,Hydraulic Press,315179.53,KUKA AG
+P1010,000020000045,Conveyor System,137568.02,Abb Robotics
+P1010,000020000046,Riveting Station,28598.44,FANUC Corporation
+P1010,000020000047,Vision Inspection Station,36594.34,Durr AG
+P1010,000020000048,Assembly Torque Wrench Station,10646.11,FANUC Corporation
+P1010,000020000049,Battery Pack Assembly Cell,309996.11,KUKA AG
+P1010,000020000050,Induction Heating Unit,63490.43,FANUC Corporation
+P1010,000020000051,CNC Machining Center,360194.79,Rockwell
+P1010,000020000052,Palletizing Robot,120881.85,Miller Electric
+P1010,000020000053,Dimensional Measurement Arm,143811.20,Eisenmann SE
+P1010,000020000054,,69972.41,Mazak Corporation
+P1010,000020000055,Hydraulic Press,389438.41,ABB Robotics
+P1010,000020000056,Conveyor System,47928.29,KUKA
+P1010,000020000057,Automated Guided Vehicle,63138.18,AIDA Engineering
+P1010,000020000058,Ultrasonic Welding Station,69622.07,ABB
+P1010,000020000059,Conveyor System,98728.32,FANUC
+P1010,000020000060,Dimensional Measurement Arm,138163.91,Carl Zeiss Industrial Metrology
+P1010,000020000061,Dimensional Measurement Arm,138547.30,Rockwell
+P1010,000020000062,Coil Winding Machine,159886.42,kuka ag
+P1010,000020000063,Torque Application Unit,43931.33,Abb Robotics
+P1010,000020000064,Vision Inspection Station,42001.52,KUKA AG
+P1010,000020000065,Wheel Alignment Rig,30950.86,Schuler Group
+P1010,000020000066,Paint Application Robot,204785.95,HEXAGON AB
+P1010,000020000067,Leak Test Station,38922.72,KUKA AG
+P1010,000020000068,Overhead Gantry Loader,136018.44,Haas
+P1010,000020000069,Coil Winding Machine,86586.75,Mazak Corporation
+P1010,000020000070,Stamping Press,422423.46,Haas Automation
+P1010,000020000071,Vision Inspection Station,63275.27,ABB Robotics
+P1010,000020000072,Paint Application Robot,235947.96,ABB
+P1010,000020000073,Adhesive Dispensing Unit,52955.48,Fanuc Corporation
+P1010,000020000074,Paint Application Robot,255821.77,KUKA
+P1010,000020000075,Laser Welding Cell,247478.92,KUKA AG
+P1010,000020000076,Overhead Gantry Loader,171520.13,siemens ag
+P1010,000020000077,Torque Application Unit,28360.09,KUKA AG
+P1010,000020000078,Induction Heating Unit,80823.68,Schuler Group
+P1010,000020000079,Dimensional Measurement Arm,69719.15,KUKA AG
+P1010,000020000080,Ultrasonic Welding Station,26688.83,ABB Robotics
+P1010,000020000081,Leak Test Station,65160.24,KUKA AG
+P1010,000020000082,Final Functional Test Bench,130957.16,KUKA AG
+P1010,000020000083,Palletizing Robot,156566.56,Mazak Corporation
+P1010,000020000084,Induction Heating Unit,86516.23,Lincoln Electric
+P1010,000020000085,Dimensional Measurement Arm,99518.01,KUKA AG
+P1010,000020000086,CNC Machining Center,249440.93,DMG MORI
+P1010,000020000087,Adhesive Dispensing Unit,80741.46,KUKA
+P1010,000020000088,Paint Application Robot,294667.73,ABB Robotics
+P1010,000020000089,Robotic Welding Cell,192375.30,KUKA AG
+P1010,000020000090,Screw Fastening Station,20223.52,ABB Robotics
+P1010,000020000091,Final Functional Test Bench,147656.60,Rockwell Automation
+P1010,000020000092,Stamping Press,461363.41,Lincoln
+P1010,000020000093,Hydraulic Press,127411.53,Lincoln Electric
+P1010,000020000094,Torque Application Unit,26557.11,KUKA
+P1010,000020000095,Robotic Welding Cell,237241.09,DMG MORI
+P1010,000020000096,Final Functional Test Bench,113655.82,HAAS AUTOMATION
+P1010,000020000097,Overhead Gantry Loader,161488.03,Fives
+P1010,000020000098,Automated Guided Vehicle,92075.41,KUKA
+P1010,000020000099,Dimensional Measurement Arm,54474.07,ABB Robotics
+P1010,000020000100,CNC Machining Center,397239.49,Yaskawa Motoman
+P1010,000020000101,Wheel Alignment Rig,68410.72,KUKA AG
+P1010,000020000102,Injection Molding Machine,265751.46,KUKA AG
+P1010,000020000103,Robotic Welding Cell,161962.45,kuka ag
+P1010,000020000104,Induction Heating Unit,33992.67,Ingersoll Rand
+P1010,000020000105,Stamping Press,394310.24,ABB
+P1010,000020000106,Paint Application Robot,317631.68,KUKA AG
+P1010,000020000107,Laser Welding Cell,360714.44,Lincoln Electric
+P1010,000020000108,Automated Guided Vehicle,91598.24,ABB Robotics
+P1010,000020000109,Laser Welding Cell,197376.83,KUKA AG
+P1010,000020000110,Stamping Press,1088406.85,HEXAGON AB
+P1010,000020000111,Ultrasonic Welding Station,32921.69,Carl Zeiss Industrial Metrology
+P1010,000020000112,Screw Fastening Station,12799.26,haas automation
+P1010,000020000113,Wheel Alignment Rig,57628.59,FANUC Corporation
+P1010,000020000114,CNC Machining Center,303119.35,kuka ag
+P1010,000020000115,Torque Application Unit,16800.03,KUKA AG
+P1010,000020000116,Adhesive Dispensing Unit,31392.86,Lincoln Electric
+P1010,000020000117,Ultrasonic Welding Station,25382.85,DMG MORI
+P1010,000020000118,Stamping Press,514814.98,Miller Electric
+P1010,000020000119,Adhesive Dispensing Unit,44904.71,KUKA AG
+P1010,000020000120,Leak Test Station,23390.68,ABB Robotics
+P1010,000020000121,Vision Inspection Station,83575.42,Dematic
+P1010,000020000122,Induction Heating Unit,59907.99,Lincoln Electric
+P1010,000020000123,Stamping Press,475169.44,Dematic
+P1010,000020000124,Automated Guided Vehicle,47634.45,KUKA
+P1010,000020000125,Automated Guided Vehicle,59342.84,FANUC Corporation
+P1010,000020000126,Battery Pack Assembly Cell,434804.70,KUKA AG
+P1010,000020000127,Injection Molding Machine,437132.40,KUKA AG
+P1010,000020000128,Paint Application Robot,229839.27,KUKA
+P1010,000020000129,Wheel Alignment Rig,79703.36,ABB
+P1010,000020000130,Adhesive Dispensing Unit,62462.11,ABB Robotics
+P1010,000020000131,,35902.09,DMG MORI
+P1010,000020000132,Screw Fastening Station,34107.94,ABB Robotics
+P1010,000020000133,Torque Application Unit,21619.70,DMG MORI
+P1010,000020000134,Adhesive Dispensing Unit,61474.05,Dematic
+P1010,000020000135,Dimensional Measurement Arm,99847.85,FANUC CORPORATION
+P1010,000020000136,Final Functional Test Bench,193643.23,dmg mori
+P1010,000020000137,Vision Inspection Station,88417.62,Yaskawa
+P1010,000020000138,CNC Machining Center,229414.68,dematic
+P1010,000020000139,,24070.73,ABB Robotics
+P1010,000020000140,Riveting Station,39679.59,KUKA AG
+P1010,000020000141,Robotic Welding Cell,228044.40,Lincoln Electric
+P1010,000020000142,Robotic Welding Cell,248536.70,FANUC Corporation
+P1010,000020000143,Adhesive Dispensing Unit,53972.74,KUKA
+P1010,000020000144,Paint Application Robot,332418.12,Schuler Group
+P1010,000020000145,Wheel Alignment Rig,40557.83,KUKA AG
+P1010,000020000146,Wheel Alignment Rig,64729.64,DMG MORI
+P1010,000020000147,Overhead Gantry Loader,106224.15,Dematic
+P1010,000020000148,Injection Molding Machine,364430.83,Yaskawa Motoman
+P1010,000020000149,Adhesive Dispensing Unit,72178.99,KUKA
+P1010,000020000150,Automated Guided Vehicle,88684.16,KUKA AG
+P1010,000020000151,Vision Inspection Station,35816.56,KUKA AG
+P1010,000020000152,Paint Application Robot,249024.34,Mazak Corporation
+P1010,000020000153,Hydraulic Press,267089.38,FANUC
+P1010,000020000154,Torque Application Unit,42504.61,FANUC Corporation
+P1010,000020000155,Adhesive Dispensing Unit,37307.85,Miller Electric
+P1010,000020000156,Riveting Station,25174.78,Yaskawa
+P1010,000020000157,Injection Molding Machine,314548.76,Comau
+P1010,000020000158,Induction Heating Unit,64080.35,Yaskawa Motoman
+P1010,000020000159,Coil Winding Machine,146417.18,KUKA
+P1010,000020000160,Wheel Alignment Rig,37230.90,ABB Robotics
+P1010,000020000161,Vision Inspection Station,79403.96,Schneider
+P1010,000020000162,Robotic Welding Cell,163765.36,KUKA AG
+P1010,000020000163,Wheel Alignment Rig,57664.43,Hexagon AB
+P1010,000020000164,Laser Welding Cell,312945.19,Mazak Corporation
+P1010,000020000165,Leak Test Station,45944.45,KUKA
+P1010,000020000166,Induction Heating Unit,38688.78,KUKA AG
+P1010,000020000167,Torque Application Unit,42906.84,ABB ROBOTICS
+P1010,000020000168,CNC Machining Center,220093.73,FANUC Corporation
+P1010,000020000169,Overhead Gantry Loader,128012.40,Dematic
+P1010,000020000170,Hydraulic Press,197823.27,Atlas Copco
+P1010,000020000171,,430997.89,KUKA
+P1010,000020000172,Wheel Alignment Rig,46997.66,ABB Robotics
+P1010,000020000173,CNC Machining Center,213032.60,Kuka Ag
+P1010,000020000174,Laser Welding Cell,358061.66,Durr AG
+P1010,000020000175,Adhesive Dispensing Unit,75420.18,Dematic
+P1010,000020000176,Stamping Press,386368.26,KUKA
+P1010,000020000177,Injection Molding Machine,418323.95,Haas Automation
+P1010,000020000178,Ultrasonic Welding Station,30070.39,DMG MORI
+P1010,000020000179,Ultrasonic Welding Station,35725.55,Abb Robotics
+P1010,000020000180,CNC Machining Center,371027.29,KUKA
+P1010,000020000181,CNC Machining Center,203300.91,ABB
+P1010,000020000182,Injection Molding Machine,448508.41,ABB Robotics
+P1010,000020000183,Riveting Station,56434.90,FANUC Corporation
+P1010,000020000184,Automated Guided Vehicle,61051.83,Haas Automation
+P1010,000020000185,Leak Test Station,33583.99,ABB Robotics
+P1010,000020000186,Riveting Station,69660.43,DMG MORI
+P1010,000020000187,Leak Test Station,53346.60,ABB Robotics
+P1010,000020000188,Overhead Gantry Loader,80496.22,Mazak Corporation
+P1010,000020000189,Stamping Press,1014066.01,FANUC Corporation
+P1010,000020000190,,24943.96,kuka ag
+P1010,000020000191,Injection Molding Machine,487394.28,FANUC Corporation
+P1010,000020000192,CNC Machining Center,397593.78,Carl
+P1010,000020000193,Coil Winding Machine,116663.69,Rockwell Automation
+P1010,000020000194,Wheel Alignment Rig,76678.22,Dmg Mori
+P1010,000020000195,Conveyor System,96549.65,Haas Automation
+P1010,000020000196,,390133.93,ABB Robotics
+P1010,000020000197,Stamping Press,376088.28,Lincoln Electric
+P1010,000020000198,Final Functional Test Bench,109107.09,kuka ag
+P1010,000020000199,Induction Heating Unit,61250.38,Hexagon AB
+P1010,000020000200,Robotic Welding Cell,211529.06,KUKA
+P1010,000020000201,Robotic Welding Cell,146316.27,Bosch Rexroth
+P1010,000020000202,Robotic Welding Cell,128964.76,bosch rexroth
+P1010,000020000203,Laser Welding Cell,351886.59,Eisenmann Se
+P1010,000020000204,Dimensional Measurement Arm,121864.07,Dematic
+P1010,000020000205,Injection Molding Machine,275064.72,KUKA AG
+P1010,000020000206,Automated Guided Vehicle,43403.75,KUKA
+P1010,000020000207,Leak Test Station,37708.27,KUKA AG
+P1010,000020000208,Hydraulic Press,207957.18,AIDA
+P1010,000020000209,Robotic Welding Cell,196992.90,Atlas Copco
+P1010,000020000210,Dimensional Measurement Arm,93085.73,ABB Robotics
+P1010,000020000211,Automated Guided Vehicle,118668.91,FANUC Corporation
+P1010,000020000212,Stamping Press,524620.79,YASKAWA MOTOMAN
+P1010,000020000213,Torque Application Unit,35440.59,Ingersoll Rand
+P1010,000020000214,Wheel Alignment Rig,41091.13,Dematic
+P1010,000020000215,Riveting Station,67640.27,DMG MORI
+P1010,000020000216,Final Functional Test Bench,187210.69,KUKA
+P1010,000020000217,Robotic Welding Cell,162826.85,Dmg Mori
+P1010,000020000218,Adhesive Dispensing Unit,82400.57,ABB Robotics
+P1010,000020000219,CNC Machining Center,413895.30,Dmg Mori
+P1010,000020000220,Vision Inspection Station,33652.49,KUKA
+P1010,000020000221,Robotic Welding Cell,203290.68,ABB Robotics
+P1010,000020000222,Dimensional Measurement Arm,70638.05,ABB Robotics
+P1010,000020000223,Automated Guided Vehicle,113128.62,Schuler
+P1010,000020000224,Adhesive Dispensing Unit,74935.50,Dematic
+P1010,000020000225,Overhead Gantry Loader,83764.84,DMG
+P1010,000020000226,CNC Machining Center,423307.20,KUKA AG
+P1010,000020000227,Final Functional Test Bench,181516.05,AIDA Engineering
+P1010,000020000228,Wheel Alignment Rig,67908.39,Eisenmann
+P1010,000020000229,CNC Machining Center,219543.16,AIDA Engineering
+P1010,000020000230,Coil Winding Machine,166667.97,Aida Engineering
+P1010,000020000231,Induction Heating Unit,77037.53,AIDA
+P1010,000020000232,Leak Test Station,53947.51,Comau
+P1010,000020000233,Battery Pack Assembly Cell,557286.10,FANUC
+P1010,000020000234,Laser Welding Cell,371063.16,FANUC Corporation
+P1010,000020000235,Laser Welding Cell,369732.31,FANUC Corporation
+P1010,000020000236,Palletizing Robot,157871.62,Eisenmann SE
+P1010,000020000237,Wheel Alignment Rig,60834.76,DMG MORI
+P1010,000020000238,Coil Winding Machine,162597.01,Lincoln Electric
+P1010,000020000239,Palletizing Robot,173754.56,DMG MORI
+P1010,000020000240,Overhead Gantry Loader,103143.38,Schuler Group
+P1010,000020000241,Automated Guided Vehicle,64864.06,Miller
+P1010,000020000242,Conveyor System,69353.48,Yaskawa Motoman
+P1010,000020000243,,28270.37,KUKA AG
+P1010,000020000244,Dimensional Measurement Arm,144859.39,Mazak Corporation
+P1010,000020000245,Stamping Press,551051.29,Dematic
+P1010,000020000246,Overhead Gantry Loader,81164.20,Schuler
+P1010,000020000247,Assembly Torque Wrench Station,24966.08,Atlas
+P1010,000020000248,Battery Pack Assembly Cell,513887.73,DMG MORI
+P1010,000020000249,CNC Machining Center,393198.02,Mazak
+P1010,000020000250,Overhead Gantry Loader,73829.63,DMG
+P1010,000020000251,Injection Molding Machine,334614.83,Dematic
+P1010,000020000252,Overhead Gantry Loader,123094.36,ABB Robotics
+P1010,000020000253,Wheel Alignment Rig,72530.91,Lincoln Electric
+P1010,000020000254,Final Functional Test Bench,124756.57,Comau
+P1010,000020000255,Final Functional Test Bench,199548.11,Comau
+P1010,000020000256,Screw Fastening Station,33646.12,Schuler
+P1010,000020000257,Hydraulic Press,248723.82,KUKA AG
+P1010,000020000258,Laser Welding Cell,278753.37,Schuler
+P1010,000020000259,Laser Welding Cell,242995.77,Ingersoll Rand
+P1010,000020000260,Torque Application Unit,36687.56,ABB Robotics
+P1010,000020000261,Injection Molding Machine,320415.50,FANUC Corporation
+P1010,000020000262,Torque Application Unit,43992.88,KUKA
+P1010,000020000263,Palletizing Robot,81153.23,Fanuc Corporation
+P1010,000020000264,Robotic Welding Cell,135103.06,KUKA AG
+P1010,000020000265,Coil Winding Machine,172956.16,KUKA AG
+P1010,000020000266,Overhead Gantry Loader,82920.95,AIDA Engineering
+P1010,000020000267,Conveyor System,109150.24,DMG
+P1010,000020000268,Stamping Press,598565.10,ABB Robotics
+P1010,000020000269,Screw Fastening Station,30873.72,Yaskawa Motoman
+P1010,000020000270,Screw Fastening Station,16032.34,KUKA AG
+P1010,000020000271,Adhesive Dispensing Unit,66744.80,FANUC Corporation
+P1010,000020000272,Injection Molding Machine,328548.10,schneider electric
+P1010,000020000273,Torque Application Unit,16476.68,Atlas Copco
+P1010,000020000274,Dimensional Measurement Arm,137071.31,Dmg Mori
+P1010,000020000275,Adhesive Dispensing Unit,74304.85,Yaskawa Motoman
+P1010,000020000276,Leak Test Station,55897.20,AIDA Engineering
+P1010,000020000277,Injection Molding Machine,436435.98,Hexagon AB
+P1010,000020000278,Hydraulic Press,269444.23,Yaskawa Motoman
+P1010,000020000279,Overhead Gantry Loader,116903.72,Yaskawa
+P1010,000020000280,Screw Fastening Station,22124.41,KUKA AG
+P1010,000020000281,Final Functional Test Bench,154916.30,dematic
+P1010,000020000282,Dimensional Measurement Arm,63855.66,FANUC Corporation
+P1010,000020000283,Palletizing Robot,116920.70,ABB Robotics
+P1010,000020000284,Ultrasonic Welding Station,25739.80,KUKA AG
+P1010,000020000285,Leak Test Station,50058.85,FANUC Corporation
+P1010,000020000286,Adhesive Dispensing Unit,43400.67,ABB Robotics
+P1010,000020000287,Palletizing Robot,148096.45,KUKA AG
+P1010,000020000288,Induction Heating Unit,78597.57,KUKA AG
+P1010,000020000289,Ultrasonic Welding Station,48219.53,AIDA Engineering
+P1010,000020000290,Battery Pack Assembly Cell,283110.53,Miller Electric
+P1010,000020000291,Screw Fastening Station,21909.89,Dematic
+P1010,000020000292,Assembly Torque Wrench Station,27508.51,FANUC Corporation
+P1010,000020000293,Ultrasonic Welding Station,36050.10,ABB Robotics
+P1010,000020000294,Palletizing Robot,126275.92,ABB Robotics
+P1010,000020000295,Palletizing Robot,139180.54,Kuka Ag
+P1010,000020000296,Robotic Welding Cell,256274.92,Schneider Electric
+P1010,000020000297,Dimensional Measurement Arm,50923.87,DURR AG
+P1010,000020000298,Wheel Alignment Rig,68551.19,FANUC
+P1010,000020000299,Leak Test Station,42049.12,KUKA AG
+P1010,000020000300,Injection Molding Machine,405828.22,KUKA AG
+P1010,000020000301,Wheel Alignment Rig,50884.63,KUKA
+P1010,000020000302,Stamping Press,842761.08,KUKA AG
+P1010,000020000303,Paint Application Robot,214818.68,KUKA
+P1010,000020000304,Automated Guided Vehicle,50797.53,ABB Robotics
+P1010,000020000305,Hydraulic Press,340216.87,Durr AG
+P1010,000020000306,Hydraulic Press,239196.26,Lincoln
+P1010,000020000307,Assembly Torque Wrench Station,18474.87,KUKA AG
+P1010,000020000308,Adhesive Dispensing Unit,73840.96,Rockwell
+P1010,000020000309,,368750.43,ABB
+P1010,000020000310,Coil Winding Machine,135202.81,Bosch Rexroth
+P1010,000020000311,Automated Guided Vehicle,103171.66,DMG
+P1010,000020000312,Screw Fastening Station,28479.86,Haas
+P1010,000020000313,Automated Guided Vehicle,59596.55,KUKA
+P1010,000020000314,Torque Application Unit,34859.29,Rockwell
+P1010,000020000315,Riveting Station,54865.70,FANUC Corporation
+P1010,000020000316,Riveting Station,32541.70,KUKA
+P1010,000020000317,Palletizing Robot,120055.94,KUKA
+P1010,000020000318,Palletizing Robot,117048.66,Yaskawa Motoman
+P1010,000020000319,Vision Inspection Station,42197.66,KUKA AG
+P1010,000020000320,Palletizing Robot,155545.01,KUKA AG
+P1010,000020000321,Robotic Welding Cell,262905.42,Schuler Group
+P1010,000020000322,,46687.48,ABB
+P1010,000020000323,Vision Inspection Station,34978.34,Atlas Copco
+P1010,000020000324,Leak Test Station,31686.94,KUKA AG
+P1010,000020000325,Leak Test Station,42228.80,KUKA AG
+P1010,000020000326,Leak Test Station,47709.52,kuka ag
+P1010,000020000327,Stamping Press,1046734.90,FANUC Corporation
+P1010,000020000328,Dimensional Measurement Arm,86189.87,KUKA AG
+P1010,000020000329,Conveyor System,67524.11,Eisenmann
+P1010,000020000330,Screw Fastening Station,35833.26,Haas Automation
+P1010,000020000331,Vision Inspection Station,84788.37,Fanuc Corporation
+P1010,000020000332,Conveyor System,97781.08,KUKA AG
+P1010,000020000333,Assembly Torque Wrench Station,19860.58,DMG MORI
+P1010,000020000334,Adhesive Dispensing Unit,86925.38,Mazak
+P1010,000020000335,Leak Test Station,38759.97,Abb Robotics
+P1010,000020000336,Ultrasonic Welding Station,50386.55,Ingersoll Rand
+P1010,000020000337,Adhesive Dispensing Unit,57748.31,DMG MORI
+P1010,000020000338,Vision Inspection Station,48600.64,KUKA AG
+P1010,000020000339,Induction Heating Unit,64574.87,KUKA AG
+P1010,000020000340,Battery Pack Assembly Cell,246897.19,Yaskawa
+P1010,000020000341,Paint Application Robot,318693.80,KUKA AG
+P1010,000020000342,Adhesive Dispensing Unit,85968.22,Siemens
+P1010,000020000343,Hydraulic Press,390355.87,ABB
+P1010,000020000344,CNC Machining Center,237545.17,DMG MORI
+P1010,000020000345,Torque Application Unit,26136.79,Yaskawa Motoman
+P1010,000020000346,Induction Heating Unit,73007.73,FANUC Corporation
+P1010,000020000347,Leak Test Station,31530.32,KUKA
+P1010,000020000348,CNC Machining Center,210288.08,FANUC Corporation
+P1010,000020000349,Screw Fastening Station,19607.64,KUKA
+P1010,000020000350,Riveting Station,41984.69,Haas Automation
+P1010,000020000351,Robotic Welding Cell,210223.05,KUKA AG
+P1010,000020000352,Adhesive Dispensing Unit,32337.81,Haas
+P1010,000020000353,Battery Pack Assembly Cell,477706.28,Miller Electric
+P1010,000020000354,Dimensional Measurement Arm,78530.66,schuler group
+P1010,000020000355,Final Functional Test Bench,169478.43,Schuler Group
+P1010,000020000356,Dimensional Measurement Arm,79989.28,Bosch Rexroth
+P1010,000020000357,Induction Heating Unit,68567.09,Dematic
+P1010,000020000358,Wheel Alignment Rig,65954.48,FANUC CORPORATION
+P1010,000020000359,Hydraulic Press,248818.35,Yaskawa Motoman
+P1010,000020000360,,60030.70,Fanuc Corporation
+P1010,000020000361,Palletizing Robot,152499.26,AIDA Engineering
+P1010,000020000362,Final Functional Test Bench,137536.44,Kuka Ag
+P1010,000020000363,Overhead Gantry Loader,120874.71,Schuler
+P1010,000020000364,Wheel Alignment Rig,55956.87,Eisenmann
+P1010,000020000365,Riveting Station,54595.30,DMG MORI
+P1010,000020000366,Paint Application Robot,159919.25,Comau
+P1010,000020000367,Vision Inspection Station,48909.89,Miller Electric
+P1010,000020000368,Ultrasonic Welding Station,28630.58,FANUC
+P1010,000020000369,Conveyor System,138106.97,KUKA AG
+P1010,000020000370,Dimensional Measurement Arm,123739.65,Yaskawa Motoman
+P1010,000020000371,Torque Application Unit,36962.15,Lincoln Electric
+P1010,000020000372,Vision Inspection Station,83113.02,Ingersoll Rand
+P1010,000020000373,Leak Test Station,50123.37,KUKA
+P1010,000020000374,Torque Application Unit,19121.33,Yaskawa Motoman
+P1010,000020000375,Coil Winding Machine,141783.86,Schuler Group
+P1010,000020000376,Coil Winding Machine,202540.90,ABB Robotics
+P1010,000020000377,Vision Inspection Station,73015.14,ABB
+P1010,000020000378,Wheel Alignment Rig,71828.04,KUKA
+P1010,000020000379,Final Functional Test Bench,157538.57,ABB
+P1010,000020000380,Torque Application Unit,26583.46,KUKA
+P1010,000020000381,Robotic Welding Cell,155780.78,AIDA Engineering
+P1010,000020000382,Injection Molding Machine,419324.45,abb robotics
+P1010,000020000383,Automated Guided Vehicle,50926.38,Mazak Corporation
+P1010,000020000384,Wheel Alignment Rig,58266.04,Rockwell Automation
+P1010,000020000385,Overhead Gantry Loader,104767.55,Dematic
+P1010,000020000386,Ultrasonic Welding Station,69940.90,Yaskawa Motoman
+P1010,000020000387,Overhead Gantry Loader,87889.53,KUKA AG
+P1010,000020000388,Induction Heating Unit,72248.52,Rockwell Automation
+P1010,000020000389,Torque Application Unit,18267.48,Bosch Rexroth
+P1010,000020000390,Wheel Alignment Rig,74457.29,KUKA AG
+P1010,000020000391,Laser Welding Cell,243366.04,Hexagon
+P1010,000020000392,Final Functional Test Bench,85453.16,KUKA AG
+P1010,000020000393,Adhesive Dispensing Unit,47435.59,Lincoln Electric
+P1010,000020000394,Conveyor System,138104.89,ABB Robotics
+P1010,000020000395,CNC Machining Center,374716.35,KUKA AG
+P1010,000020000396,Riveting Station,66668.58,Haas Automation
+P1010,000020000397,Automated Guided Vehicle,57697.48,AIDA
+P1010,000020000398,Battery Pack Assembly Cell,342622.85,ABB Robotics
+P1010,000020000399,CNC Machining Center,425479.81,KUKA
+P1010,000020000400,Leak Test Station,52924.40,KUKA AG
+P1010,000020000401,CNC Machining Center,379718.62,KUKA
+P1010,000020000402,Automated Guided Vehicle,82450.09,Mazak Corporation
+P1010,000020000403,Wheel Alignment Rig,86009.96,AIDA Engineering
+P1010,000020000404,Riveting Station,39940.37,KUKA
+P1010,000020000405,Riveting Station,46126.03,KUKA AG
+P1010,000020000406,Battery Pack Assembly Cell,553379.04,ABB Robotics
+P1010,000020000407,Battery Pack Assembly Cell,460342.98,ABB ROBOTICS
+P1010,000020000408,Overhead Gantry Loader,61775.28,Bosch Rexroth
+P1010,000020000409,Ultrasonic Welding Station,37879.87,Mazak
+P1010,000020000410,Laser Welding Cell,345871.70,KUKA
+P1010,000020000411,Induction Heating Unit,50316.78,Yaskawa Motoman
+P1010,000020000412,Vision Inspection Station,73411.93,ABB Robotics
+P1010,000020000413,Wheel Alignment Rig,58687.41,Mazak
+P1010,000020000414,Coil Winding Machine,175954.15,Mazak Corporation
+P1010,000020000415,Battery Pack Assembly Cell,422867.77,FANUC
+P1010,000020000416,Leak Test Station,36986.77,FANUC
+P1010,000020000417,Overhead Gantry Loader,84463.82,KUKA AG
+P1010,000020000418,Ultrasonic Welding Station,38160.01,ABB
+P1010,000020000419,Overhead Gantry Loader,61372.09,mazak corporation
+P1010,000020000420,Automated Guided Vehicle,109949.68,Mazak Corporation
+P1010,000020000421,Wheel Alignment Rig,46388.94,Yaskawa Motoman
+P1010,000020000422,Induction Heating Unit,42025.73,Lincoln Electric
+P1010,000020000423,Conveyor System,116797.91,Abb Robotics
+P1010,000020000424,Battery Pack Assembly Cell,271864.29,ABB Robotics
+P1010,000020000425,Assembly Torque Wrench Station,13065.38,ABB Robotics
+P1010,000020000426,Hydraulic Press,398259.94,KUKA AG
+P1010,000020000427,Palletizing Robot,148599.85,FANUC Corporation
+P1010,000020000428,Overhead Gantry Loader,137214.64,KUKA AG
+P1010,000020000429,Coil Winding Machine,193796.16,KUKA AG
+P1010,000020000430,Automated Guided Vehicle,45865.84,ABB Robotics
+P1010,000020000431,Wheel Alignment Rig,76898.20,Abb Robotics
+P1010,000020000432,Riveting Station,44757.19,KUKA AG
+P1010,000020000433,Hydraulic Press,333594.00,FANUC Corporation
+P1010,000020000434,Assembly Torque Wrench Station,32967.46,KUKA
+P1010,000020000435,Torque Application Unit,20687.74,KUKA
+P1010,000020000436,Final Functional Test Bench,121343.56,FANUC Corporation
+P1010,000020000437,CNC Machining Center,277089.62,Rockwell Automation
+P1010,000020000438,CNC Machining Center,402391.82,FANUC Corporation
+P1010,000020000439,Overhead Gantry Loader,118800.11,Carl Zeiss Industrial Metrology
+P1010,000020000440,Overhead Gantry Loader,112180.30,FANUC Corporation
+P1010,000020000441,Final Functional Test Bench,62836.18,KUKA AG
+P1010,000020000442,Final Functional Test Bench,125522.80,ATLAS COPCO
+P1010,000020000443,,59285.82,Kuka Ag
+P1010,000020000444,Stamping Press,1032976.99,haas automation
+P1010,000020000445,Injection Molding Machine,292953.05,Yaskawa Motoman
+P1010,000020000446,Wheel Alignment Rig,81850.65,Mazak Corporation
+P1010,000020000447,,32884.66,FANUC
+P1010,000020000448,Stamping Press,395580.97,kuka ag
+P1010,000020000449,Stamping Press,777225.33,Dematic
+P1010,000020000450,Overhead Gantry Loader,97451.92,Yaskawa Motoman
+P1010,000020000451,Assembly Torque Wrench Station,14750.10,Haas Automation
+P1010,000020000452,Palletizing Robot,114550.68,Durr Ag
+P1010,000020000453,Laser Welding Cell,318825.45,Dematic
+P1010,000020000454,Injection Molding Machine,223927.27,FANUC Corporation
+P1010,000020000455,Dimensional Measurement Arm,59741.71,ABB Robotics
+P1010,000020000456,Assembly Torque Wrench Station,32870.20,ABB Robotics
+P1010,000020000457,Injection Molding Machine,173481.43,Yaskawa Motoman
+P1010,000020000458,Automated Guided Vehicle,56294.36,FANUC Corporation
+P1010,000020000459,Conveyor System,51108.77,Ingersoll Rand
+P1010,000020000460,Adhesive Dispensing Unit,54771.19,Carl Zeiss Industrial Metrology
+P1010,000020000461,Conveyor System,89393.52,Dmg Mori
+P1010,000020000462,Laser Welding Cell,225628.15,Bosch
+P1010,000020000463,Stamping Press,737266.12,Eisenmann
+P1010,000020000464,Laser Welding Cell,184262.38,DMG
+P1010,000020000465,Injection Molding Machine,233903.38,KUKA
+P1010,000020000466,Injection Molding Machine,453250.80,KUKA AG
+P1010,000020000467,Adhesive Dispensing Unit,85781.46,Haas
+P1010,000020000468,Injection Molding Machine,474218.54,KUKA AG
+P1010,000020000469,Robotic Welding Cell,263660.74,KUKA AG
+P1010,000020000470,,198573.83,mazak corporation
+P1010,000020000471,Paint Application Robot,214611.24,Durr
+P1010,000020000472,Conveyor System,81935.06,KUKA AG
+P1010,000020000473,Dimensional Measurement Arm,145736.94,ABB Robotics
+P1010,000020000474,Battery Pack Assembly Cell,278970.51,Rockwell Automation
+P1010,000020000475,Wheel Alignment Rig,73933.73,Lincoln Electric
+P1010,000020000476,Robotic Welding Cell,141156.84,DMG MORI
+P1010,000020000477,Final Functional Test Bench,89916.59,Siemens AG
+P1010,000020000478,Torque Application Unit,37094.68,ABB Robotics
+P1010,000020000479,Leak Test Station,61367.14,KUKA
+P1010,000020000480,Overhead Gantry Loader,173219.02,ABB Robotics
+P1010,000020000481,Adhesive Dispensing Unit,34873.39,KUKA AG
+P1010,000020000482,Injection Molding Machine,226312.40,KUKA
+P1010,000020000483,Battery Pack Assembly Cell,305490.54,Kuka Ag
+P1010,000020000484,Wheel Alignment Rig,46738.12,KUKA AG
+P1010,000020000485,Laser Welding Cell,282639.06,KUKA AG
+P1010,000020000486,Robotic Welding Cell,265476.65,KUKA AG
+P1010,000020000487,Robotic Welding Cell,219387.43,KUKA AG
+P1010,000020000488,Injection Molding Machine,297871.74,Haas
+P1010,000020000489,Torque Application Unit,28114.06,FANUC Corporation
+P1010,000020000490,Riveting Station,29166.66,KUKA
+P1010,000020000491,Assembly Torque Wrench Station,13786.18,KUKA AG
+P1010,000020000492,Conveyor System,135566.10,FANUC Corporation
+P1010,000020000493,Final Functional Test Bench,126882.78,Schneider Electric
+P1010,000020000494,Final Functional Test Bench,112878.11,Fanuc Corporation
+P1010,000020000495,Torque Application Unit,34241.41,ABB Robotics
+P1010,000020000496,Conveyor System,116284.47,KUKA AG
+P1010,000020000497,Torque Application Unit,27758.27,FANUC Corporation
+P1010,000020000498,Adhesive Dispensing Unit,80849.81,KUKA
+P1010,000020000499,Overhead Gantry Loader,103840.07,ABB Robotics
+P1010,000020000500,Dimensional Measurement Arm,88237.39,KUKA
+P1010,000020000501,Laser Welding Cell,318798.91,KUKA
+P1010,000020000502,Injection Molding Machine,185945.66,KUKA
+P1010,000020000503,Paint Application Robot,172420.92,Mazak
+P1010,000020000504,Vision Inspection Station,80807.68,KUKA AG
+P1010,000020000505,Wheel Alignment Rig,85798.47,KUKA AG
+P1010,000020000506,Riveting Station,28483.73,Yaskawa Motoman
+P1010,000020000507,Vision Inspection Station,89314.40,FANUC Corporation
+P1010,000020000508,Torque Application Unit,24835.11,Miller Electric
+P1010,000020000509,Conveyor System,58788.65,KUKA AG
+P1010,000020000510,Leak Test Station,27804.07,Eisenmann
+P1010,000020000511,Ultrasonic Welding Station,44442.47,Siemens AG
+P1010,000020000512,Automated Guided Vehicle,99509.93,Haas Automation
+P1010,000020000513,Injection Molding Machine,256853.27,Eisenmann
+P1010,000020000514,Injection Molding Machine,491727.67,ABB
+P1010,000020000515,Automated Guided Vehicle,51682.60,Yaskawa Motoman
+P1010,000020000516,Stamping Press,872990.61,ABB
+P1010,000020000517,Leak Test Station,61994.81,Atlas Copco
+P1010,000020000518,Assembly Torque Wrench Station,11346.72,Dematic
+P1010,000020000519,Coil Winding Machine,186769.85,Schuler Group
+P1010,000020000520,Stamping Press,1081922.08,Carl Zeiss Industrial Metrology
+P1010,000020000521,Injection Molding Machine,439995.14,KUKA AG
+P1010,000020000522,Vision Inspection Station,80984.34,ABB Robotics
+P1010,000020000523,Assembly Torque Wrench Station,13431.35,Lincoln Electric
+P1010,000020000524,Wheel Alignment Rig,34114.97,Haas
+P1010,000020000525,Laser Welding Cell,336849.42,FANUC
+P1010,000020000526,Palletizing Robot,167196.41,ATLAS COPCO
+P1010,000020000527,Leak Test Station,46583.22,Rockwell
+P1010,000020000528,Assembly Torque Wrench Station,26823.17,DEMATIC
+P1010,000020000529,Final Functional Test Bench,82950.33,Lincoln Electric
+P1010,000020000530,Paint Application Robot,279903.02,DMG MORI
+P1010,000020000531,Torque Application Unit,36943.14,AIDA Engineering
+P1010,000020000532,Leak Test Station,39930.35,Lincoln Electric
+P1010,000020000533,Screw Fastening Station,36689.67,KUKA
+P1010,000020000534,Assembly Torque Wrench Station,21449.88,Mazak Corporation
+P1010,000020000535,Battery Pack Assembly Cell,390972.49,KUKA AG
+P1010,000020000536,CNC Machining Center,190248.70,FANUC
+P1010,000020000537,Automated Guided Vehicle,95983.58,DMG MORI
+P1010,000020000538,,791246.29,FANUC Corporation
+P1010,000020000539,Assembly Torque Wrench Station,14708.80,ABB Robotics
+P1010,000020000540,Induction Heating Unit,77991.07,ABB Robotics
+P1010,000020000541,Laser Welding Cell,217694.92,Carl Zeiss Industrial Metrology
+P1010,000020000542,Laser Welding Cell,236470.98,Mazak Corporation
+P1010,000020000543,,201783.53,KUKA AG
+P1010,000020000544,Torque Application Unit,15992.56,Schuler Group
+P1010,000020000545,Palletizing Robot,150371.41,KUKA AG
+P1010,000020000546,Conveyor System,100621.69,Abb Robotics
+P1010,000020000547,Riveting Station,32771.77,Mazak
+P1010,000020000548,Overhead Gantry Loader,163615.10,EISENMANN SE
+P1010,000020000549,Leak Test Station,45459.07,Haas
+P1010,000020000550,Laser Welding Cell,373878.41,ABB Robotics
+P1010,000020000551,Screw Fastening Station,35497.98,KUKA AG
+P1010,000020000552,Overhead Gantry Loader,90862.29,MILLER ELECTRIC
+P1010,000020000553,Screw Fastening Station,18177.47,Yaskawa Motoman
+P1010,000020000554,Adhesive Dispensing Unit,60636.17,Bosch Rexroth
+P1010,000020000555,Ultrasonic Welding Station,40976.53,yaskawa motoman
+P1010,000020000556,,62286.34,ABB Robotics
+P1010,000020000557,Riveting Station,27499.07,Ingersoll Rand
+P1010,000020000558,Leak Test Station,32037.56,Fanuc Corporation
+P1010,000020000559,Wheel Alignment Rig,74802.58,AIDA Engineering
+P1010,000020000560,Screw Fastening Station,36212.83,ABB Robotics
+P1010,000020000561,Final Functional Test Bench,198870.55,KUKA AG
+P1010,000020000562,Injection Molding Machine,199146.11,FANUC Corporation
+P1010,000020000563,Ultrasonic Welding Station,58765.68,Eisenmann SE
+P1010,000020000564,Induction Heating Unit,86448.68,Mazak
+P1010,000020000565,Battery Pack Assembly Cell,372259.73,Yaskawa Motoman
+P1010,000020000566,Injection Molding Machine,246944.99,KUKA AG
+P1010,000020000567,Injection Molding Machine,320927.08,Atlas Copco
+P1010,000020000568,Overhead Gantry Loader,146441.07,AIDA Engineering
+P1010,000020000569,Assembly Torque Wrench Station,19688.41,Yaskawa Motoman
+P1010,000020000570,Assembly Torque Wrench Station,27732.51,Yaskawa Motoman
+P1010,000020000571,,303830.68,ABB Robotics
+P1010,000020000572,Coil Winding Machine,163632.05,KUKA
+P1010,000020000573,CNC Machining Center,275540.84,Lincoln Electric
+P1010,000020000574,Battery Pack Assembly Cell,506088.89,FANUC Corporation
+P1010,000020000575,Vision Inspection Station,35923.55,Yaskawa Motoman
+P1010,000020000576,Battery Pack Assembly Cell,459551.61,FANUC Corporation
+P1010,000020000577,Riveting Station,36392.37,KUKA
+P1010,000020000578,Screw Fastening Station,37950.99,KUKA AG
+P1010,000020000579,Coil Winding Machine,153413.38,KUKA AG
+P1010,000020000580,Laser Welding Cell,247993.82,ABB ROBOTICS
+P1010,000020000581,Dimensional Measurement Arm,143717.36,ABB Robotics
+P1010,000020000582,Hydraulic Press,125627.16,KUKA
+P1010,000020000583,CNC Machining Center,280354.71,FANUC
+P1010,000020000584,Laser Welding Cell,289298.73,FANUC Corporation
+P1010,000020000585,Final Functional Test Bench,118397.30,Lincoln Electric
+P1010,000020000586,Final Functional Test Bench,128391.78,ABB Robotics
+P1010,000020000587,Ultrasonic Welding Station,45268.36,dmg mori
+P1010,000020000588,Hydraulic Press,236277.28,Fives Group
+P1010,000020000589,Automated Guided Vehicle,104380.87,Eisenmann SE
+P1010,000020000590,Induction Heating Unit,63373.60,KUKA AG
+P1010,000020000591,Overhead Gantry Loader,138726.90,FANUC Corporation
+P1010,000020000592,Screw Fastening Station,15428.09,Dematic
+P1010,000020000593,Torque Application Unit,36432.87,KUKA
+P1010,000020000594,Robotic Welding Cell,172463.67,Yaskawa Motoman
+P1010,000020000595,,17404.65,Miller Electric
+P1010,000020000596,Laser Welding Cell,185134.07,Bosch Rexroth
+P1010,000020000597,Vision Inspection Station,53398.57,Yaskawa Motoman
+P1010,000020000598,Torque Application Unit,22913.86,Durr
+P1010,000020000599,Paint Application Robot,296836.44,KUKA AG
+P1010,000020000600,Conveyor System,129716.99,Dematic
+P1010,000020000601,Torque Application Unit,28632.30,Mazak Corporation
+P1010,000020000602,Induction Heating Unit,48910.69,Schuler
+P1010,000020000603,Paint Application Robot,152992.10,KUKA AG
+P1010,000020000604,Coil Winding Machine,204936.81,KUKA
+P1010,000020000605,Overhead Gantry Loader,128227.95,Abb Robotics
+P1010,000020000606,Coil Winding Machine,128076.47,KUKA AG
+P1010,000020000607,Riveting Station,40857.85,KUKA
+P1010,000020000608,Automated Guided Vehicle,46428.74,KUKA AG
+P1010,000020000609,Final Functional Test Bench,114677.32,Haas
+P1010,000020000610,Paint Application Robot,300234.69,KUKA AG
+P1010,000020000611,Adhesive Dispensing Unit,45124.54,KUKA
+P1010,000020000612,Conveyor System,94581.51,Ingersoll
+P1010,000020000613,Hydraulic Press,193165.86,KUKA AG
+P1010,000020000614,Laser Welding Cell,379369.91,KUKA AG
+P1010,000020000615,Final Functional Test Bench,98882.16,Kuka Ag
+P1010,000020000616,Induction Heating Unit,72516.41,Schuler
+P1010,000020000617,Robotic Welding Cell,136038.16,KUKA AG
+P1010,000020000618,Assembly Torque Wrench Station,10409.96,Ingersoll Rand
+P1010,000020000619,Laser Welding Cell,295543.99,Haas Automation
+P1010,000020000620,Ultrasonic Welding Station,48565.96,Bosch Rexroth
+P1010,000020000621,Coil Winding Machine,173609.82,Yaskawa Motoman
+P1010,000020000622,Overhead Gantry Loader,90673.03,KUKA AG
+P1010,000020000623,Dimensional Measurement Arm,51522.29,KUKA AG
+P1010,000020000624,Paint Application Robot,234728.31,Dematic
+P1010,000020000625,Adhesive Dispensing Unit,76144.67,Kuka Ag
+P1010,000020000626,Paint Application Robot,292124.65,Yaskawa Motoman
+P1010,000020000627,Dimensional Measurement Arm,94955.72,KUKA AG
+P1010,000020000628,CNC Machining Center,295924.66,FANUC Corporation
+P1010,000020000629,Wheel Alignment Rig,72775.07,ABB Robotics
+P1010,000020000630,Wheel Alignment Rig,87484.03,Durr AG
+P1010,000020000631,Leak Test Station,50630.53,Dematic
+P1010,000020000632,Overhead Gantry Loader,82318.38,Yaskawa Motoman
+P1010,000020000633,Battery Pack Assembly Cell,528949.89,Dematic
+P1010,000020000634,Ultrasonic Welding Station,26701.78,Schuler Group
+P1010,000020000635,Final Functional Test Bench,85624.70,FANUC
+P1010,000020000636,Palletizing Robot,173258.49,INGERSOLL RAND
+P1010,000020000637,Conveyor System,84945.28,KUKA AG
+P1010,000020000638,Battery Pack Assembly Cell,599196.10,Atlas Copco
+P1010,000020000639,Leak Test Station,49599.92,Lincoln Electric
+P1010,000020000640,CNC Machining Center,432798.46,ABB Robotics
+P1010,000020000641,Hydraulic Press,313284.24,KUKA AG
+P1010,000020000642,Screw Fastening Station,39180.96,Kuka Ag
+P1010,000020000643,Screw Fastening Station,13615.46,KUKA AG
+P1010,000020000644,Final Functional Test Bench,191461.08,Mazak Corporation
+P1010,000020000645,Torque Application Unit,39314.63,KUKA
+P1010,000020000646,Robotic Welding Cell,260101.16,DMG MORI
+P1010,000020000647,Palletizing Robot,168201.71,FANUC Corporation
+P1010,000020000648,Coil Winding Machine,175280.35,DMG MORI
+P1010,000020000649,Laser Welding Cell,243926.18,Lincoln
+P1010,000020000650,Coil Winding Machine,146392.27,Lincoln Electric
+P1010,000020000651,Final Functional Test Bench,146670.79,Abb Robotics
+P1010,000020000652,,189305.76,KUKA AG
+P1010,000020000653,Laser Welding Cell,221033.92,ABB
+P1010,000020000654,Wheel Alignment Rig,76560.91,Mazak

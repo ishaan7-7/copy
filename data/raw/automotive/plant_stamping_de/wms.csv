@@ -1,0 +1,378 @@
+Material_No,Bin_Location,Quantity,Kanban_ID,Ship_From,Ship_To
+MAT-701609,H-16-4,890,KANBAN-00001,Stamping Plant DE,BIW/Welding Plant DE
+MAT-362828,C-09-1,3626,KANBAN-00002,Stamping Plant DE,BIW/Welding Plant DE
+MAT-437165,D-03-4,3531,KANBAN-00003,Stamping Plant DE,BIW/Welding Plant DE
+MAT-585779,B-15-3,1213,KANBAN-00004,Stamping Plant DE,BIW/Welding Plant DE
+MAT-444045,D-19-1,2051,KANBAN-00005,Stamping Plant DE,BIW/Welding Plant DE
+MAT-914618,F-09-2,868,KANBAN-00006,Stamping Plant DE,BIW/Welding Plant DE
+MAT-991981,G-13-3,1728,KANBAN-00007,Stamping Plant DE,BIW/Welding Plant DE
+MAT-699888,A-17-1,279,KANBAN-00008,Stamping Plant DE,BIW/Welding Plant DE
+MAT-556435,F-07-5,2278,KANBAN-00009,Stamping Plant DE,BIW/Welding Plant DE
+MAT-772206,E-04-5,4472,KANBAN-00010,Stamping Plant DE,BIW/Welding Plant DE
+MAT-541887,B-29-1,476,KANBAN-00011,Stamping Plant DE,BIW/Welding Plant DE
+MAT-603883,B-28-4,805,KANBAN-00012,Stamping Plant DE,BIW/Welding Plant DE
+MAT-531364,A-23-3,2014,KANBAN-00013,Stamping Plant DE,BIW/Welding Plant DE
+MAT-673757,A-18-5,3664,KANBAN-00014,Stamping Plant DE,BIW/Welding Plant DE
+MAT-105145,E-02-4,3751,KANBAN-00015,Stamping Plant DE,BIW/Welding Plant DE
+MAT-108979,E-10-2,2077,KANBAN-00016,Stamping Plant DE,BIW/Welding Plant DE
+MAT-732222,E-29-5,1613,KANBAN-00017,Stamping Plant DE,BIW/Welding Plant DE
+MAT-533606,H-21-3,4211,KANBAN-00018,Stamping Plant DE,BIW/Welding Plant DE
+MAT-312982,B-10-5,2359,KANBAN-00019,Stamping Plant DE,BIW/Welding Plant DE
+MAT-709201,F-04-1,3853,KANBAN-00020,Stamping Plant DE,BIW/Welding Plant DE
+MAT-809696,D-24-4,128,KANBAN-00021,Stamping Plant DE,BIW/Welding Plant DE
+MAT-545088,B-24-4,4153,KANBAN-00022,Stamping Plant DE,BIW/Welding Plant DE
+MAT-810014,A-09-3,1087,KANBAN-00023,Stamping Plant DE,BIW/Welding Plant DE
+MAT-323874,E-11-2,79,KANBAN-00024,Stamping Plant DE,BIW/Welding Plant DE
+MAT-906661,F-22-2,353,KANBAN-00025,Stamping Plant DE,BIW/Welding Plant DE
+MAT-143021,A-10-2,1733,KANBAN-00026,Stamping Plant DE,BIW/Welding Plant DE
+MAT-459619,B-23-4,2431,KANBAN-00027,Stamping Plant DE,BIW/Welding Plant DE
+MAT-236822,B-08-2,3104,KANBAN-00028,Stamping Plant DE,BIW/Welding Plant DE
+MAT-881540,C-04-5,4629,KANBAN-00029,Stamping Plant DE,BIW/Welding Plant DE
+MAT-512501,G-24-5,3651,KANBAN-00030,Stamping Plant DE,BIW/Welding Plant DE
+MAT-807252,G-23-5,610,KANBAN-00031,Stamping Plant DE,BIW/Welding Plant DE
+MAT-793141,H-11-5,4244,KANBAN-00032,Stamping Plant DE,BIW/Welding Plant DE
+MAT-512070,E-19-4,4717,KANBAN-00033,Stamping Plant DE,BIW/Welding Plant DE
+MAT-117131,B-22-5,4284,KANBAN-00034,Stamping Plant DE,BIW/Welding Plant DE
+MAT-222789,C-14-5,2736,KANBAN-00035,Stamping Plant DE,BIW/Welding Plant DE
+MAT-857930,F-08-2,4236,KANBAN-00036,Stamping Plant DE,BIW/Welding Plant DE
+MAT-202496,G-15-1,3405,KANBAN-00037,Stamping Plant DE,BIW/Welding Plant DE
+MAT-727304,E-21-3,3088,KANBAN-00038,Stamping Plant DE,BIW/Welding Plant DE
+MAT-322599,B-11-1,1449,KANBAN-00039,Stamping Plant DE,BIW/Welding Plant DE
+MAT-362336,F-18-4,490,KANBAN-00040,Stamping Plant DE,BIW/Welding Plant DE
+MAT-506533,G-15-4,2809,KANBAN-00041,Stamping Plant DE,BIW/Welding Plant DE
+MAT-764752,G-19-3,4982,KANBAN-00042,Stamping Plant DE,BIW/Welding Plant DE
+MAT-689389,A-26-4,1233,KANBAN-00043,Stamping Plant DE,BIW/Welding Plant DE
+MAT-981681,C-23-4,2194,KANBAN-00044,Stamping Plant DE,BIW/Welding Plant DE
+MAT-728191,B-12-1,698,KANBAN-00045,Stamping Plant DE,BIW/Welding Plant DE
+MAT-197664,C-12-3,3066,KANBAN-00046,Stamping Plant DE,BIW/Welding Plant DE
+MAT-232122,F-17-2,3367,KANBAN-00047,Stamping Plant DE,BIW/Welding Plant DE
+MAT-854098,A-19-5,4622,KANBAN-00048,Stamping Plant DE,BIW/Welding Plant DE
+MAT-272777,B-02-2,4064,KANBAN-00049,Stamping Plant DE,BIW/Welding Plant DE
+MAT-524726,G-18-4,3678,KANBAN-00050,Stamping Plant DE,BIW/Welding Plant DE
+MAT-954299,E-13-3,3231,KANBAN-00051,Stamping Plant DE,BIW/Welding Plant DE
+MAT-616824,A-28-5,4764,KANBAN-00052,Stamping Plant DE,BIW/Welding Plant DE
+MAT-866263,B-11-1,2197,KANBAN-00053,Stamping Plant DE,BIW/Welding Plant DE
+MAT-457548,E-22-4,2035,KANBAN-00054,Stamping Plant DE,BIW/Welding Plant DE
+MAT-173637,E-19-3,1779,KANBAN-00055,Stamping Plant DE,BIW/Welding Plant DE
+MAT-651397,F-27-4,2243,KANBAN-00056,Stamping Plant DE,BIW/Welding Plant DE
+MAT-307504,D-17-4,4327,KANBAN-00057,Stamping Plant DE,BIW/Welding Plant DE
+MAT-560634,H-22-1,3780,KANBAN-00058,Stamping Plant DE,BIW/Welding Plant DE
+MAT-348972,A-20-4,4953,KANBAN-00059,Stamping Plant DE,BIW/Welding Plant DE
+MAT-373936,B-13-1,3797,KANBAN-00060,Stamping Plant DE,BIW/Welding Plant DE
+MAT-147415,C-06-5,2733,KANBAN-00061,Stamping Plant DE,BIW/Welding Plant DE
+MAT-406967,E-04-4,533,KANBAN-00062,Stamping Plant DE,BIW/Welding Plant DE
+MAT-418921,F-29-2,2696,KANBAN-00063,Stamping Plant DE,BIW/Welding Plant DE
+MAT-262852,A-06-3,4189,KANBAN-00064,Stamping Plant DE,BIW/Welding Plant DE
+MAT-348056,E-10-3,75,KANBAN-00065,Stamping Plant DE,BIW/Welding Plant DE
+MAT-522509,A-29-4,1628,KANBAN-00066,Stamping Plant DE,BIW/Welding Plant DE
+MAT-602650,C-27-2,3399,KANBAN-00067,Stamping Plant DE,BIW/Welding Plant DE
+MAT-240066,B-19-3,1965,KANBAN-00068,Stamping Plant DE,BIW/Welding Plant DE
+MAT-598220,A-20-5,4262,KANBAN-00069,Stamping Plant DE,BIW/Welding Plant DE
+MAT-958442,E-26-2,4043,KANBAN-00070,Stamping Plant DE,BIW/Welding Plant DE
+MAT-858201,F-09-2,4091,KANBAN-00071,Stamping Plant DE,BIW/Welding Plant DE
+MAT-580866,C-05-3,2460,KANBAN-00072,Stamping Plant DE,BIW/Welding Plant DE
+MAT-618436,A-19-5,1715,KANBAN-00073,Stamping Plant DE,BIW/Welding Plant DE
+MAT-155518,H-17-3,4557,KANBAN-00074,Stamping Plant DE,BIW/Welding Plant DE
+MAT-331314,C-09-2,2022,KANBAN-00075,Stamping Plant DE,BIW/Welding Plant DE
+MAT-828569,F-03-3,2243,KANBAN-00076,Stamping Plant DE,BIW/Welding Plant DE
+MAT-409348,C-01-2,4972,KANBAN-00077,Stamping Plant DE,BIW/Welding Plant DE
+MAT-127408,C-08-2,4564,KANBAN-00078,Stamping Plant DE,BIW/Welding Plant DE
+MAT-404653,G-03-4,1901,KANBAN-00079,Stamping Plant DE,BIW/Welding Plant DE
+MAT-169381,C-09-3,1077,KANBAN-00080,Stamping Plant DE,BIW/Welding Plant DE
+MAT-299848,A-02-2,577,KANBAN-00081,Stamping Plant DE,BIW/Welding Plant DE
+MAT-719672,C-18-2,669,KANBAN-00082,Stamping Plant DE,BIW/Welding Plant DE
+MAT-614016,B-08-4,1972,KANBAN-00083,Stamping Plant DE,BIW/Welding Plant DE
+MAT-923155,C-22-4,2169,KANBAN-00084,Stamping Plant DE,BIW/Welding Plant DE
+MAT-693482,D-04-3,2807,KANBAN-00085,Stamping Plant DE,BIW/Welding Plant DE
+MAT-752292,H-29-4,4944,KANBAN-00086,Stamping Plant DE,BIW/Welding Plant DE
+MAT-439073,H-27-2,81,KANBAN-00087,Stamping Plant DE,BIW/Welding Plant DE
+MAT-794067,D-21-1,870,KANBAN-00088,Stamping Plant DE,BIW/Welding Plant DE
+MAT-302252,A-09-3,1257,KANBAN-00089,Stamping Plant DE,BIW/Welding Plant DE
+MAT-903499,A-15-5,1081,KANBAN-00090,Stamping Plant DE,BIW/Welding Plant DE
+MAT-662115,F-07-4,386,KANBAN-00091,Stamping Plant DE,BIW/Welding Plant DE
+MAT-604183,H-25-4,1235,KANBAN-00092,Stamping Plant DE,BIW/Welding Plant DE
+MAT-937801,C-21-1,3231,KANBAN-00093,Stamping Plant DE,BIW/Welding Plant DE
+MAT-460385,B-09-5,3692,KANBAN-00094,Stamping Plant DE,BIW/Welding Plant DE
+MAT-272539,C-14-3,461,KANBAN-00095,Stamping Plant DE,BIW/Welding Plant DE
+MAT-696697,D-09-4,4601,KANBAN-00096,Stamping Plant DE,BIW/Welding Plant DE
+MAT-457895,D-15-3,1966,KANBAN-00097,Stamping Plant DE,BIW/Welding Plant DE
+MAT-631592,F-16-1,1124,KANBAN-00098,Stamping Plant DE,BIW/Welding Plant DE
+MAT-300678,C-26-1,4973,KANBAN-00099,Stamping Plant DE,BIW/Welding Plant DE
+MAT-385594,E-13-2,2064,KANBAN-00100,Stamping Plant DE,BIW/Welding Plant DE
+MAT-339239,D-17-2,1454,KANBAN-00101,Stamping Plant DE,BIW/Welding Plant DE
+MAT-417790,D-19-3,2690,KANBAN-00102,Stamping Plant DE,BIW/Welding Plant DE
+MAT-560856,B-21-4,2014,KANBAN-00103,Stamping Plant DE,BIW/Welding Plant DE
+MAT-300197,C-29-1,468,KANBAN-00104,Stamping Plant DE,BIW/Welding Plant DE
+MAT-957262,F-27-4,4035,KANBAN-00105,Stamping Plant DE,BIW/Welding Plant DE
+MAT-418896,F-15-3,1861,KANBAN-00106,Stamping Plant DE,BIW/Welding Plant DE
+MAT-700496,C-29-5,4327,KANBAN-00107,Stamping Plant DE,BIW/Welding Plant DE
+MAT-488569,H-12-2,1307,KANBAN-00108,Stamping Plant DE,BIW/Welding Plant DE
+MAT-201835,A-06-4,2524,KANBAN-00109,Stamping Plant DE,BIW/Welding Plant DE
+MAT-567160,G-25-3,2788,KANBAN-00110,Stamping Plant DE,BIW/Welding Plant DE
+MAT-875951,B-19-5,4106,KANBAN-00111,Stamping Plant DE,BIW/Welding Plant DE
+MAT-708855,D-02-1,3928,KANBAN-00112,Stamping Plant DE,BIW/Welding Plant DE
+MAT-440273,A-22-2,2545,KANBAN-00113,Stamping Plant DE,BIW/Welding Plant DE
+MAT-971951,C-14-5,2256,KANBAN-00114,Stamping Plant DE,BIW/Welding Plant DE
+MAT-450601,G-08-4,3658,KANBAN-00115,Stamping Plant DE,BIW/Welding Plant DE
+MAT-226437,B-02-2,4456,KANBAN-00116,Stamping Plant DE,BIW/Welding Plant DE
+MAT-556406,F-16-1,3758,KANBAN-00117,Stamping Plant DE,BIW/Welding Plant DE
+MAT-639039,E-16-4,3239,KANBAN-00118,Stamping Plant DE,BIW/Welding Plant DE
+MAT-605453,A-16-3,2719,KANBAN-00119,Stamping Plant DE,BIW/Welding Plant DE
+MAT-212357,G-27-3,1689,KANBAN-00120,Stamping Plant DE,BIW/Welding Plant DE
+MAT-631255,C-04-1,4883,KANBAN-00121,Stamping Plant DE,BIW/Welding Plant DE
+MAT-501213,B-10-5,286,KANBAN-00122,Stamping Plant DE,BIW/Welding Plant DE
+MAT-230483,A-10-3,2317,KANBAN-00123,Stamping Plant DE,BIW/Welding Plant DE
+MAT-312364,D-16-3,4639,KANBAN-00124,Stamping Plant DE,BIW/Welding Plant DE
+MAT-475851,A-21-4,3548,KANBAN-00125,Stamping Plant DE,BIW/Welding Plant DE
+MAT-387594,G-21-3,118,KANBAN-00126,Stamping Plant DE,BIW/Welding Plant DE
+MAT-221634,E-02-3,4499,KANBAN-00127,Stamping Plant DE,BIW/Welding Plant DE
+MAT-872398,B-04-4,3109,KANBAN-00128,Stamping Plant DE,BIW/Welding Plant DE
+MAT-512793,C-04-1,2532,KANBAN-00129,Stamping Plant DE,BIW/Welding Plant DE
+MAT-864736,D-02-1,2389,KANBAN-00130,Stamping Plant DE,BIW/Welding Plant DE
+MAT-650109,E-20-5,2216,KANBAN-00131,Stamping Plant DE,BIW/Welding Plant DE
+MAT-858062,D-13-1,3760,KANBAN-00132,Stamping Plant DE,BIW/Welding Plant DE
+MAT-458721,H-18-1,212,KANBAN-00133,Stamping Plant DE,BIW/Welding Plant DE
+MAT-938291,A-13-2,116,KANBAN-00134,Stamping Plant DE,BIW/Welding Plant DE
+MAT-551075,D-21-1,852,KANBAN-00135,Stamping Plant DE,BIW/Welding Plant DE
+MAT-825579,A-20-5,2329,KANBAN-00136,Stamping Plant DE,BIW/Welding Plant DE
+MAT-293124,E-20-5,1710,KANBAN-00137,Stamping Plant DE,BIW/Welding Plant DE
+MAT-855888,E-27-3,3175,KANBAN-00138,Stamping Plant DE,BIW/Welding Plant DE
+MAT-120930,D-28-1,1874,KANBAN-00139,Stamping Plant DE,BIW/Welding Plant DE
+MAT-697919,A-11-4,4581,KANBAN-00140,Stamping Plant DE,BIW/Welding Plant DE
+MAT-556331,H-15-2,4687,KANBAN-00141,Stamping Plant DE,BIW/Welding Plant DE
+MAT-333043,F-12-1,955,KANBAN-00142,Stamping Plant DE,BIW/Welding Plant DE
+MAT-671724,E-05-1,910,KANBAN-00143,Stamping Plant DE,BIW/Welding Plant DE
+MAT-257523,D-06-5,4325,KANBAN-00144,Stamping Plant DE,BIW/Welding Plant DE
+MAT-139013,A-06-4,2661,KANBAN-00145,Stamping Plant DE,BIW/Welding Plant DE
+MAT-633798,B-26-5,4862,KANBAN-00146,Stamping Plant DE,BIW/Welding Plant DE
+MAT-602393,G-20-2,3134,KANBAN-00147,Stamping Plant DE,BIW/Welding Plant DE
+MAT-904597,B-28-3,182,KANBAN-00148,Stamping Plant DE,BIW/Welding Plant DE
+MAT-871300,A-26-5,2458,KANBAN-00149,Stamping Plant DE,BIW/Welding Plant DE
+MAT-768674,E-14-3,3695,KANBAN-00150,Stamping Plant DE,BIW/Welding Plant DE
+MAT-528344,C-28-1,3612,KANBAN-00151,Stamping Plant DE,BIW/Welding Plant DE
+MAT-398237,G-20-1,1302,KANBAN-00152,Stamping Plant DE,BIW/Welding Plant DE
+MAT-955852,G-15-2,4428,KANBAN-00153,Stamping Plant DE,BIW/Welding Plant DE
+MAT-715231,E-05-4,469,KANBAN-00154,Stamping Plant DE,BIW/Welding Plant DE
+MAT-927063,B-16-5,3510,KANBAN-00155,Stamping Plant DE,BIW/Welding Plant DE
+MAT-201198,F-12-1,2045,KANBAN-00156,Stamping Plant DE,BIW/Welding Plant DE
+MAT-256827,D-20-5,4016,KANBAN-00157,Stamping Plant DE,BIW/Welding Plant DE
+MAT-206780,H-13-4,1514,KANBAN-00158,Stamping Plant DE,BIW/Welding Plant DE
+MAT-224659,H-16-4,4951,KANBAN-00159,Stamping Plant DE,BIW/Welding Plant DE
+MAT-681950,A-18-5,1302,KANBAN-00160,Stamping Plant DE,BIW/Welding Plant DE
+MAT-104215,A-29-5,488,KANBAN-00161,Stamping Plant DE,BIW/Welding Plant DE
+MAT-524146,B-12-5,147,KANBAN-00162,Stamping Plant DE,BIW/Welding Plant DE
+MAT-187320,H-06-2,4754,KANBAN-00163,Stamping Plant DE,BIW/Welding Plant DE
+MAT-555407,E-29-3,1016,KANBAN-00164,Stamping Plant DE,BIW/Welding Plant DE
+MAT-185986,C-20-1,3579,KANBAN-00165,Stamping Plant DE,BIW/Welding Plant DE
+MAT-185922,A-21-5,283,KANBAN-00166,Stamping Plant DE,BIW/Welding Plant DE
+MAT-414256,F-06-5,3688,KANBAN-00001,Solara Metals Coil Plant,Stamping Plant DE
+MAT-293064,H-28-4,4644,KANBAN-00002,Solara Metals Coil Plant,Stamping Plant DE
+MAT-185933,D-06-4,4255,KANBAN-00003,Solara Metals Coil Plant,Stamping Plant DE
+MAT-112194,F-01-5,1090,KANBAN-00004,Solara Metals Coil Plant,Stamping Plant DE
+MAT-916907,A-26-2,3238,KANBAN-00005,Solara Metals Coil Plant,Stamping Plant DE
+MAT-592086,G-09-5,994,KANBAN-00006,Solara Metals Coil Plant,Stamping Plant DE
+MAT-204927,A-02-1,1635,KANBAN-00007,Solara Metals Coil Plant,Stamping Plant DE
+MAT-228791,D-19-4,1374,KANBAN-00008,Solara Metals Coil Plant,Stamping Plant DE
+MAT-298498,H-19-3,3434,KANBAN-00009,Solara Metals Coil Plant,Stamping Plant DE
+MAT-498486,A-25-5,4096,KANBAN-00010,Solara Metals Coil Plant,Stamping Plant DE
+MAT-784616,A-18-5,629,KANBAN-00011,Solara Metals Coil Plant,Stamping Plant DE
+MAT-633193,C-11-3,232,KANBAN-00012,Solara Metals Coil Plant,Stamping Plant DE
+MAT-229020,G-22-4,2396,KANBAN-00013,Solara Metals Coil Plant,Stamping Plant DE
+MAT-313877,E-04-1,1777,KANBAN-00014,Solara Metals Coil Plant,Stamping Plant DE
+MAT-130336,H-17-5,4573,KANBAN-00015,Solara Metals Coil Plant,Stamping Plant DE
+MAT-745160,H-28-5,515,KANBAN-00016,Solara Metals Coil Plant,Stamping Plant DE
+MAT-113157,F-24-5,2366,KANBAN-00017,Solara Metals Coil Plant,Stamping Plant DE
+MAT-659163,C-05-1,1250,KANBAN-00018,Solara Metals Coil Plant,Stamping Plant DE
+MAT-257615,A-14-1,4550,KANBAN-00019,Solara Metals Coil Plant,Stamping Plant DE
+MAT-522457,B-05-4,967,KANBAN-00020,Solara Metals Coil Plant,Stamping Plant DE
+MAT-509433,E-20-4,3994,KANBAN-00021,Solara Metals Coil Plant,Stamping Plant DE
+MAT-220787,C-13-5,1045,KANBAN-00022,Solara Metals Coil Plant,Stamping Plant DE
+MAT-308767,F-15-4,2886,KANBAN-00023,Solara Metals Coil Plant,Stamping Plant DE
+MAT-842971,H-01-4,4305,KANBAN-00024,Solara Metals Coil Plant,Stamping Plant DE
+MAT-132530,E-04-4,3576,KANBAN-00025,Solara Metals Coil Plant,Stamping Plant DE
+MAT-614887,E-07-3,920,KANBAN-00026,Solara Metals Coil Plant,Stamping Plant DE
+MAT-418696,D-24-5,4346,KANBAN-00027,Solara Metals Coil Plant,Stamping Plant DE
+MAT-424718,C-05-3,3481,KANBAN-00028,Solara Metals Coil Plant,Stamping Plant DE
+MAT-848623,G-12-2,4196,KANBAN-00029,Solara Metals Coil Plant,Stamping Plant DE
+MAT-847491,A-27-4,3029,KANBAN-00030,Solara Metals Coil Plant,Stamping Plant DE
+MAT-989293,D-04-5,1034,KANBAN-00031,Solara Metals Coil Plant,Stamping Plant DE
+MAT-431652,D-25-1,1448,KANBAN-00032,Solara Metals Coil Plant,Stamping Plant DE
+MAT-964155,F-03-3,3828,KANBAN-00033,Solara Metals Coil Plant,Stamping Plant DE
+MAT-957904,D-11-3,2813,KANBAN-00034,Solara Metals Coil Plant,Stamping Plant DE
+MAT-177318,G-28-1,1312,KANBAN-00035,Solara Metals Coil Plant,Stamping Plant DE
+MAT-553692,A-06-3,3675,KANBAN-00036,Solara Metals Coil Plant,Stamping Plant DE
+MAT-774377,A-23-1,4023,KANBAN-00037,Solara Metals Coil Plant,Stamping Plant DE
+MAT-921648,G-14-5,272,KANBAN-00038,Solara Metals Coil Plant,Stamping Plant DE
+MAT-171535,E-03-2,3050,KANBAN-00039,Solara Metals Coil Plant,Stamping Plant DE
+MAT-778776,F-04-1,2775,KANBAN-00040,Solara Metals Coil Plant,Stamping Plant DE
+MAT-582893,E-05-5,2084,KANBAN-00041,Solara Metals Coil Plant,Stamping Plant DE
+MAT-474821,F-02-2,4958,KANBAN-00042,Solara Metals Coil Plant,Stamping Plant DE
+MAT-797641,G-06-5,3014,KANBAN-00043,Solara Metals Coil Plant,Stamping Plant DE
+MAT-360763,E-14-1,2289,KANBAN-00044,Solara Metals Coil Plant,Stamping Plant DE
+MAT-834679,F-27-1,4916,KANBAN-00045,Solara Metals Coil Plant,Stamping Plant DE
+MAT-883750,B-05-3,3319,KANBAN-00046,Solara Metals Coil Plant,Stamping Plant DE
+MAT-240279,B-11-2,4167,KANBAN-00047,Solara Metals Coil Plant,Stamping Plant DE
+MAT-880649,B-26-3,4432,KANBAN-00048,Solara Metals Coil Plant,Stamping Plant DE
+MAT-604551,E-14-3,4259,KANBAN-00049,Solara Metals Coil Plant,Stamping Plant DE
+MAT-566468,E-19-2,3272,KANBAN-00050,Solara Metals Coil Plant,Stamping Plant DE
+MAT-393389,H-29-5,2560,KANBAN-00051,Solara Metals Coil Plant,Stamping Plant DE
+MAT-767709,A-04-4,4178,KANBAN-00052,Solara Metals Coil Plant,Stamping Plant DE
+MAT-165986,C-22-3,4540,KANBAN-00053,Solara Metals Coil Plant,Stamping Plant DE
+MAT-440528,H-24-2,1551,KANBAN-00054,Solara Metals Coil Plant,Stamping Plant DE
+MAT-447377,H-19-2,2285,KANBAN-00055,Solara Metals Coil Plant,Stamping Plant DE
+MAT-512032,E-02-2,435,KANBAN-00056,Solara Metals Coil Plant,Stamping Plant DE
+MAT-450012,D-20-1,4854,KANBAN-00057,Solara Metals Coil Plant,Stamping Plant DE
+MAT-104266,E-27-4,285,KANBAN-00058,Solara Metals Coil Plant,Stamping Plant DE
+MAT-109399,B-10-2,2238,KANBAN-00059,Solara Metals Coil Plant,Stamping Plant DE
+MAT-331251,F-06-1,1461,KANBAN-00060,Solara Metals Coil Plant,Stamping Plant DE
+MAT-683279,D-08-4,76,KANBAN-00061,Solara Metals Coil Plant,Stamping Plant DE
+MAT-483301,C-01-3,3674,KANBAN-00062,Solara Metals Coil Plant,Stamping Plant DE
+MAT-192631,F-28-3,1212,KANBAN-00063,Solara Metals Coil Plant,Stamping Plant DE
+MAT-635355,A-01-4,1327,KANBAN-00064,Solara Metals Coil Plant,Stamping Plant DE
+MAT-369682,B-28-3,411,KANBAN-00065,Solara Metals Coil Plant,Stamping Plant DE
+MAT-401908,D-19-4,1800,KANBAN-00066,Solara Metals Coil Plant,Stamping Plant DE
+MAT-634896,E-17-1,4030,KANBAN-00067,Solara Metals Coil Plant,Stamping Plant DE
+MAT-579000,F-14-4,3609,KANBAN-00068,Solara Metals Coil Plant,Stamping Plant DE
+MAT-815497,D-11-5,2082,KANBAN-00069,Solara Metals Coil Plant,Stamping Plant DE
+MAT-217037,H-28-4,2490,KANBAN-00070,Solara Metals Coil Plant,Stamping Plant DE
+MAT-187243,G-08-1,4312,KANBAN-00071,Solara Metals Coil Plant,Stamping Plant DE
+MAT-659849,D-20-4,1955,KANBAN-00072,Solara Metals Coil Plant,Stamping Plant DE
+MAT-489196,E-16-2,4966,KANBAN-00073,Solara Metals Coil Plant,Stamping Plant DE
+MAT-718163,C-12-3,4064,KANBAN-00074,Solara Metals Coil Plant,Stamping Plant DE
+MAT-512448,A-03-4,1120,KANBAN-00075,Solara Metals Coil Plant,Stamping Plant DE
+MAT-664125,D-04-4,4324,KANBAN-00076,Solara Metals Coil Plant,Stamping Plant DE
+MAT-611500,B-22-4,2028,KANBAN-00077,Solara Metals Coil Plant,Stamping Plant DE
+MAT-822686,A-17-1,3263,KANBAN-00078,Solara Metals Coil Plant,Stamping Plant DE
+MAT-397640,E-23-1,1935,KANBAN-00079,Solara Metals Coil Plant,Stamping Plant DE
+MAT-764571,F-19-4,1395,KANBAN-00080,Solara Metals Coil Plant,Stamping Plant DE
+MAT-867788,E-22-4,234,KANBAN-00081,Solara Metals Coil Plant,Stamping Plant DE
+MAT-511843,D-18-4,4318,KANBAN-00082,Solara Metals Coil Plant,Stamping Plant DE
+MAT-214366,D-12-3,1095,KANBAN-00083,Solara Metals Coil Plant,Stamping Plant DE
+MAT-873984,G-12-2,144,KANBAN-00084,Solara Metals Coil Plant,Stamping Plant DE
+MAT-947298,A-15-3,1565,KANBAN-00085,Solara Metals Coil Plant,Stamping Plant DE
+MAT-278769,H-17-5,1357,KANBAN-00086,Solara Metals Coil Plant,Stamping Plant DE
+MAT-562386,F-07-1,1458,KANBAN-00087,Solara Metals Coil Plant,Stamping Plant DE
+MAT-445661,F-24-3,3967,KANBAN-00088,Solara Metals Coil Plant,Stamping Plant DE
+MAT-754379,A-29-4,4067,KANBAN-00089,Solara Metals Coil Plant,Stamping Plant DE
+MAT-300363,E-08-4,2334,KANBAN-00090,Solara Metals Coil Plant,Stamping Plant DE
+MAT-830431,C-11-3,3201,KANBAN-00091,Solara Metals Coil Plant,Stamping Plant DE
+MAT-448387,D-22-5,1958,KANBAN-00092,Solara Metals Coil Plant,Stamping Plant DE
+MAT-723539,H-05-2,434,KANBAN-00093,Solara Metals Coil Plant,Stamping Plant DE
+MAT-962643,G-14-2,1185,KANBAN-00094,Solara Metals Coil Plant,Stamping Plant DE
+MAT-322477,G-21-3,3035,KANBAN-00095,Solara Metals Coil Plant,Stamping Plant DE
+MAT-631892,H-26-4,1902,KANBAN-00096,Solara Metals Coil Plant,Stamping Plant DE
+MAT-649819,A-12-5,912,KANBAN-00097,Solara Metals Coil Plant,Stamping Plant DE
+MAT-530869,F-13-2,2254,KANBAN-00098,Solara Metals Coil Plant,Stamping Plant DE
+MAT-883228,A-15-2,668,KANBAN-00099,Solara Metals Coil Plant,Stamping Plant DE
+MAT-618852,D-05-1,4060,KANBAN-00100,Solara Metals Coil Plant,Stamping Plant DE
+MAT-166500,E-22-1,3029,KANBAN-00101,Solara Metals Coil Plant,Stamping Plant DE
+MAT-864346,D-19-1,4596,KANBAN-00102,Solara Metals Coil Plant,Stamping Plant DE
+MAT-262308,H-16-4,4080,KANBAN-00103,Solara Metals Coil Plant,Stamping Plant DE
+MAT-154305,D-12-4,4731,KANBAN-00104,Solara Metals Coil Plant,Stamping Plant DE
+MAT-839608,H-15-5,3428,KANBAN-00105,Solara Metals Coil Plant,Stamping Plant DE
+MAT-921319,D-19-4,4696,KANBAN-00106,Solara Metals Coil Plant,Stamping Plant DE
+MAT-394336,A-15-2,3555,KANBAN-00107,Solara Metals Coil Plant,Stamping Plant DE
+MAT-683777,H-12-5,786,KANBAN-00108,Solara Metals Coil Plant,Stamping Plant DE
+MAT-619617,H-20-2,1135,KANBAN-00109,Solara Metals Coil Plant,Stamping Plant DE
+MAT-307901,D-18-1,3491,KANBAN-00110,Solara Metals Coil Plant,Stamping Plant DE
+MAT-805129,H-29-2,4271,KANBAN-00111,Solara Metals Coil Plant,Stamping Plant DE
+MAT-885299,H-06-5,4764,KANBAN-00112,Solara Metals Coil Plant,Stamping Plant DE
+MAT-471106,H-03-1,3502,KANBAN-00113,Solara Metals Coil Plant,Stamping Plant DE
+MAT-179638,E-28-3,4199,KANBAN-00114,Solara Metals Coil Plant,Stamping Plant DE
+MAT-224507,A-13-5,3430,KANBAN-00115,Solara Metals Coil Plant,Stamping Plant DE
+MAT-352809,F-17-3,1824,KANBAN-00116,Solara Metals Coil Plant,Stamping Plant DE
+MAT-555856,F-13-1,877,KANBAN-00117,Solara Metals Coil Plant,Stamping Plant DE
+MAT-178822,C-03-4,880,KANBAN-00118,Solara Metals Coil Plant,Stamping Plant DE
+MAT-956921,C-25-2,4811,KANBAN-00119,Solara Metals Coil Plant,Stamping Plant DE
+MAT-937409,B-02-3,4431,KANBAN-00120,Solara Metals Coil Plant,Stamping Plant DE
+MAT-377558,G-21-1,2550,KANBAN-00121,Solara Metals Coil Plant,Stamping Plant DE
+MAT-835726,H-25-2,2564,KANBAN-00122,Solara Metals Coil Plant,Stamping Plant DE
+MAT-330351,E-25-1,2130,KANBAN-00123,Solara Metals Coil Plant,Stamping Plant DE
+MAT-621219,C-03-1,785,KANBAN-00124,Solara Metals Coil Plant,Stamping Plant DE
+MAT-363843,B-14-2,4696,KANBAN-00125,Solara Metals Coil Plant,Stamping Plant DE
+MAT-556922,F-07-2,634,KANBAN-00126,Solara Metals Coil Plant,Stamping Plant DE
+MAT-392633,G-16-4,4276,KANBAN-00127,Solara Metals Coil Plant,Stamping Plant DE
+MAT-597055,C-14-5,3725,KANBAN-00128,Solara Metals Coil Plant,Stamping Plant DE
+MAT-511211,H-27-5,4389,KANBAN-00129,Solara Metals Coil Plant,Stamping Plant DE
+MAT-867249,F-08-5,3483,KANBAN-00130,Solara Metals Coil Plant,Stamping Plant DE
+MAT-308193,C-21-1,2772,KANBAN-00131,Solara Metals Coil Plant,Stamping Plant DE
+MAT-400924,B-17-4,1388,KANBAN-00132,Solara Metals Coil Plant,Stamping Plant DE
+MAT-145655,C-25-1,2837,KANBAN-00133,Solara Metals Coil Plant,Stamping Plant DE
+MAT-521512,C-19-1,4525,KANBAN-00134,Solara Metals Coil Plant,Stamping Plant DE
+MAT-290114,E-10-3,3275,KANBAN-00135,Solara Metals Coil Plant,Stamping Plant DE
+MAT-911126,E-18-4,4002,KANBAN-00136,Solara Metals Coil Plant,Stamping Plant DE
+MAT-189359,C-05-2,2180,KANBAN-00137,Solara Metals Coil Plant,Stamping Plant DE
+MAT-888887,D-02-1,1341,KANBAN-00138,Solara Metals Coil Plant,Stamping Plant DE
+MAT-897246,B-26-4,1825,KANBAN-00139,Solara Metals Coil Plant,Stamping Plant DE
+MAT-671114,E-13-2,4224,KANBAN-00140,Solara Metals Coil Plant,Stamping Plant DE
+MAT-608740,E-18-1,3508,KANBAN-00141,Solara Metals Coil Plant,Stamping Plant DE
+MAT-498762,F-18-4,4337,KANBAN-00142,Solara Metals Coil Plant,Stamping Plant DE
+MAT-743587,D-20-3,1102,KANBAN-00143,Solara Metals Coil Plant,Stamping Plant DE
+MAT-552014,B-25-4,2850,KANBAN-00144,Solara Metals Coil Plant,Stamping Plant DE
+MAT-766113,D-24-2,2863,KANBAN-00145,Solara Metals Coil Plant,Stamping Plant DE
+MAT-869348,E-20-1,899,KANBAN-00146,Solara Metals Coil Plant,Stamping Plant DE
+MAT-446390,A-04-1,1762,KANBAN-00147,Solara Metals Coil Plant,Stamping Plant DE
+MAT-931111,F-13-5,339,KANBAN-00148,Solara Metals Coil Plant,Stamping Plant DE
+MAT-642362,C-26-5,580,KANBAN-00149,Solara Metals Coil Plant,Stamping Plant DE
+MAT-103919,F-13-5,1333,KANBAN-00150,Solara Metals Coil Plant,Stamping Plant DE
+MAT-176695,H-28-4,2141,KANBAN-00151,Solara Metals Coil Plant,Stamping Plant DE
+MAT-160778,B-06-4,2936,KANBAN-00152,Solara Metals Coil Plant,Stamping Plant DE
+MAT-108827,H-27-3,351,KANBAN-00153,Solara Metals Coil Plant,Stamping Plant DE
+MAT-197838,A-27-1,1288,KANBAN-00154,Solara Metals Coil Plant,Stamping Plant DE
+MAT-868666,F-08-3,1625,KANBAN-00155,Solara Metals Coil Plant,Stamping Plant DE
+MAT-899409,B-03-3,3122,KANBAN-00156,Solara Metals Coil Plant,Stamping Plant DE
+MAT-320738,C-14-1,3114,KANBAN-00157,Solara Metals Coil Plant,Stamping Plant DE
+MAT-584576,B-08-5,3402,KANBAN-00158,Solara Metals Coil Plant,Stamping Plant DE
+MAT-119802,E-19-5,55,KANBAN-00159,Solara Metals Coil Plant,Stamping Plant DE
+MAT-614601,C-08-4,4176,KANBAN-00160,Solara Metals Coil Plant,Stamping Plant DE
+MAT-270309,E-28-1,4537,KANBAN-00161,Solara Metals Coil Plant,Stamping Plant DE
+MAT-266301,B-22-4,3133,KANBAN-00162,Solara Metals Coil Plant,Stamping Plant DE
+MAT-752198,F-19-4,211,KANBAN-00163,Solara Metals Coil Plant,Stamping Plant DE
+MAT-237140,G-26-4,1039,KANBAN-00164,Solara Metals Coil Plant,Stamping Plant DE
+MAT-513336,F-29-4,4061,KANBAN-00165,Solara Metals Coil Plant,Stamping Plant DE
+MAT-797978,A-29-5,2584,KANBAN-00166,Solara Metals Coil Plant,Stamping Plant DE
+MAT-589046,H-27-1,4810,KANBAN-00167,Solara Metals Coil Plant,Stamping Plant DE
+MAT-524928,D-16-5,874,KANBAN-00168,Solara Metals Coil Plant,Stamping Plant DE
+MAT-599744,G-14-4,4269,KANBAN-00169,Solara Metals Coil Plant,Stamping Plant DE
+MAT-546713,D-06-4,1298,KANBAN-00170,Solara Metals Coil Plant,Stamping Plant DE
+MAT-994584,G-28-4,1060,KANBAN-00171,Solara Metals Coil Plant,Stamping Plant DE
+MAT-384876,E-09-3,225,KANBAN-00172,Solara Metals Coil Plant,Stamping Plant DE
+MAT-589145,H-25-1,3036,KANBAN-00173,Solara Metals Coil Plant,Stamping Plant DE
+MAT-102520,C-28-5,719,KANBAN-00174,Solara Metals Coil Plant,Stamping Plant DE
+MAT-768858,C-10-3,2551,KANBAN-00175,Solara Metals Coil Plant,Stamping Plant DE
+MAT-633418,F-12-3,478,KANBAN-00176,Solara Metals Coil Plant,Stamping Plant DE
+MAT-258297,B-05-1,463,KANBAN-00177,Solara Metals Coil Plant,Stamping Plant DE
+MAT-629421,A-16-1,4251,KANBAN-00178,Solara Metals Coil Plant,Stamping Plant DE
+MAT-445308,C-04-4,64,KANBAN-00179,Solara Metals Coil Plant,Stamping Plant DE
+MAT-850655,G-25-2,1340,KANBAN-00180,Solara Metals Coil Plant,Stamping Plant DE
+MAT-312051,A-01-4,400,KANBAN-00181,Solara Metals Coil Plant,Stamping Plant DE
+MAT-410346,A-02-5,1140,KANBAN-00182,Solara Metals Coil Plant,Stamping Plant DE
+MAT-904068,F-13-5,3671,KANBAN-00183,Solara Metals Coil Plant,Stamping Plant DE
+MAT-807713,C-18-1,1969,KANBAN-00184,Solara Metals Coil Plant,Stamping Plant DE
+MAT-934175,B-11-1,3880,KANBAN-00185,Solara Metals Coil Plant,Stamping Plant DE
+MAT-765070,D-07-5,2629,KANBAN-00186,Solara Metals Coil Plant,Stamping Plant DE
+MAT-432403,H-24-2,4108,KANBAN-00187,Solara Metals Coil Plant,Stamping Plant DE
+MAT-146239,A-06-5,3294,KANBAN-00188,Solara Metals Coil Plant,Stamping Plant DE
+MAT-251292,H-10-4,3372,KANBAN-00189,Solara Metals Coil Plant,Stamping Plant DE
+MAT-216044,H-02-4,306,KANBAN-00190,Solara Metals Coil Plant,Stamping Plant DE
+MAT-371369,D-23-3,3153,KANBAN-00191,Solara Metals Coil Plant,Stamping Plant DE
+MAT-405606,B-08-1,2467,KANBAN-00192,Solara Metals Coil Plant,Stamping Plant DE
+MAT-511429,C-25-4,2327,KANBAN-00193,Solara Metals Coil Plant,Stamping Plant DE
+MAT-437272,B-08-3,2513,KANBAN-00194,Solara Metals Coil Plant,Stamping Plant DE
+MAT-655284,F-11-1,3784,KANBAN-00195,Solara Metals Coil Plant,Stamping Plant DE
+MAT-317097,H-04-2,3695,KANBAN-00196,Solara Metals Coil Plant,Stamping Plant DE
+MAT-222394,E-01-4,653,KANBAN-00197,Solara Metals Coil Plant,Stamping Plant DE
+MAT-787244,E-05-1,1467,KANBAN-00198,Solara Metals Coil Plant,Stamping Plant DE
+MAT-625491,A-24-1,1317,KANBAN-00199,Solara Metals Coil Plant,Stamping Plant DE
+MAT-727726,G-29-2,4684,KANBAN-00200,Solara Metals Coil Plant,Stamping Plant DE
+MAT-780845,F-11-5,1108,KANBAN-00201,Solara Metals Coil Plant,Stamping Plant DE
+MAT-874613,C-21-4,4953,KANBAN-00202,Solara Metals Coil Plant,Stamping Plant DE
+MAT-116977,D-15-3,2710,KANBAN-00203,Solara Metals Coil Plant,Stamping Plant DE
+MAT-809396,H-15-3,93,KANBAN-00204,Solara Metals Coil Plant,Stamping Plant DE
+MAT-207319,H-19-2,758,KANBAN-00205,Solara Metals Coil Plant,Stamping Plant DE
+MAT-619062,D-20-1,364,KANBAN-00206,Solara Metals Coil Plant,Stamping Plant DE
+MAT-163542,F-21-5,2667,KANBAN-00207,Solara Metals Coil Plant,Stamping Plant DE
+MAT-671910,B-09-4,4525,KANBAN-00208,Solara Metals Coil Plant,Stamping Plant DE
+MAT-206482,F-05-4,4596,KANBAN-00209,Solara Metals Coil Plant,Stamping Plant DE
+MAT-371201,G-02-4,4957,KANBAN-00210,Solara Metals Coil Plant,Stamping Plant DE
+MAT-574957,B-22-4,3964,KANBAN-00211,Solara Metals Coil Plant,Stamping Plant DE

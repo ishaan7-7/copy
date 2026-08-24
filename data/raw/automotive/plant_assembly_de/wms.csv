@@ -1,0 +1,570 @@
+PartNo,Bin,OnHandQty,IssuingPlant,ReceivingPlant
+MAT-598085,C-16-5,1489,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-446945,H-26-3,1300,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-456075,H-05-5,1420,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-526391,G-04-4,4415,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-154556,A-14-4,1576,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-779297,A-09-1,2757,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-548118,D-25-4,2634,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-736372,C-04-5,3987,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-205970,C-16-1,4927,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-321086,G-29-2,3142,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-310357,D-03-2,711,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-804589,E-24-4,3498,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-919137,A-10-4,2524,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-441676,G-18-2,4965,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-126244,A-03-3,1087,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-227109,A-17-4,2483,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-690418,B-06-2,1311,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-715931,B-11-2,4446,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-618916,H-25-4,3875,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-200870,C-29-2,3089,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-718267,F-18-5,3330,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-810396,G-07-2,4819,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-617298,C-15-1,1593,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-603287,B-15-5,2025,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-630319,A-26-1,1166,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-552214,B-25-1,4953,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-487785,F-28-5,659,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-326590,B-12-3,2818,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-715061,A-05-3,1557,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-752630,B-27-5,3200,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-731204,D-25-2,912,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-593284,E-21-2,520,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-756238,H-01-1,4862,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-787087,G-10-1,4236,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-204151,H-10-5,195,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-978142,H-22-2,3447,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-781505,D-20-4,4213,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-350615,B-28-5,2217,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-911130,G-20-3,4103,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-145723,H-17-3,770,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-324804,D-08-4,2808,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-892155,H-07-2,4105,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-263505,C-26-1,146,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-339864,H-03-2,1015,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-578362,D-12-2,3673,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-586872,C-19-4,2090,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-210928,F-26-4,4420,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-919775,B-08-1,3051,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-195140,F-24-5,2294,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-432601,H-15-3,4817,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-408683,C-05-3,2412,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-157547,H-01-1,245,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-648676,B-11-5,3025,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-851482,D-19-4,1142,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-574810,E-01-2,940,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-781514,A-19-5,1742,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-373316,H-15-3,3360,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-781304,B-03-3,2929,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-811436,F-09-1,3048,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-775349,A-24-3,3558,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-962057,F-09-5,3710,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-441839,C-25-2,1724,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-979006,H-12-2,1567,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-794578,F-25-2,3276,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-403695,G-15-3,429,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-960238,B-14-5,3024,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-265444,F-12-3,4169,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-953490,H-10-3,4645,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-552661,C-24-4,2606,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-896795,C-19-2,3046,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-977817,H-05-4,1008,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-376556,H-03-3,3798,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-938850,F-07-4,3771,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-479359,E-03-4,2132,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-447562,G-15-1,2982,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-232804,C-24-1,4210,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-638207,G-20-2,1592,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-671433,B-09-1,2885,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-365722,E-25-3,3853,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-598811,E-25-5,3452,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-794567,C-24-3,3232,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-715442,E-10-5,2871,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-517591,E-02-1,4999,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-900007,H-08-2,4529,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-687603,D-09-3,898,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-562512,G-09-2,2929,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-109031,E-21-5,3919,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-104932,E-22-4,4426,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-701504,F-23-2,2672,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-404030,A-09-5,1943,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-620078,A-18-4,1254,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-540117,E-03-1,1020,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-782650,D-03-5,1551,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-113633,A-19-1,761,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-810582,F-17-1,293,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-688545,C-02-5,2843,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-904303,C-16-3,2240,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-140691,A-04-4,1466,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-739755,A-07-4,1397,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-364610,G-03-3,1823,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-986076,E-04-5,4242,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-552751,D-01-2,2338,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-123414,B-04-2,2653,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-838998,F-10-3,4907,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-864831,E-12-1,1980,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-961372,H-17-1,4997,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-165989,C-12-3,2234,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-806534,A-08-4,2225,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-874722,G-15-5,408,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-490752,D-15-5,4292,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-414583,B-27-5,2989,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-841379,G-25-1,1848,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-872711,B-15-1,1233,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-677478,B-02-5,1576,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-430862,B-24-2,2168,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-738983,E-11-3,4986,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-899728,G-10-1,1703,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-408618,F-18-3,362,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-117485,E-23-1,2716,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-313065,A-15-1,934,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-826564,B-03-4,3015,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-660932,B-03-3,1884,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-762329,H-02-5,4030,Battery & eDrive Plant PL,Assembly Plant DE
+MAT-390639,F-02-5,4013,Paint Shop DE,Assembly Plant DE
+MAT-603694,H-04-3,4894,Paint Shop DE,Assembly Plant DE
+MAT-847525,H-19-2,1323,Paint Shop DE,Assembly Plant DE
+MAT-187653,C-11-5,3482,Paint Shop DE,Assembly Plant DE
+MAT-395220,A-10-1,3083,Paint Shop DE,Assembly Plant DE
+MAT-751573,D-10-5,852,Paint Shop DE,Assembly Plant DE
+MAT-386447,H-25-1,3992,Paint Shop DE,Assembly Plant DE
+MAT-120592,G-19-2,344,Paint Shop DE,Assembly Plant DE
+MAT-878778,E-25-4,4352,Paint Shop DE,Assembly Plant DE
+MAT-599124,F-12-4,1893,Paint Shop DE,Assembly Plant DE
+MAT-939331,F-17-1,1005,Paint Shop DE,Assembly Plant DE
+MAT-443402,H-03-1,1799,Paint Shop DE,Assembly Plant DE
+MAT-951266,B-18-2,1582,Paint Shop DE,Assembly Plant DE
+MAT-719125,B-11-4,3883,Paint Shop DE,Assembly Plant DE
+MAT-782502,G-07-1,4090,Paint Shop DE,Assembly Plant DE
+MAT-842486,B-18-4,3830,Paint Shop DE,Assembly Plant DE
+MAT-432669,A-15-5,3907,Paint Shop DE,Assembly Plant DE
+MAT-790083,F-06-2,2768,Paint Shop DE,Assembly Plant DE
+MAT-287972,C-18-4,3985,Paint Shop DE,Assembly Plant DE
+MAT-867923,F-08-3,1831,Paint Shop DE,Assembly Plant DE
+MAT-693054,B-07-2,3978,Paint Shop DE,Assembly Plant DE
+MAT-737313,F-19-4,2607,Paint Shop DE,Assembly Plant DE
+MAT-104801,A-27-3,588,Paint Shop DE,Assembly Plant DE
+MAT-867901,G-08-5,4862,Paint Shop DE,Assembly Plant DE
+MAT-805783,F-09-2,4908,Paint Shop DE,Assembly Plant DE
+MAT-929085,A-05-1,4808,Paint Shop DE,Assembly Plant DE
+MAT-916343,B-27-2,169,Paint Shop DE,Assembly Plant DE
+MAT-572725,G-02-5,2810,Paint Shop DE,Assembly Plant DE
+MAT-819261,E-28-1,2863,Paint Shop DE,Assembly Plant DE
+MAT-390144,G-20-4,4903,Paint Shop DE,Assembly Plant DE
+MAT-735508,F-01-1,3923,Paint Shop DE,Assembly Plant DE
+MAT-492731,E-22-4,4904,Paint Shop DE,Assembly Plant DE
+MAT-553064,E-12-3,1345,Paint Shop DE,Assembly Plant DE
+MAT-995843,D-09-4,688,Paint Shop DE,Assembly Plant DE
+MAT-497035,F-13-1,2193,Paint Shop DE,Assembly Plant DE
+MAT-556192,F-22-1,3564,Paint Shop DE,Assembly Plant DE
+MAT-335577,A-07-1,4678,Paint Shop DE,Assembly Plant DE
+MAT-932729,F-19-2,1883,Paint Shop DE,Assembly Plant DE
+MAT-171855,B-20-2,3874,Paint Shop DE,Assembly Plant DE
+MAT-805505,C-18-3,4600,Paint Shop DE,Assembly Plant DE
+MAT-145647,F-28-4,4066,Paint Shop DE,Assembly Plant DE
+MAT-381555,G-04-5,1529,Paint Shop DE,Assembly Plant DE
+MAT-560305,E-13-2,4966,Paint Shop DE,Assembly Plant DE
+MAT-209167,A-01-3,2434,Paint Shop DE,Assembly Plant DE
+MAT-796868,A-23-5,3413,Paint Shop DE,Assembly Plant DE
+MAT-499218,D-23-4,3296,Paint Shop DE,Assembly Plant DE
+MAT-765599,F-27-1,3247,Paint Shop DE,Assembly Plant DE
+MAT-706063,E-05-3,1572,Paint Shop DE,Assembly Plant DE
+MAT-436976,B-08-5,2010,Paint Shop DE,Assembly Plant DE
+MAT-725387,A-14-2,3400,Paint Shop DE,Assembly Plant DE
+MAT-876446,F-03-1,3182,Paint Shop DE,Assembly Plant DE
+MAT-535754,A-15-5,1594,Paint Shop DE,Assembly Plant DE
+MAT-514745,C-15-5,4371,Paint Shop DE,Assembly Plant DE
+MAT-344329,F-25-2,1956,Paint Shop DE,Assembly Plant DE
+MAT-471603,A-25-4,621,Paint Shop DE,Assembly Plant DE
+MAT-222165,D-22-1,3375,Paint Shop DE,Assembly Plant DE
+MAT-520370,B-16-4,1472,Paint Shop DE,Assembly Plant DE
+MAT-685062,E-26-4,4690,Paint Shop DE,Assembly Plant DE
+MAT-410626,B-19-2,339,Paint Shop DE,Assembly Plant DE
+MAT-786834,H-03-5,4498,Paint Shop DE,Assembly Plant DE
+MAT-108236,F-17-2,1398,Paint Shop DE,Assembly Plant DE
+MAT-800679,C-10-1,830,Paint Shop DE,Assembly Plant DE
+MAT-199281,D-14-3,1851,Paint Shop DE,Assembly Plant DE
+MAT-418824,E-07-2,4061,Paint Shop DE,Assembly Plant DE
+MAT-784716,E-29-5,1933,Paint Shop DE,Assembly Plant DE
+MAT-626399,C-17-3,1175,Paint Shop DE,Assembly Plant DE
+MAT-535340,C-06-3,4794,Paint Shop DE,Assembly Plant DE
+MAT-422857,A-04-4,3211,Paint Shop DE,Assembly Plant DE
+MAT-825632,G-25-5,3523,Paint Shop DE,Assembly Plant DE
+MAT-714184,C-09-1,2009,Paint Shop DE,Assembly Plant DE
+MAT-948883,E-20-5,2422,Paint Shop DE,Assembly Plant DE
+MAT-687327,A-23-4,3294,Paint Shop DE,Assembly Plant DE
+MAT-565443,G-04-4,2986,Paint Shop DE,Assembly Plant DE
+MAT-392647,H-13-4,3357,Paint Shop DE,Assembly Plant DE
+MAT-885029,C-02-3,4789,Paint Shop DE,Assembly Plant DE
+MAT-227359,E-09-2,3972,Paint Shop DE,Assembly Plant DE
+MAT-547704,A-21-3,1065,Paint Shop DE,Assembly Plant DE
+MAT-444500,B-06-3,4004,Paint Shop DE,Assembly Plant DE
+MAT-559258,D-27-5,4754,Paint Shop DE,Assembly Plant DE
+MAT-373775,E-10-5,1939,Paint Shop DE,Assembly Plant DE
+MAT-829814,A-24-4,2853,Paint Shop DE,Assembly Plant DE
+MAT-843222,E-21-2,935,Paint Shop DE,Assembly Plant DE
+MAT-652026,H-23-2,4528,Paint Shop DE,Assembly Plant DE
+MAT-583658,C-15-5,1861,Paint Shop DE,Assembly Plant DE
+MAT-883511,G-09-5,3873,Paint Shop DE,Assembly Plant DE
+MAT-662261,A-12-3,528,Paint Shop DE,Assembly Plant DE
+MAT-647409,G-10-3,4722,Paint Shop DE,Assembly Plant DE
+MAT-996662,C-01-4,4064,Paint Shop DE,Assembly Plant DE
+MAT-602039,A-20-2,1161,Paint Shop DE,Assembly Plant DE
+MAT-622612,A-16-4,2605,Paint Shop DE,Assembly Plant DE
+MAT-614600,E-08-2,1603,Paint Shop DE,Assembly Plant DE
+MAT-236624,H-16-3,965,Paint Shop DE,Assembly Plant DE
+MAT-915469,F-28-2,1603,Paint Shop DE,Assembly Plant DE
+MAT-353134,B-16-3,2667,Paint Shop DE,Assembly Plant DE
+MAT-760000,H-03-4,2318,Paint Shop DE,Assembly Plant DE
+MAT-138978,E-08-5,1837,Paint Shop DE,Assembly Plant DE
+MAT-110450,H-27-5,2469,Paint Shop DE,Assembly Plant DE
+MAT-790437,F-20-4,1203,Paint Shop DE,Assembly Plant DE
+MAT-685551,H-08-4,2816,Paint Shop DE,Assembly Plant DE
+MAT-672528,B-13-2,1987,Paint Shop DE,Assembly Plant DE
+MAT-329662,A-01-4,931,Paint Shop DE,Assembly Plant DE
+MAT-385500,G-05-3,2520,Paint Shop DE,Assembly Plant DE
+MAT-928948,B-23-1,1745,Paint Shop DE,Assembly Plant DE
+MAT-880912,D-20-5,4627,Paint Shop DE,Assembly Plant DE
+MAT-385694,F-18-2,3535,Paint Shop DE,Assembly Plant DE
+MAT-852134,G-14-1,667,Paint Shop DE,Assembly Plant DE
+MAT-594888,H-17-1,1784,Paint Shop DE,Assembly Plant DE
+MAT-484281,E-10-5,287,Paint Shop DE,Assembly Plant DE
+MAT-614650,H-12-1,4205,Paint Shop DE,Assembly Plant DE
+MAT-349667,B-20-5,3882,Paint Shop DE,Assembly Plant DE
+MAT-419929,A-07-3,4674,Paint Shop DE,Assembly Plant DE
+MAT-974851,E-02-2,398,Paint Shop DE,Assembly Plant DE
+MAT-164396,A-13-1,3942,Paint Shop DE,Assembly Plant DE
+MAT-709397,B-26-5,1918,Paint Shop DE,Assembly Plant DE
+MAT-460214,G-12-1,782,Paint Shop DE,Assembly Plant DE
+MAT-259669,A-24-3,4107,Paint Shop DE,Assembly Plant DE
+MAT-945620,D-05-4,4447,Paint Shop DE,Assembly Plant DE
+MAT-771597,G-04-2,2352,Paint Shop DE,Assembly Plant DE
+MAT-925339,C-07-3,1844,Paint Shop DE,Assembly Plant DE
+MAT-913110,G-15-5,1090,Paint Shop DE,Assembly Plant DE
+MAT-676310,E-07-1,4493,Paint Shop DE,Assembly Plant DE
+MAT-250778,F-05-1,4182,Paint Shop DE,Assembly Plant DE
+MAT-539923,H-14-4,367,Paint Shop DE,Assembly Plant DE
+MAT-172295,G-07-3,1991,Paint Shop DE,Assembly Plant DE
+MAT-281765,C-06-2,4261,Paint Shop DE,Assembly Plant DE
+MAT-355691,C-29-3,3109,Paint Shop DE,Assembly Plant DE
+MAT-588449,C-25-4,4367,Paint Shop DE,Assembly Plant DE
+MAT-854210,F-24-1,804,Paint Shop DE,Assembly Plant DE
+MAT-503991,E-23-2,2716,Paint Shop DE,Assembly Plant DE
+MAT-581671,H-12-4,139,Paint Shop DE,Assembly Plant DE
+MAT-895114,C-17-5,1865,Paint Shop DE,Assembly Plant DE
+MAT-860752,G-25-4,4923,Paint Shop DE,Assembly Plant DE
+MAT-390364,F-01-5,3706,Paint Shop DE,Assembly Plant DE
+MAT-528911,D-21-3,3530,Paint Shop DE,Assembly Plant DE
+MAT-284889,C-08-3,2623,Paint Shop DE,Assembly Plant DE
+MAT-152988,B-09-4,1658,Paint Shop DE,Assembly Plant DE
+MAT-157825,A-23-3,1946,Paint Shop DE,Assembly Plant DE
+MAT-629574,D-11-1,3467,Paint Shop DE,Assembly Plant DE
+MAT-115379,B-05-5,634,Paint Shop DE,Assembly Plant DE
+MAT-886258,G-14-3,2893,Paint Shop DE,Assembly Plant DE
+MAT-207454,G-21-3,3714,Seating & Interior Plant PL,Assembly Plant DE
+MAT-830694,C-10-5,465,Seating & Interior Plant PL,Assembly Plant DE
+MAT-852055,C-27-1,2949,Seating & Interior Plant PL,Assembly Plant DE
+MAT-304928,D-20-3,2477,Seating & Interior Plant PL,Assembly Plant DE
+MAT-824107,E-09-2,4499,Seating & Interior Plant PL,Assembly Plant DE
+MAT-992170,C-21-3,4697,Seating & Interior Plant PL,Assembly Plant DE
+MAT-917470,G-17-3,4350,Seating & Interior Plant PL,Assembly Plant DE
+MAT-717073,A-08-2,2886,Seating & Interior Plant PL,Assembly Plant DE
+MAT-291739,F-13-4,2593,Seating & Interior Plant PL,Assembly Plant DE
+MAT-544664,D-05-5,56,Seating & Interior Plant PL,Assembly Plant DE
+MAT-489793,H-17-5,3913,Seating & Interior Plant PL,Assembly Plant DE
+MAT-801667,C-01-1,2578,Seating & Interior Plant PL,Assembly Plant DE
+MAT-334504,H-23-4,3043,Seating & Interior Plant PL,Assembly Plant DE
+MAT-963743,H-07-1,2475,Seating & Interior Plant PL,Assembly Plant DE
+MAT-999274,G-13-4,2664,Seating & Interior Plant PL,Assembly Plant DE
+MAT-589565,G-03-5,3336,Seating & Interior Plant PL,Assembly Plant DE
+MAT-970020,E-18-4,1982,Seating & Interior Plant PL,Assembly Plant DE
+MAT-667130,G-14-3,810,Seating & Interior Plant PL,Assembly Plant DE
+MAT-928752,E-15-2,1934,Seating & Interior Plant PL,Assembly Plant DE
+MAT-221709,A-24-3,2219,Seating & Interior Plant PL,Assembly Plant DE
+MAT-374907,A-22-3,1434,Seating & Interior Plant PL,Assembly Plant DE
+MAT-838406,F-16-1,4498,Seating & Interior Plant PL,Assembly Plant DE
+MAT-694612,G-24-1,4812,Seating & Interior Plant PL,Assembly Plant DE
+MAT-192665,D-05-3,479,Seating & Interior Plant PL,Assembly Plant DE
+MAT-377541,G-29-2,4850,Seating & Interior Plant PL,Assembly Plant DE
+MAT-656867,D-22-3,881,Seating & Interior Plant PL,Assembly Plant DE
+MAT-418358,H-08-4,762,Seating & Interior Plant PL,Assembly Plant DE
+MAT-314240,A-13-4,1942,Seating & Interior Plant PL,Assembly Plant DE
+MAT-129751,A-27-5,3794,Seating & Interior Plant PL,Assembly Plant DE
+MAT-762489,G-27-2,4223,Seating & Interior Plant PL,Assembly Plant DE
+MAT-242164,F-01-4,2952,Seating & Interior Plant PL,Assembly Plant DE
+MAT-888989,A-06-2,4061,Seating & Interior Plant PL,Assembly Plant DE
+MAT-267615,E-07-1,2016,Seating & Interior Plant PL,Assembly Plant DE
+MAT-504734,A-29-5,4770,Seating & Interior Plant PL,Assembly Plant DE
+MAT-318012,A-05-1,1892,Seating & Interior Plant PL,Assembly Plant DE
+MAT-818920,F-02-1,2958,Seating & Interior Plant PL,Assembly Plant DE
+MAT-204517,F-13-1,4027,Seating & Interior Plant PL,Assembly Plant DE
+MAT-406828,C-27-1,789,Seating & Interior Plant PL,Assembly Plant DE
+MAT-303838,C-16-4,1799,Seating & Interior Plant PL,Assembly Plant DE
+MAT-368733,H-03-1,896,Seating & Interior Plant PL,Assembly Plant DE
+MAT-690070,B-14-1,3723,Seating & Interior Plant PL,Assembly Plant DE
+MAT-777257,E-18-5,2072,Seating & Interior Plant PL,Assembly Plant DE
+MAT-296458,A-13-3,4508,Seating & Interior Plant PL,Assembly Plant DE
+MAT-448962,A-27-3,2701,Seating & Interior Plant PL,Assembly Plant DE
+MAT-611073,G-10-2,3121,Seating & Interior Plant PL,Assembly Plant DE
+MAT-254706,G-24-4,2715,Seating & Interior Plant PL,Assembly Plant DE
+MAT-467723,F-29-2,660,Seating & Interior Plant PL,Assembly Plant DE
+MAT-126965,A-25-2,829,Seating & Interior Plant PL,Assembly Plant DE
+MAT-791202,B-14-4,3521,Seating & Interior Plant PL,Assembly Plant DE
+MAT-252729,A-17-3,648,Seating & Interior Plant PL,Assembly Plant DE
+MAT-458013,H-15-3,3259,Seating & Interior Plant PL,Assembly Plant DE
+MAT-818479,G-02-4,1746,Seating & Interior Plant PL,Assembly Plant DE
+MAT-442418,G-09-3,4438,Seating & Interior Plant PL,Assembly Plant DE
+MAT-487298,F-18-2,933,Seating & Interior Plant PL,Assembly Plant DE
+MAT-155740,E-29-4,2066,Seating & Interior Plant PL,Assembly Plant DE
+MAT-692847,F-24-4,3829,Seating & Interior Plant PL,Assembly Plant DE
+MAT-497738,H-15-5,2200,Seating & Interior Plant PL,Assembly Plant DE
+MAT-368105,F-11-2,1890,Seating & Interior Plant PL,Assembly Plant DE
+MAT-774919,F-28-3,4341,Seating & Interior Plant PL,Assembly Plant DE
+MAT-397594,E-04-4,4774,Seating & Interior Plant PL,Assembly Plant DE
+MAT-589752,E-19-4,4858,Seating & Interior Plant PL,Assembly Plant DE
+MAT-707213,B-23-2,342,Seating & Interior Plant PL,Assembly Plant DE
+MAT-853342,F-11-3,4100,Seating & Interior Plant PL,Assembly Plant DE
+MAT-149359,C-12-3,3758,Seating & Interior Plant PL,Assembly Plant DE
+MAT-405987,B-09-4,1627,Seating & Interior Plant PL,Assembly Plant DE
+MAT-604641,H-24-1,4233,Seating & Interior Plant PL,Assembly Plant DE
+MAT-276914,D-18-4,785,Seating & Interior Plant PL,Assembly Plant DE
+MAT-612533,C-20-1,3166,Seating & Interior Plant PL,Assembly Plant DE
+MAT-855251,A-07-1,276,Seating & Interior Plant PL,Assembly Plant DE
+MAT-537820,C-16-5,4867,Seating & Interior Plant PL,Assembly Plant DE
+MAT-309895,D-22-2,1585,Seating & Interior Plant PL,Assembly Plant DE
+MAT-910105,F-10-4,4452,Seating & Interior Plant PL,Assembly Plant DE
+MAT-786950,F-06-4,558,Seating & Interior Plant PL,Assembly Plant DE
+MAT-206799,D-26-4,2929,Seating & Interior Plant PL,Assembly Plant DE
+MAT-598129,H-08-4,2037,Seating & Interior Plant PL,Assembly Plant DE
+MAT-410752,C-12-3,143,Seating & Interior Plant PL,Assembly Plant DE
+MAT-819975,B-14-4,3860,Seating & Interior Plant PL,Assembly Plant DE
+MAT-922960,A-24-2,2192,Seating & Interior Plant PL,Assembly Plant DE
+MAT-436377,A-23-1,3571,Seating & Interior Plant PL,Assembly Plant DE
+MAT-827849,F-28-1,1614,Seating & Interior Plant PL,Assembly Plant DE
+MAT-577242,A-01-5,4518,Seating & Interior Plant PL,Assembly Plant DE
+MAT-490692,G-25-3,3533,Seating & Interior Plant PL,Assembly Plant DE
+MAT-180383,G-09-4,1743,Seating & Interior Plant PL,Assembly Plant DE
+MAT-163614,B-09-4,3589,Seating & Interior Plant PL,Assembly Plant DE
+MAT-916998,H-21-2,3256,Seating & Interior Plant PL,Assembly Plant DE
+MAT-424412,D-11-1,2622,Seating & Interior Plant PL,Assembly Plant DE
+MAT-652063,G-05-2,4805,Seating & Interior Plant PL,Assembly Plant DE
+MAT-714745,F-22-1,3020,Seating & Interior Plant PL,Assembly Plant DE
+MAT-462130,B-16-5,1508,Seating & Interior Plant PL,Assembly Plant DE
+MAT-680357,A-08-5,3271,Seating & Interior Plant PL,Assembly Plant DE
+MAT-925193,D-05-1,1523,Seating & Interior Plant PL,Assembly Plant DE
+MAT-930178,G-02-1,2196,Seating & Interior Plant PL,Assembly Plant DE
+MAT-355363,C-23-3,3004,Seating & Interior Plant PL,Assembly Plant DE
+MAT-526740,F-25-4,647,Seating & Interior Plant PL,Assembly Plant DE
+MAT-211938,D-10-1,4213,Seating & Interior Plant PL,Assembly Plant DE
+MAT-430613,H-14-5,1526,Seating & Interior Plant PL,Assembly Plant DE
+MAT-239228,E-08-3,2689,Seating & Interior Plant PL,Assembly Plant DE
+MAT-294731,D-05-4,2264,Seating & Interior Plant PL,Assembly Plant DE
+MAT-111384,A-03-3,702,Seating & Interior Plant PL,Assembly Plant DE
+MAT-722849,A-19-1,4332,Seating & Interior Plant PL,Assembly Plant DE
+MAT-772266,E-14-5,3167,Seating & Interior Plant PL,Assembly Plant DE
+MAT-241456,A-23-3,438,Seating & Interior Plant PL,Assembly Plant DE
+MAT-778443,F-28-4,2988,Seating & Interior Plant PL,Assembly Plant DE
+MAT-969822,B-17-1,1844,Seating & Interior Plant PL,Assembly Plant DE
+MAT-589501,B-14-1,776,Seating & Interior Plant PL,Assembly Plant DE
+MAT-588377,A-23-3,3144,Seating & Interior Plant PL,Assembly Plant DE
+MAT-135998,C-17-4,4469,Seating & Interior Plant PL,Assembly Plant DE
+MAT-954693,D-15-4,3302,Seating & Interior Plant PL,Assembly Plant DE
+MAT-956469,E-08-4,690,Seating & Interior Plant PL,Assembly Plant DE
+MAT-630069,G-15-5,3905,Seating & Interior Plant PL,Assembly Plant DE
+MAT-770389,F-08-2,4271,Seating & Interior Plant PL,Assembly Plant DE
+MAT-262828,H-27-5,3299,Seating & Interior Plant PL,Assembly Plant DE
+MAT-898736,C-13-2,4245,Seating & Interior Plant PL,Assembly Plant DE
+MAT-294689,C-04-3,3856,Seating & Interior Plant PL,Assembly Plant DE
+MAT-724787,A-08-3,2212,Seating & Interior Plant PL,Assembly Plant DE
+MAT-782811,F-09-4,1874,Seating & Interior Plant PL,Assembly Plant DE
+MAT-307399,B-26-5,1679,Seating & Interior Plant PL,Assembly Plant DE
+MAT-470816,F-06-5,2176,Seating & Interior Plant PL,Assembly Plant DE
+MAT-646257,D-04-2,4570,Seating & Interior Plant PL,Assembly Plant DE
+MAT-649712,F-06-4,1812,Seating & Interior Plant PL,Assembly Plant DE
+MAT-937665,H-21-5,2974,Seating & Interior Plant PL,Assembly Plant DE
+MAT-417194,A-21-1,1319,Seating & Interior Plant PL,Assembly Plant DE
+MAT-570118,E-15-2,4622,Seating & Interior Plant PL,Assembly Plant DE
+MAT-435721,C-25-1,4353,Seating & Interior Plant PL,Assembly Plant DE
+MAT-424991,F-17-1,835,Seating & Interior Plant PL,Assembly Plant DE
+MAT-896365,E-04-5,4861,Seating & Interior Plant PL,Assembly Plant DE
+MAT-649953,F-25-3,4800,Seating & Interior Plant PL,Assembly Plant DE
+MAT-471086,F-27-3,3002,Seating & Interior Plant PL,Assembly Plant DE
+MAT-131968,A-14-2,1045,Seating & Interior Plant PL,Assembly Plant DE
+MAT-698848,A-17-5,3536,Seating & Interior Plant PL,Assembly Plant DE
+MAT-236736,C-18-5,1168,Seating & Interior Plant PL,Assembly Plant DE
+MAT-898007,F-05-4,2996,Seating & Interior Plant PL,Assembly Plant DE
+MAT-271618,F-27-4,1436,Seating & Interior Plant PL,Assembly Plant DE
+MAT-750807,D-19-3,4923,Seating & Interior Plant PL,Assembly Plant DE
+MAT-428290,G-11-5,1923,Seating & Interior Plant PL,Assembly Plant DE
+MAT-245027,F-08-3,2774,Seating & Interior Plant PL,Assembly Plant DE
+MAT-309072,A-17-2,4659,Seating & Interior Plant PL,Assembly Plant DE
+MAT-831403,B-01-3,1028,Seating & Interior Plant PL,Assembly Plant DE
+MAT-710010,E-13-3,4901,Seating & Interior Plant PL,Assembly Plant DE
+MAT-868938,B-21-4,1712,Seating & Interior Plant PL,Assembly Plant DE
+MAT-645589,H-29-1,755,Seating & Interior Plant PL,Assembly Plant DE
+MAT-112830,C-19-2,1107,Seating & Interior Plant PL,Assembly Plant DE
+MAT-106695,D-05-1,476,Seating & Interior Plant PL,Assembly Plant DE
+MAT-990395,F-26-4,4259,Seating & Interior Plant PL,Assembly Plant DE
+MAT-399069,A-19-5,607,Seating & Interior Plant PL,Assembly Plant DE
+MAT-521389,C-04-4,4680,Seating & Interior Plant PL,Assembly Plant DE
+MAT-282093,C-15-5,4113,Seating & Interior Plant PL,Assembly Plant DE
+MAT-539551,C-26-1,3264,Seating & Interior Plant PL,Assembly Plant DE
+MAT-904570,A-17-4,4282,Seating & Interior Plant PL,Assembly Plant DE
+MAT-498045,D-14-1,3463,Seating & Interior Plant PL,Assembly Plant DE
+MAT-566418,B-16-5,3701,Seating & Interior Plant PL,Assembly Plant DE
+MAT-279233,C-14-2,4364,Seating & Interior Plant PL,Assembly Plant DE
+MAT-160074,D-10-5,2063,Seating & Interior Plant PL,Assembly Plant DE
+MAT-888037,E-14-3,2990,Seating & Interior Plant PL,Assembly Plant DE
+MAT-432213,B-23-1,4674,Seating & Interior Plant PL,Assembly Plant DE
+MAT-721270,C-08-3,335,Seating & Interior Plant PL,Assembly Plant DE
+MAT-801351,B-08-4,2225,Seating & Interior Plant PL,Assembly Plant DE
+MAT-111617,A-24-3,1761,Seating & Interior Plant PL,Assembly Plant DE
+MAT-239657,F-16-3,3309,Seating & Interior Plant PL,Assembly Plant DE
+MAT-989110,A-12-2,2241,Seating & Interior Plant PL,Assembly Plant DE
+MAT-250568,D-11-4,207,Seating & Interior Plant PL,Assembly Plant DE
+MAT-660026,C-23-1,4454,Seating & Interior Plant PL,Assembly Plant DE
+MAT-859632,A-02-2,2651,Seating & Interior Plant PL,Assembly Plant DE
+MAT-273484,C-22-5,2616,Seating & Interior Plant PL,Assembly Plant DE
+MAT-864253,B-27-4,1425,Seating & Interior Plant PL,Assembly Plant DE
+MAT-592704,A-08-1,2344,Seating & Interior Plant PL,Assembly Plant DE
+MAT-614485,H-20-2,2537,Seating & Interior Plant PL,Assembly Plant DE
+MAT-768404,F-23-3,118,Seating & Interior Plant PL,Assembly Plant DE
+MAT-541680,A-02-5,652,Seating & Interior Plant PL,Assembly Plant DE
+MAT-274096,H-15-3,4526,Seating & Interior Plant PL,Assembly Plant DE
+MAT-112195,H-19-5,1643,Seating & Interior Plant PL,Assembly Plant DE
+MAT-431471,H-07-2,4868,Seating & Interior Plant PL,Assembly Plant DE
+MAT-149235,G-25-4,1376,Seating & Interior Plant PL,Assembly Plant DE
+MAT-440345,A-09-3,1550,Seating & Interior Plant PL,Assembly Plant DE
+MAT-494480,B-27-4,1611,Seating & Interior Plant PL,Assembly Plant DE
+MAT-440332,C-14-4,4495,Seating & Interior Plant PL,Assembly Plant DE
+MAT-253504,D-13-3,3792,Seating & Interior Plant PL,Assembly Plant DE
+MAT-904421,A-06-4,3269,Seating & Interior Plant PL,Assembly Plant DE
+MAT-804175,E-26-4,4535,Seating & Interior Plant PL,Assembly Plant DE
+MAT-386536,B-01-4,2127,Seating & Interior Plant PL,Assembly Plant DE
+MAT-554290,A-15-1,3347,Seating & Interior Plant PL,Assembly Plant DE
+MAT-630415,F-05-1,278,Seating & Interior Plant PL,Assembly Plant DE
+MAT-557196,F-12-5,4778,Seating & Interior Plant PL,Assembly Plant DE
+MAT-985710,G-09-2,2282,Seating & Interior Plant PL,Assembly Plant DE
+MAT-617988,A-13-1,4604,Seating & Interior Plant PL,Assembly Plant DE
+MAT-926514,G-05-3,4136,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-635548,G-26-2,1536,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-920905,C-17-2,4612,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-561629,B-12-5,1706,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-186091,B-05-4,362,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-901891,E-01-1,4083,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-129060,B-27-2,2440,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-810433,G-17-4,3838,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-193840,G-22-3,217,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-283186,G-21-1,3168,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-486476,C-21-2,3727,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-801106,B-25-3,2948,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-571718,G-06-4,4398,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-793390,C-25-3,2402,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-648172,H-24-3,826,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-506731,B-11-5,1981,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-938042,B-06-3,756,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-636093,D-12-3,3207,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-181259,F-22-1,2356,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-221925,A-14-1,3542,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-306705,G-17-1,1485,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-785415,F-04-2,2607,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-641328,B-12-4,4735,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-975005,E-08-1,4953,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-864024,E-21-4,2590,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-945758,A-29-1,1329,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-824181,E-04-4,2911,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-177001,D-14-1,2098,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-867885,A-26-4,1544,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-422322,D-25-1,3712,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-809354,H-08-1,2187,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-330492,H-22-4,2667,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-245095,H-21-2,3584,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-341042,C-14-2,1447,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-266951,H-16-5,1163,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-433035,A-11-4,710,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-325179,F-07-1,971,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-471508,A-18-3,3830,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-373110,F-04-3,3269,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-193288,C-05-3,1832,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-473014,H-04-4,3068,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-519796,A-08-4,285,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-880353,B-26-4,744,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-455752,F-29-1,1288,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-621987,H-15-5,1595,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-750896,B-12-5,4560,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-326677,A-26-3,2943,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-806583,F-23-4,2389,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-180519,A-08-1,2714,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-828885,F-15-2,727,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-495388,B-09-3,4652,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-633003,D-22-1,4208,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-667983,E-04-5,440,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-947652,A-09-4,3844,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-738658,H-19-4,1995,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-330226,F-26-2,1678,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-658522,C-13-1,4131,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-976576,H-02-2,3424,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-207554,G-17-3,4139,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-186958,D-04-1,3006,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-380540,B-01-1,1638,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-958674,G-07-5,2892,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-617695,A-15-5,2561,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-243908,C-11-5,1063,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-576457,C-04-1,965,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-230339,A-24-3,3632,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-448029,A-04-2,3558,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-782523,H-13-4,3973,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-356076,B-27-5,1277,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-976406,D-29-5,217,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-620028,B-28-3,2944,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-697010,E-18-3,1172,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-385873,C-17-3,4794,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-624672,A-07-5,2127,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-168706,D-22-1,1868,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-359666,H-20-3,748,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-647520,C-18-2,4879,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-811993,G-27-5,4054,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-211785,A-15-5,4281,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-394757,H-20-4,1633,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-686352,B-02-1,1704,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-590488,B-19-2,3848,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-676414,C-24-3,2078,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-708360,C-15-5,3177,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-825341,G-08-3,3328,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-602960,A-11-2,4607,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-951150,G-18-5,4021,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-540756,D-26-2,586,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-553450,G-06-5,319,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-936931,D-29-2,4679,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-609400,D-27-2,1178,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-143701,H-01-1,4762,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-581652,A-10-1,4700,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-209654,H-18-4,605,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-810800,D-13-5,3705,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-140835,G-24-4,4723,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-183703,F-05-5,736,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-490814,F-01-5,3306,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-573566,H-26-4,3051,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-477825,F-02-4,3021,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-444436,C-07-2,2706,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-702471,D-15-5,717,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-244483,D-22-1,3510,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-352929,D-03-4,3336,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-693185,F-26-3,3451,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-271758,D-22-5,569,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-323186,F-14-3,3901,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-965234,D-05-2,4354,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-183250,C-05-2,341,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-917434,C-13-2,3631,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-837096,C-03-4,3523,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-200911,A-29-3,715,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-428457,C-18-4,4142,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-888173,E-15-1,3841,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-314808,E-12-2,3677,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-190892,C-07-5,3853,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-443997,H-12-4,4843,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-419133,A-16-2,3945,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-547088,F-03-1,2069,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-199936,G-13-5,3559,Electronics & Wiring Harness Plant MX,Assembly Plant DE
+MAT-712581,F-28-3,354,Electronics & Wiring Harness Plant MX,Assembly Plant DE
