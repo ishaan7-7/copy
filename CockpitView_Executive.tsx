@@ -3508,11 +3508,9 @@ export default function CockpitViewExecutive({
   }, [tripData, isTripDataPlaceholder]);
 
   const tileUrl =
-    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-  const tileLabelsUrl =
-    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
   const tileAttribution =
-    "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ";
+    "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012";
 
   const healthColor = (h: number) =>
     h >= 80 ? "#22c55e" : h >= 60 ? "#eab308" : "#ef4444";
@@ -4979,18 +4977,8 @@ export default function CockpitViewExecutive({
                         keepBuffer={6}
                         updateWhenZooming={false}
                         updateWhenIdle={true}
-                        maxNativeZoom={16}
+                        maxNativeZoom={19}
                         maxZoom={19}
-                        zIndex={1}
-                      />
-                      <TileLayer
-                        url={tileLabelsUrl}
-                        keepBuffer={6}
-                        updateWhenZooming={false}
-                        updateWhenIdle={true}
-                        maxNativeZoom={16}
-                        maxZoom={19}
-                        zIndex={2}
                       />
                       <MapController
                         selectedVehicle={selectedVehicle}
@@ -6119,18 +6107,8 @@ export default function CockpitViewExecutive({
                     keepBuffer={6}
                     updateWhenZooming={false}
                     updateWhenIdle={true}
-                    maxNativeZoom={16}
+                    maxNativeZoom={19}
                     maxZoom={19}
-                    zIndex={1}
-                  />
-                  <TileLayer
-                    url={tileLabelsUrl}
-                    keepBuffer={6}
-                    updateWhenZooming={false}
-                    updateWhenIdle={true}
-                    maxNativeZoom={16}
-                    maxZoom={19}
-                    zIndex={2}
                   />
                   <MapController
                     selectedVehicle={selectedVehicle}
