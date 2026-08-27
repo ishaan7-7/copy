@@ -253,6 +253,7 @@ interface CockpitVehicle {
 interface TripData {
   route: { lat: number; lng: number; road_type: string }[];
   completed_index: number;
+  direction?: number;
   progress_pct: number;
   distance_completed_km: number;
   distance_total_km: number;
@@ -3490,17 +3491,20 @@ export default function CockpitViewExecutive({
   
   const completedRoute = useMemo(() => {
     if (!tripData || isTripDataPlaceholder) return [];
-    const points = tripData.has_reversed
-      ? tripData.route
-      : tripData.route.slice(0, tripData.completed_index + 1);
+    const points =
+      tripData.direction === -1
+        ? tripData.route.slice(tripData.completed_index)
+        : tripData.route.slice(0, tripData.completed_index + 1);
     return points.map((p) => [p.lat, p.lng] as [number, number]);
   }, [tripData, isTripDataPlaceholder]);
 
   const remainingRoute = useMemo(() => {
-    if (!tripData || isTripDataPlaceholder || tripData.has_reversed) return [];
-    return tripData.route
-      .slice(tripData.completed_index)
-      .map((p) => [p.lat, p.lng] as [number, number]);
+    if (!tripData || isTripDataPlaceholder) return [];
+    const points =
+      tripData.direction === -1
+        ? tripData.route.slice(0, tripData.completed_index + 1)
+        : tripData.route.slice(tripData.completed_index);
+    return points.map((p) => [p.lat, p.lng] as [number, number]);
   }, [tripData, isTripDataPlaceholder]);
 
   const tileUrl =
