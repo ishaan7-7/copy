@@ -1,0 +1,20 @@
+"Remember that truck?"
+
+"Here's what's under the hood. Sensor data streams in live — that's Ingest, Bronze."
+
+"Seconds later, it checks: still normal? That's Silver, Gold, Alerts."
+
+"Most fleets check once a day. This one never stops."
+
+move to second silde
+
+"Now, the clever part. Two ML models check every reading, together."
+
+"One flags anything unusual. The other checks: has the vehicle ever been like this before?"
+
+"Say the driver floors the pedal. The reading spikes — unusual, in the moment."
+"But the vehicle's done this exact thing a hundred times before, so the second model recognizes the pattern, and lets it pass as normal."
+
+But if it's unusual, and the vehicle has genuinely never been in this state before — both signals line up, and the system doesn't just raise an alarm, it pinpoints the exact fault.
+
+Now — over to Jabin, who'll take us deeper into the knowledge repo."
