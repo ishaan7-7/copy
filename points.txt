@@ -1,4 +1,0 @@
-ADP: Consolidated vendor and software license data to support cost-optimization decisions, with Excel reporting and Power BI dashboard support (queries, filters, schema)
-Text Analytics Support: Migrated the audit report generation system from local Python scripts to a scheduled Databricks job, cutting manual effort
-GM DLA Dashboard: Handled data cleaning, schema design, and PySpark query development; supplied the dataset and SQL queries for the React-based demo
-TelemetriX COE: Built and trained ML models and the backend for a real-time streaming pipeline (FastAPI, Kafka, Spark)
