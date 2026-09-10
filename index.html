@@ -2604,6 +2604,21 @@
           window.history.replaceState(null, "", "#" + targetId);
         }
 
+        // Documents 2-5 each have a ".doc-separator" title banner
+        // ("— Document N — ...") as the sibling immediately before the
+        // document's own id element. Scrolling to the id element itself
+        // pushes that banner off the top of the viewport, so the true start
+        // of the document is the separator, not the element the id lives on.
+        // Document 1 has no separator (it directly follows the master
+        // index), so it falls back to the id element as before.
+        function resolveDocumentScrollTarget(documentId) {
+          var el = document.getElementById(documentId);
+          if (!el) return null;
+          var prev = el.previousElementSibling;
+          if (prev && prev.classList.contains("doc-separator")) return prev;
+          return el;
+        }
+
         function initScopedAnchorNavigation() {
           document.addEventListener("click", function (event) {
             var link =
@@ -2725,7 +2740,10 @@
               );
               var openDocument = function (event) {
                 event.preventDefault();
-                scrollToRepositoryTarget(documentTarget, config.documentTarget);
+                scrollToRepositoryTarget(
+                  resolveDocumentScrollTarget(config.documentTarget),
+                  config.documentTarget
+                );
               };
               header.addEventListener("click", openDocument);
               header.addEventListener("keydown", function (event) {
@@ -2758,6 +2776,16 @@
         }
 
         function initSecretDocumentJump() {
+          // When this page runs inside the dashboard's <iframe>, the browser
+          // does not hand it keyboard focus on load — key events stay with
+          // the parent frame until the user clicks something inside here.
+          // Claiming focus for our own window (not another tab/origin, so
+          // browsers permit it) makes the shortcut work immediately instead
+          // of only after the first click.
+          try {
+            window.focus();
+          } catch (e) {}
+
           var documentTargets = [
             "doc-mqtt",
             "doc-vt",
@@ -2784,7 +2812,7 @@
             if (!digit) return;
             var targetId = documentTargets[digit - 1];
             if (!targetId) return;
-            var target = document.getElementById(targetId);
+            var target = resolveDocumentScrollTarget(targetId);
             if (!target) return;
             event.preventDefault();
             scrollToRepositoryTarget(target, targetId);
