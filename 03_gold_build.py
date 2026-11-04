@@ -38,6 +38,10 @@ TS_FMT = "yyyy-MM-dd'T'HH:mm:ss"
 
 
 def render(sql):
+    # {silver}.normalize_resource is a SQL function registered directly on {FQN} in Unit 2 (no separate
+    # "silver" schema to qualify it with here), not a silver_<system>__<table> table - handle it before the
+    # general table-reference rewrite below, or it would get mangled into a nonexistent "silver_normalize_resource".
+    sql = sql.replace("{silver}.normalize_resource", f"{FQN}.normalize_resource")
     return sql.replace("{silver}.", f"{FQN}.silver_")
 
 # COMMAND ----------

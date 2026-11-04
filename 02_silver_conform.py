@@ -16,6 +16,11 @@
 # MAGIC   companion (`WORKORDER`+`WOSTATUS`, `PM`+`A_PM`) or are naturally append-only by construction
 # MAGIC   (`TC_ITEM_REVISION`, `SPEC` - each revision is already its own row) - duplicating that mechanism here would
 # MAGIC   be redundant with what the source already provides.
+# MAGIC
+# MAGIC Also registers the SQL function `normalize_resource()` used for entity resolution later, in Unit 3's
+# MAGIC `SAME_AS` edge (Maximo `HMC04` / `PAD02 ` -> MES `HMC-04` / `PAD-02`) - ported from the reference's own
+# MAGIC `silver.normalize_resource()`, adapted to this project's single-schema addressing (no separate `silver`
+# MAGIC schema to hang it on, so it lives directly in `{FQN}` instead of `{FQN}.silver`).
 
 # COMMAND ----------
 
@@ -28,6 +33,16 @@ FQN = f"{CATALOG}.{SCHEMA}"
 from pyspark.sql import functions as F
 
 spark.conf.set("spark.sql.session.timeZone", "UTC")
+
+# COMMAND ----------
+
+spark.sql(f"""
+CREATE OR REPLACE FUNCTION {FQN}.normalize_resource(x STRING)
+RETURNS STRING
+COMMENT 'Canonical MES resource name: upper, trimmed, letters-hyphen-digits (HMC04 -> HMC-04)'
+RETURN regexp_replace(upper(trim(x)), '^([A-Z]+)-?([0-9]+)$', '$1-$2')
+""")
+print(f"function ready: {FQN}.normalize_resource")
 
 # COMMAND ----------
 
@@ -203,10 +218,13 @@ display(spark.createDataFrame(scd2_report, "system string, table string, status 
 
 # MAGIC %md ## 5. Prove the SCD2 mechanism is real - break it, watch it catch the change, restore it
 # MAGIC
-# MAGIC Takes one real `MARA` row, mutates its material description in a scratch copy of bronze, re-runs the SCD2
+# MAGIC Takes one real `MARA` row, mutates its material group (`MATKL`) in a scratch copy of bronze, re-runs the SCD2
 # MAGIC conform against that mutated input, and checks: the current `silver_erp__mara` row shows the new value with a
 # MAGIC fresh `valid_from`, and the old value now has its own row in `silver_erp__mara__history` with a real
 # MAGIC `valid_to`. Then restores the real bronze table so this doesn't leave fake data behind.
+# MAGIC
+# MAGIC Note: real SAP `MARA` has no material-description column - that lives in a separate text table, `MAKT`
+# MAGIC (keyed by `MATNR`+`SPRAS`), not in `MARA` itself. `MATKL` (material group) is used here instead.
 
 # COMMAND ----------
 
@@ -214,23 +232,21 @@ real_bronze = f"{FQN}.bronze_erp__mara"
 sample_key = spark.table(real_bronze).select("MATNR").first()["MATNR"]
 print("testing against real MATNR:", sample_key)
 
-mutated = (spark.table(real_bronze)
-           .withColumn("MAKTX_TEST_OVERRIDE", F.when(F.col("MATNR") == sample_key, F.lit("SCD2 TEST VALUE")).otherwise(F.col("MATNR"))))
 mutated_conformed = conform(real_bronze, "erp", "mara").withColumn(
-    "maktx", F.when(F.col("matnr") == sample_key, F.lit("SCD2_TEST_VALUE")).otherwise(F.col("maktx")))
+    "matkl", F.when(F.col("matnr") == sample_key, F.lit("SCD2_TEST_VALUE")).otherwise(F.col("matkl")))
 
 status, rows, changed = scd2_upsert(FQN, "erp", "mara", mutated_conformed, ["matnr"])
 print("mutated-run result:", status, rows, "rows,", changed, "changed")
 
-cur = spark.sql(f"SELECT matnr, maktx, valid_from, valid_to, is_current FROM {FQN}.silver_erp__mara WHERE matnr = '{sample_key}'")
-hist = spark.sql(f"SELECT matnr, maktx, valid_from, valid_to, is_current FROM {FQN}.silver_erp__mara__history WHERE matnr = '{sample_key}'")
-print("current row after mutation (expect maktx = SCD2_TEST_VALUE, is_current = true, valid_to = NULL):")
+cur = spark.sql(f"SELECT matnr, matkl, valid_from, valid_to, is_current FROM {FQN}.silver_erp__mara WHERE matnr = '{sample_key}'")
+hist = spark.sql(f"SELECT matnr, matkl, valid_from, valid_to, is_current FROM {FQN}.silver_erp__mara__history WHERE matnr = '{sample_key}'")
+print("current row after mutation (expect matkl = SCD2_TEST_VALUE, is_current = true, valid_to = NULL):")
 display(cur)
-print("history row created by the mutation (expect the ORIGINAL maktx, is_current = false, real valid_to):")
+print("history row created by the mutation (expect the ORIGINAL matkl, is_current = false, real valid_to):")
 display(hist)
 
 restore_status, restore_rows, restore_changed = scd2_upsert(FQN, "erp", "mara", conform(real_bronze, "erp", "mara"), ["matnr"])
 print("restored real data:", restore_status, restore_rows, "rows,", restore_changed, "changed")
-restored = spark.sql(f"SELECT matnr, maktx, valid_from, valid_to, is_current FROM {FQN}.silver_erp__mara WHERE matnr = '{sample_key}'")
+restored = spark.sql(f"SELECT matnr, matkl, valid_from, valid_to, is_current FROM {FQN}.silver_erp__mara WHERE matnr = '{sample_key}'")
 display(restored)
-print("confirm the row above shows the REAL original maktx again, is_current = true, valid_to = NULL")
+print("confirm the row above shows the REAL original matkl again, is_current = true, valid_to = NULL")
