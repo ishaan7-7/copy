@@ -1,0 +1,19 @@
+import requests
+
+ctx = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
+host = ctx.apiUrl().get()
+token = ctx.apiToken().get()
+headers = {"Authorization": f"Bearer {token}"}
+
+requests.post(f"{host}/api/2.0/secrets/scopes/create", headers=headers, json={"scope": "nexus_neo4j"}).raise_for_status()
+
+secrets = {
+    "aura_uri": "PASTE_YOUR_AURA_CONNECTION_URI_HERE",
+    "aura_user": "neo4j",
+    "aura_password": "PASTE_YOUR_AURA_PASSWORD_HERE",
+}
+for key, value in secrets.items():
+    requests.post(f"{host}/api/2.0/secrets/put", headers=headers,
+                   json={"scope": "nexus_neo4j", "key": key, "string_value": value}).raise_for_status()
+
+print("scope + 3 secrets created")
