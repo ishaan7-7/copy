@@ -1,19 +1,33 @@
-import requests
+from neo4j import GraphDatabase
+from neo4j.graph import Node, Path, Relationship
+import json
 
-ctx = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
-host = ctx.apiUrl().get()
-token = ctx.apiToken().get()
-headers = {"Authorization": f"Bearer {token}"}
+aura_uri = dbutils.secrets.get("nexus_neo4j", "aura_uri")
+aura_user = dbutils.secrets.get("nexus_neo4j", "aura_user")
+aura_password = dbutils.secrets.get("nexus_neo4j", "aura_password")
 
-requests.post(f"{host}/api/2.0/secrets/scopes/create", headers=headers, json={"scope": "nexus_neo4j"}).raise_for_status()
+driver = GraphDatabase.driver(aura_uri, auth=(aura_user, aura_password))
 
-secrets = {
-    "aura_uri": "PASTE_YOUR_AURA_CONNECTION_URI_HERE",
-    "aura_user": "neo4j",
-    "aura_password": "PASTE_YOUR_AURA_PASSWORD_HERE",
-}
-for key, value in secrets.items():
-    requests.post(f"{host}/api/2.0/secrets/put", headers=headers,
-                   json={"scope": "nexus_neo4j", "key": key, "string_value": value}).raise_for_status()
 
-print("scope + 3 secrets created")
+def serialize(value):
+    if isinstance(value, Node):
+        return {"_type": "Node", "element_id": value.element_id, "labels": list(value.labels), "properties": dict(value)}
+    if isinstance(value, Relationship):
+        return {"_type": "Relationship", "element_id": value.element_id, "rel_type": value.type,
+                "start_node": value.start_node.element_id, "end_node": value.end_node.element_id,
+                "properties": dict(value)}
+    if isinstance(value, Path):
+        return {"_type": "Path", "nodes": [serialize(n) for n in value.nodes], "relationships": [serialize(r) for r in value.relationships]}
+    if isinstance(value, list):
+        return [serialize(v) for v in value]
+    if isinstance(value, dict):
+        return {k: serialize(v) for k, v in value.items()}
+    return value
+
+
+cypher = "MATCH (m:Material {key:'1000101'})<-[r:OF_MATERIAL]-(b:Batch) RETURN m, r, b LIMIT 3"
+
+with driver.session() as session:
+    records = [serialize(dict(record)) for record in session.run(cypher)]
+
+print(json.dumps({"cypher": cypher, "record_count": len(records), "records": records}, indent=2))
