@@ -458,11 +458,14 @@ PING = {
 }
 
 
+MAX_REPLY_BYTES = 1_000_000
+
+
 class _KeyAuth(httpx.Auth):
     def auth_flow(self, request):
-        if request.url.scheme != "https" or request.url.host != OPENAI_HOST:
+        if request.url.scheme != "https" or request.url.host != OPENAI_HOST or request.url.port not in (None, 443):
             raise RuntimeError("host not allowed")
-        for h in ("OpenAI-Organization", "OpenAI-Project"):
+        for h in ("OpenAI-Organization", "OpenAI-Project", "Cookie"):
             request.headers.pop(h, None)
         request.headers["Authorization"] = "Bearer " + dbutils.secrets.get(KEY_SCOPE, KEY_NAME).strip()
         try:
@@ -471,63 +474,156 @@ class _KeyAuth(httpx.Auth):
             request.headers["Authorization"] = "removed"
 
 
+class _ApiError(Exception):
+    def __init__(self, status, code, message):
+        super().__init__(f"http {status}, code {code}")
+        self.status, self.code, self.message = status, code, message
+
+
+class _BadReply(Exception):
+    pass
+
+
 def _client(transport=None):
-    import openai
-    h = httpx.Client(auth=_KeyAuth(), trust_env=False, follow_redirects=False, timeout=httpx.Timeout(60.0, connect=10.0), transport=transport)
-    return openai.OpenAI(api_key="placeholder", base_url=f"https://{OPENAI_HOST}/v1", http_client=h, max_retries=0)
+    return httpx.Client(base_url=f"https://{OPENAI_HOST}/v1", auth=_KeyAuth(), trust_env=False, follow_redirects=False,
+                        verify=True, timeout=httpx.Timeout(60.0, connect=10.0), transport=transport,
+                        headers={"Accept": "application/json"})
+
+
+def _call(c, method, path, body=None):
+    if path not in ("/models", "/responses"):
+        raise ValueError("path not allowed")
+    with c.stream(method, path, json=body) as r:
+        buf = bytearray()
+        for chunk in r.iter_bytes():
+            buf += chunk
+            if len(buf) > MAX_REPLY_BYTES:
+                raise _BadReply("reply larger than allowed")
+        status = r.status_code
+        ctype = r.headers.get("content-type", "").split(";")[0].strip().lower()
+        limits = {k.lower(): v for k, v in r.headers.items() if k.lower().startswith("x-ratelimit-")}
+    if 300 <= status < 400:
+        raise _BadReply(f"redirect {status} refused")
+    d = None
+    if ctype == "application/json":
+        try:
+            d = json.loads(bytes(buf))
+        except ValueError:
+            d = None
+    if status >= 400:
+        err = d.get("error") if isinstance(d, dict) else None
+        err = err if isinstance(err, dict) else {}
+        code = err.get("code") if isinstance(err.get("code"), str) else None
+        msg = err.get("message") if isinstance(err.get("message"), str) else "no readable error body"
+        raise _ApiError(status, code, scrub(msg)[:200])
+    if status != 200 or not isinstance(d, dict):
+        raise _BadReply(f"unexpected reply: http {status}, type {ctype[:40] or 'none'}")
+    return d, limits
+
+
+def _need(d, key, typ):
+    v = d.get(key) if isinstance(d, dict) else None
+    if not isinstance(v, typ) or (typ is int and (isinstance(v, bool) or v < 0)):
+        raise _BadReply(f"field {key} missing or wrong type")
+    return v
+
+
+def _optional_count(d, outer, inner):
+    v = d.get(outer)
+    if v is None:
+        return None
+    v = v.get(inner) if isinstance(v, dict) else "bad"
+    if v is None:
+        return None
+    if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+        raise _BadReply(f"field {outer}.{inner} wrong type")
+    return v
+
+
+def _parse_models(d):
+    if d.get("object") != "list":
+        raise _BadReply("not a model list")
+    return sorted(_need(m, "id", str) for m in _need(d, "data", list))
+
+
+def _parse_response(d):
+    if d.get("object") != "response":
+        raise _BadReply("not a response object")
+    items = []
+    for o in _need(d, "output", list):
+        t = _need(o, "type", str)
+        item = {"type": t}
+        if t == "function_call":
+            item.update(name=_need(o, "name", str), arguments=_need(o, "arguments", str), call_id=_need(o, "call_id", str))
+        elif t == "reasoning":
+            ec = o.get("encrypted_content")
+            if ec is not None and not isinstance(ec, str):
+                raise _BadReply("field encrypted_content wrong type")
+            item["encrypted"] = bool(ec)
+        items.append(item)
+    u = _need(d, "usage", dict)
+    usage = {"input": _need(u, "input_tokens", int), "output": _need(u, "output_tokens", int),
+             "cached": _optional_count(u, "input_tokens_details", "cached_tokens") or 0,
+             "reasoning": _optional_count(u, "output_tokens_details", "reasoning_tokens")}
+    if usage["cached"] > usage["input"]:
+        raise _BadReply("cached tokens exceed input tokens")
+    return _need(d, "status", str), _need(d, "model", str), items, usage
 
 
 def _api_error(e):
-    return {"error": type(e).__name__, "http_status": getattr(e, "status_code", None), "code": getattr(e, "code", None), "message": scrub(getattr(e, "message", e))[:200]}
+    if isinstance(e, _ApiError):
+        return {"error": "api", "http_status": e.status, "code": e.code, "message": e.message}
+    return {"error": failure(e)}
 
 
 def _tiny(c, model, reasoning):
-    kw = {"model": model, "input": "Call the ping tool with n set to 7.", "tools": [PING], "tool_choice": "required",
-          "parallel_tool_calls": False, "max_output_tokens": 800, "store": False}
+    body = {"model": model, "input": "Call the ping tool with n set to 7.", "tools": [PING], "tool_choice": "required",
+            "parallel_tool_calls": False, "max_output_tokens": 800, "store": False}
     if reasoning:
-        kw["reasoning"] = {"effort": "low"}
-        kw["include"] = ["reasoning.encrypted_content"]
+        body["reasoning"] = {"effort": "low"}
+        body["include"] = ["reasoning.encrypted_content"]
     t0 = time.time()
-    raw = c.responses.with_raw_response.create(**kw)
-    r = raw.parse()
-    u = r.usage
-    cached = getattr(getattr(u, "input_tokens_details", None), "cached_tokens", 0) or 0
+    d, limits = _call(c, "POST", "/responses", body)
+    status, reported, items, u = _parse_response(d)
     p_in, p_cached, p_out = PRICES["luna" if reasoning else "gpt-4o-mini"]
-    call = next((o for o in r.output if o.type == "function_call"), None)
+    call = next((o for o in items if o["type"] == "function_call"), None)
+    try:
+        args = json.loads(call["arguments"]) if call else None
+    except ValueError:
+        args = None
     return {
-        "status": r.status, "model_reported": r.model, "ms": int((time.time() - t0) * 1000),
-        "output_types": [o.type for o in r.output],
-        "tool_called": bool(call and call.name == "ping"),
-        "arguments_ok": bool(call and json.loads(call.arguments) == {"n": 7}),
-        "encrypted_reasoning_returned": any(getattr(o, "encrypted_content", None) for o in r.output if o.type == "reasoning"),
-        "tokens": {"input": u.input_tokens, "cached": cached, "output": u.output_tokens,
-                   "reasoning": getattr(getattr(u, "output_tokens_details", None), "reasoning_tokens", None)},
-        "cost_usd": round(((u.input_tokens - cached) * p_in + cached * p_cached + u.output_tokens * p_out) / 1e6, 6),
-        "rate_limits": {k: v for k, v in raw.headers.items() if k.lower().startswith("x-ratelimit-")},
+        "status": status, "model_reported": reported, "ms": int((time.time() - t0) * 1000),
+        "output_types": [o["type"] for o in items],
+        "tool_called": bool(call and call["name"] == "ping"),
+        "arguments_ok": args == {"n": 7},
+        "encrypted_reasoning_returned": any(o.get("encrypted") for o in items if o["type"] == "reasoning"),
+        "tokens": u,
+        "cost_usd": round(((u["input"] - u["cached"]) * p_in + u["cached"] * p_cached + u["output"] * p_out) / 1e6, 6),
+        "rate_limits": limits,
     }
 
 
 def _model_check(transport=None):
-    c = _client(transport)
     out = {}
-    try:
-        ids = sorted(m.id for m in c.models.list())
-        out["models_listed"] = len(ids)
-        out["relevant_ids"] = [i for i in ids if "luna" in i or i.startswith("gpt-4o-mini") or i.startswith("gpt-6")]
-    except Exception as e:
-        ids = None
-        out["models_listed"] = _api_error(e)
-    luna = "gpt-6-luna" if ids is None or "gpt-6-luna" in ids else next((i for i in ids if "luna" in i), None)
-    mini = "gpt-4o-mini" if ids is None or "gpt-4o-mini" in ids else None
-    out["calls"] = {}
-    if MAKE_MODEL_CALLS:
-        for model, reasoning in ((luna, True), (mini, False)):
-            if not model:
-                continue
-            try:
-                out["calls"][model] = _tiny(c, model, reasoning)
-            except Exception as e:
-                out["calls"][model] = _api_error(e)
+    with _client(transport) as c:
+        try:
+            ids = _parse_models(_call(c, "GET", "/models")[0])
+            out["models_listed"] = len(ids)
+            out["relevant_ids"] = [i for i in ids if "luna" in i or i.startswith("gpt-4o-mini") or i.startswith("gpt-6")]
+        except Exception as e:
+            ids = None
+            out["models_listed"] = _api_error(e)
+        luna = "gpt-6-luna" if ids is None or "gpt-6-luna" in ids else next((i for i in ids if "luna" in i), None)
+        mini = "gpt-4o-mini" if ids is None or "gpt-4o-mini" in ids else None
+        out["calls"] = {}
+        if MAKE_MODEL_CALLS:
+            for model, reasoning in ((luna, True), (mini, False)):
+                if not model:
+                    continue
+                try:
+                    out["calls"][model] = _tiny(c, model, reasoning)
+                except Exception as e:
+                    out["calls"][model] = _api_error(e)
     usable = [m for m, r in out["calls"].items() if r.get("tool_called") and r.get("arguments_ok")]
     out["chosen_by_auto"] = next((m for m in usable if "luna" in m), usable[0] if usable else None)
     if not MAKE_MODEL_CALLS:
@@ -625,7 +721,7 @@ def _secrets_absent(text):
     return not found, found
 
 
-REPORT["_notebook"] = {"version": "2026-11-26.1", "order": list(REPORT)}
+REPORT["_notebook"] = {"version": "2026-11-26.2", "order": list(REPORT)}
 text = scrub(json.dumps(REPORT, indent=1, default=str))
 clean, leaked = _secrets_absent(text)
 if not clean:
