@@ -10,10 +10,10 @@
 # MAGIC | 2 | Whether the package site can be reached with exact versions and fixed hashes |
 # MAGIC | 3 | Whether the 178 allowed objects are all present with the expected fingerprint |
 # MAGIC | 4 | How this engine shows the tables a query reads (needed by lock 4) |
-# MAGIC | 5 | Whether serverless can reach `api.openai.com`, and which models the key can use |
+# MAGIC | 5 | Whether serverless can reach the Azure model address, which API styles work with the deployment, and what a call costs |
 # MAGIC | 6 | Whether Aura can be reached encrypted, and whether a write is refused in a read session |
 # MAGIC
-# MAGIC **What it does not do:** it reads no table rows, stores nothing, changes nothing outside this session, and prints no key, password, host or organisation ID. With a key it makes at most two tiny model calls, together under $0.001.
+# MAGIC **What it does not do:** it reads no table rows, stores nothing, changes nothing outside this session, and prints no key, password or Aura host. With a key it makes at most three tiny model calls, together under $0.04 at GPT-5 list prices.
 # MAGIC
 # MAGIC **How to run:** fill in the settings cell, attach serverless, Run all. Copy everything between the two `COPY` lines at the end and send it back.
 # MAGIC
@@ -23,8 +23,11 @@
 
 CATALOG = "cmegtmdev"
 SCHEMA = "manufacturing_coe"
-KEY_SCOPE = ""  # fill in: name of the secret scope that holds the OpenAI key, or leave empty
-KEY_NAME = ""  # fill in: name of the key inside that scope, or leave empty
+KEY_SCOPE = "nexus_openai"  # fill in: secret scope that holds the key; leave empty to skip the key checks
+KEY_NAME = "api_key"
+MODEL_ENDPOINT = "https://az03-al-cme-gtm-aihub.cognitiveservices.azure.com/"
+DEPLOYMENT = "gpt-5-2"
+API_VERSION_GIVEN = "2024-12-01-preview"
 AURA_SCOPE = "nexus_neo4j"
 MAKE_MODEL_CALLS = True
 
@@ -49,9 +52,16 @@ from collections import Counter
 if not (re.fullmatch(r"[A-Za-z0-9_]+", CATALOG) and re.fullmatch(r"[A-Za-z0-9_]+", SCHEMA)):
     raise ValueError("CATALOG and SCHEMA must be plain names")
 FQN = f"`{CATALOG}`.`{SCHEMA}`"
+_ep = re.fullmatch(r"https://([a-z0-9][a-z0-9-]{1,62}\.(?:cognitiveservices|openai)\.azure\.com)/?", MODEL_ENDPOINT.strip().lower())
+if not _ep:
+    raise ValueError("MODEL_ENDPOINT must be https://<name>.cognitiveservices.azure.com or https://<name>.openai.azure.com")
+MODEL_HOST = _ep.group(1)
+if not (re.fullmatch(r"[A-Za-z0-9._-]{1,64}", DEPLOYMENT) and re.fullmatch(r"\d{4}-\d{2}-\d{2}(-preview)?", API_VERSION_GIVEN)):
+    raise ValueError("DEPLOYMENT or API_VERSION_GIVEN has an unexpected form")
 REPORT = {}
 _SCRUB = [
     (re.compile(r"sk-\S+"), "[key]"),
+    (re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z0-9]{84}|[A-Za-z0-9]{32})(?![A-Za-z0-9])"), "[key]"),
     (re.compile(r"(?i)bearer\s+\S+"), "Bearer [removed]"),
     (re.compile(r"(?i)[a-z0-9-]+\.databases\.neo4j\.io"), "[aura-host]"),
     (re.compile(r"(?i)\b(s3a?|abfss|gs|wasbs|dbfs)://\S+"), "[storage-path]"),
@@ -105,7 +115,7 @@ record(
     memory_gb=_memory_gb(),
     preinstalled={p: _ver(p) for p in ["openai", "httpx", "httpcore", "certifi", "pydantic", "pandas", "pyarrow", "databricks-sdk", "sqlglot", "neo4j", "pytz"]},
     proxy_variables=sorted(k for k in os.environ if "proxy" in k.lower()),
-    openai_variables=sorted(k for k in os.environ if k.upper().startswith("OPENAI")),
+    openai_variables=sorted(k for k in os.environ if k.upper().startswith(("OPENAI", "AZURE_OPENAI", "AZURE_API"))),
 )
 
 
@@ -376,7 +386,7 @@ AURA_READY = False
 
 def _key_shape():
     k = dbutils.secrets.get(KEY_SCOPE, KEY_NAME)
-    kind = next((p for p in ("sk-proj-", "sk-svcacct-", "sk-admin-", "sk-") if k.startswith(p)), "other")
+    kind = next((f"azure-{n}" for n in (84, 32) if re.fullmatch(rf"[A-Za-z0-9]{{{n}}}", k)), None) or next((p for p in ("sk-proj-", "sk-svcacct-", "sk-admin-", "sk-") if k.startswith(p)), "other")
     return {"kind": kind, "length": len(k), "surrounding_whitespace": k != k.strip()}
 
 
@@ -403,13 +413,11 @@ except Exception as e:
 
 # COMMAND ----------
 
-# MAGIC %md ## 6. Network: can serverless reach OpenAI over TLS (no key sent)
+# MAGIC %md ## 6. Network: can serverless reach the Azure model address over TLS (no key sent)
 
 # COMMAND ----------
 
 import httpx
-
-OPENAI_HOST = "api.openai.com"
 
 
 def _tls_probe(host):
@@ -424,54 +432,72 @@ def _tls_probe(host):
 
 def _unauthenticated(trust_env):
     with httpx.Client(trust_env=trust_env, follow_redirects=False, timeout=httpx.Timeout(15.0, connect=10.0)) as h:
-        return h.get(f"https://{OPENAI_HOST}/v1/models").status_code
+        r = h.get(f"https://{MODEL_HOST}/openai/v1/models")
+        out = {"http_status": r.status_code}
+        try:
+            d = r.json()
+        except ValueError:
+            d = None
+        err = d.get("error") if isinstance(d, dict) else None
+        if isinstance(err, dict):
+            if isinstance(err.get("code"), str):
+                out["error_code"] = scrub(err["code"])[:60]
+            if isinstance(err.get("message"), str):
+                out["message"] = scrub(err["message"])[:200]
+        return out
 
 
 NETWORK_READY = False
 facts = {}
 try:
-    facts["direct_tls"] = _tls_probe(OPENAI_HOST)
+    facts["direct_tls"] = _tls_probe(MODEL_HOST)
 except Exception as e:
     facts["direct_tls"] = failure(e)
 try:
-    facts["direct_status_without_key"] = _unauthenticated(False)
-    NETWORK_READY = facts["direct_status_without_key"] == 401
+    facts["direct_without_key"] = _unauthenticated(False)
+    NETWORK_READY = facts["direct_without_key"]["http_status"] == 401
 except Exception as e:
-    facts["direct_status_without_key"] = failure(e)
+    facts["direct_without_key"] = failure(e)
 if not NETWORK_READY:
     try:
-        facts["status_through_environment_proxy"] = _unauthenticated(True)
+        facts["through_environment_proxy"] = _unauthenticated(True)
     except Exception as e:
-        facts["status_through_environment_proxy"] = failure(e)
+        facts["through_environment_proxy"] = failure(e)
 record("network", "PASS" if NETWORK_READY else "FAIL", **facts)
 
 # COMMAND ----------
 
-# MAGIC %md ## 7. Model access: which models the key can use, one tiny call each (skipped without a key)
+# MAGIC %md ## 7. Model access: which API styles work with the deployment, one tiny call each (skipped without a key)
 
 # COMMAND ----------
 
-PRICES = {"luna": (0.10, 0.01, 0.50), "gpt-4o-mini": (0.15, 0.075, 0.60)}
-PING = {
-    "type": "function", "name": "ping", "description": "Connectivity test.", "strict": True,
-    "parameters": {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"], "additionalProperties": False},
-}
-
-
+PRICE_GPT5_LIST = (1.25, 0.125, 10.0)
+RESPONSES_API_VERSION = "2025-04-01-preview"
+PROMPT = "Call the ping tool with n set to 7."
+PING_PARAMETERS = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"], "additionalProperties": False}
+PING_RESPONSES = {"type": "function", "name": "ping", "description": "Connectivity test.", "strict": True, "parameters": PING_PARAMETERS}
+PING_CHAT = {"type": "function", "function": {"name": "ping", "description": "Connectivity test.", "strict": True, "parameters": PING_PARAMETERS}}
 MAX_REPLY_BYTES = 1_000_000
+KEEP_HEADERS = ("x-ratelimit-", "x-ms-region")
+ALLOWED_CALLS = {
+    ("GET", "/v1/models", None),
+    ("POST", "/v1/responses", None),
+    ("POST", "/responses", RESPONSES_API_VERSION),
+    ("POST", f"/deployments/{DEPLOYMENT}/chat/completions", API_VERSION_GIVEN),
+}
 
 
 class _KeyAuth(httpx.Auth):
     def auth_flow(self, request):
-        if request.url.scheme != "https" or request.url.host != OPENAI_HOST or request.url.port not in (None, 443):
+        if request.url.scheme != "https" or request.url.host != MODEL_HOST or request.url.port not in (None, 443):
             raise RuntimeError("host not allowed")
-        for h in ("OpenAI-Organization", "OpenAI-Project", "Cookie"):
+        for h in ("Authorization", "OpenAI-Organization", "OpenAI-Project", "Cookie"):
             request.headers.pop(h, None)
-        request.headers["Authorization"] = "Bearer " + dbutils.secrets.get(KEY_SCOPE, KEY_NAME).strip()
+        request.headers["api-key"] = dbutils.secrets.get(KEY_SCOPE, KEY_NAME).strip()
         try:
             yield request
         finally:
-            request.headers["Authorization"] = "removed"
+            request.headers["api-key"] = "removed"
 
 
 class _ApiError(Exception):
@@ -485,15 +511,16 @@ class _BadReply(Exception):
 
 
 def _client(transport=None):
-    return httpx.Client(base_url=f"https://{OPENAI_HOST}/v1", auth=_KeyAuth(), trust_env=False, follow_redirects=False,
+    return httpx.Client(base_url=f"https://{MODEL_HOST}/openai", auth=_KeyAuth(), trust_env=False, follow_redirects=False,
                         verify=True, timeout=httpx.Timeout(60.0, connect=10.0), transport=transport,
                         headers={"Accept": "application/json"})
 
 
-def _call(c, method, path, body=None):
-    if path not in ("/models", "/responses"):
-        raise ValueError("path not allowed")
-    with c.stream(method, path, json=body) as r:
+def _call(c, method, path, body=None, api_version=None):
+    if (method, path, api_version) not in ALLOWED_CALLS:
+        raise ValueError("call not allowed")
+    params = {"api-version": api_version} if api_version else None
+    with c.stream(method, path, json=body, params=params) as r:
         buf = bytearray()
         for chunk in r.iter_bytes():
             buf += chunk
@@ -501,7 +528,7 @@ def _call(c, method, path, body=None):
                 raise _BadReply("reply larger than allowed")
         status = r.status_code
         ctype = r.headers.get("content-type", "").split(";")[0].strip().lower()
-        limits = {k.lower(): v for k, v in r.headers.items() if k.lower().startswith("x-ratelimit-")}
+        kept = {k.lower(): v for k, v in r.headers.items() if k.lower().startswith(KEEP_HEADERS)}
     if 300 <= status < 400:
         raise _BadReply(f"redirect {status} refused")
     d = None
@@ -514,11 +541,20 @@ def _call(c, method, path, body=None):
         err = d.get("error") if isinstance(d, dict) else None
         err = err if isinstance(err, dict) else {}
         code = err.get("code") if isinstance(err.get("code"), str) else None
+        inner = err.get("innererror") if isinstance(err.get("innererror"), dict) else {}
+        if isinstance(inner.get("code"), str):
+            code = f"{code}/{inner['code']}"
         msg = err.get("message") if isinstance(err.get("message"), str) else "no readable error body"
-        raise _ApiError(status, code, scrub(msg)[:200])
+        key = dbutils.secrets.get(KEY_SCOPE, KEY_NAME).strip()
+        if key:
+            msg = msg.replace(key, "[key]")
+            for part in set(re.findall(r"[A-Za-z0-9_-]{8,}", msg)):
+                if part in key:
+                    msg = msg.replace(part, "[part of key]")
+        raise _ApiError(status, code, scrub(msg)[:300])
     if status != 200 or not isinstance(d, dict):
         raise _BadReply(f"unexpected reply: http {status}, type {ctype[:40] or 'none'}")
-    return d, limits
+    return d, kept
 
 
 def _need(d, key, typ):
@@ -538,6 +574,15 @@ def _optional_count(d, outer, inner):
     if not isinstance(v, int) or isinstance(v, bool) or v < 0:
         raise _BadReply(f"field {outer}.{inner} wrong type")
     return v
+
+
+def _usage(u, i, o, i_details, o_details):
+    usage = {"input": _need(u, i, int), "output": _need(u, o, int),
+             "cached": _optional_count(u, i_details, "cached_tokens") or 0,
+             "reasoning": _optional_count(u, o_details, "reasoning_tokens")}
+    if usage["cached"] > usage["input"]:
+        raise _BadReply("cached tokens exceed input tokens")
+    return usage
 
 
 def _parse_models(d):
@@ -561,13 +606,29 @@ def _parse_response(d):
                 raise _BadReply("field encrypted_content wrong type")
             item["encrypted"] = bool(ec)
         items.append(item)
-    u = _need(d, "usage", dict)
-    usage = {"input": _need(u, "input_tokens", int), "output": _need(u, "output_tokens", int),
-             "cached": _optional_count(u, "input_tokens_details", "cached_tokens") or 0,
-             "reasoning": _optional_count(u, "output_tokens_details", "reasoning_tokens")}
-    if usage["cached"] > usage["input"]:
-        raise _BadReply("cached tokens exceed input tokens")
-    return _need(d, "status", str), _need(d, "model", str), items, usage
+    usage = _usage(_need(d, "usage", dict), "input_tokens", "output_tokens", "input_tokens_details", "output_tokens_details")
+    return _need(d, "status", str), _need(d, "model", str), items, usage, None
+
+
+def _parse_chat(d):
+    if d.get("object") != "chat.completion":
+        raise _BadReply("not a chat completion object")
+    choices = _need(d, "choices", list)
+    if not choices:
+        raise _BadReply("no choices in reply")
+    first = choices[0]
+    msg = _need(first, "message", dict)
+    calls = msg.get("tool_calls")
+    if calls is not None and not isinstance(calls, list):
+        raise _BadReply("field tool_calls wrong type")
+    items = []
+    for t in calls or []:
+        fn = _need(t, "function", dict)
+        items.append({"type": "function_call", "name": _need(fn, "name", str), "arguments": _need(fn, "arguments", str), "call_id": _need(t, "id", str)})
+    usage = _usage(_need(d, "usage", dict), "prompt_tokens", "completion_tokens", "prompt_tokens_details", "completion_tokens_details")
+    finish = first.get("finish_reason") if isinstance(first, dict) and isinstance(first.get("finish_reason"), str) else "none"
+    filter_seen = "prompt_filter_results" in d or (isinstance(first, dict) and "content_filter_results" in first)
+    return finish, _need(d, "model", str), items, usage, filter_seen
 
 
 def _api_error(e):
@@ -576,65 +637,71 @@ def _api_error(e):
     return {"error": failure(e)}
 
 
-def _tiny(c, model, reasoning):
-    body = {"model": model, "input": "Call the ping tool with n set to 7.", "tools": [PING], "tool_choice": "required",
-            "parallel_tool_calls": False, "max_output_tokens": 800, "store": False}
-    if reasoning:
-        body["reasoning"] = {"effort": "low"}
-        body["include"] = ["reasoning.encrypted_content"]
+def _probe(c, style):
+    if style == "chat_given_version":
+        body = {"messages": [{"role": "user", "content": PROMPT}], "tools": [PING_CHAT], "tool_choice": "required",
+                "max_completion_tokens": 1000, "reasoning_effort": "low"}
+        call, parse = ("POST", f"/deployments/{DEPLOYMENT}/chat/completions", API_VERSION_GIVEN), _parse_chat
+    else:
+        body = {"model": DEPLOYMENT, "input": PROMPT, "tools": [PING_RESPONSES], "tool_choice": "required",
+                "max_output_tokens": 1000, "store": False, "reasoning": {"effort": "low"}}
+        if style == "responses_v1":
+            body["include"] = ["reasoning.encrypted_content"]
+            call = ("POST", "/v1/responses", None)
+        else:
+            call = ("POST", "/responses", RESPONSES_API_VERSION)
+        parse = _parse_response
     t0 = time.time()
-    d, limits = _call(c, "POST", "/responses", body)
-    status, reported, items, u = _parse_response(d)
-    p_in, p_cached, p_out = PRICES["luna" if reasoning else "gpt-4o-mini"]
-    call = next((o for o in items if o["type"] == "function_call"), None)
+    d, kept = _call(c, call[0], call[1], body, call[2])
+    status, reported, items, u, filter_seen = parse(d)
+    p_in, p_cached, p_out = PRICE_GPT5_LIST
+    fc = next((o for o in items if o["type"] == "function_call"), None)
     try:
-        args = json.loads(call["arguments"]) if call else None
+        args = json.loads(fc["arguments"]) if fc else None
     except ValueError:
         args = None
-    return {
+    out = {
         "status": status, "model_reported": reported, "ms": int((time.time() - t0) * 1000),
         "output_types": [o["type"] for o in items],
-        "tool_called": bool(call and call["name"] == "ping"),
+        "tool_called": bool(fc and fc["name"] == "ping"),
         "arguments_ok": args == {"n": 7},
-        "encrypted_reasoning_returned": any(o.get("encrypted") for o in items if o["type"] == "reasoning"),
         "tokens": u,
-        "cost_usd": round(((u["input"] - u["cached"]) * p_in + u["cached"] * p_cached + u["output"] * p_out) / 1e6, 6),
-        "rate_limits": limits,
+        "cost_usd_at_gpt5_list_price": round(((u["input"] - u["cached"]) * p_in + u["cached"] * p_cached + u["output"] * p_out) / 1e6, 6),
+        "headers": kept,
     }
+    if style == "responses_v1":
+        out["encrypted_reasoning_returned"] = any(o.get("encrypted") for o in items if o["type"] == "reasoning")
+    if filter_seen is not None:
+        out["content_filter_results_present"] = filter_seen
+    return out
 
 
 def _model_check(transport=None):
-    out = {}
+    out = {"deployment": DEPLOYMENT}
     with _client(transport) as c:
         try:
-            ids = _parse_models(_call(c, "GET", "/models")[0])
-            out["models_listed"] = len(ids)
-            out["relevant_ids"] = [i for i in ids if "luna" in i or i.startswith("gpt-4o-mini") or i.startswith("gpt-6")]
+            ids = _parse_models(_call(c, "GET", "/v1/models")[0])
+            out["models_known_to_resource"] = len(ids)
+            out["gpt5_family_ids"] = [i for i in ids if i.startswith("gpt-5")][:30]
         except Exception as e:
-            ids = None
-            out["models_listed"] = _api_error(e)
-        luna = "gpt-6-luna" if ids is None or "gpt-6-luna" in ids else next((i for i in ids if "luna" in i), None)
-        mini = "gpt-4o-mini" if ids is None or "gpt-4o-mini" in ids else None
+            out["models_known_to_resource"] = _api_error(e)
         out["calls"] = {}
         if MAKE_MODEL_CALLS:
-            for model, reasoning in ((luna, True), (mini, False)):
-                if not model:
-                    continue
+            for style in ("responses_v1", "responses_versioned", "chat_given_version"):
                 try:
-                    out["calls"][model] = _tiny(c, model, reasoning)
+                    out["calls"][style] = _probe(c, style)
                 except Exception as e:
-                    out["calls"][model] = _api_error(e)
-    usable = [m for m, r in out["calls"].items() if r.get("tool_called") and r.get("arguments_ok")]
-    out["chosen_by_auto"] = next((m for m in usable if "luna" in m), usable[0] if usable else None)
+                    out["calls"][style] = _api_error(e)
+    out["styles_working"] = [s for s, r in out["calls"].items() if r.get("tool_called") and r.get("arguments_ok")]
     if not MAKE_MODEL_CALLS:
         return "INFO", out
-    return ("PASS" if usable else "FAIL"), out
+    return ("PASS" if out["styles_working"] else "FAIL"), out
 
 
 if not KEY_READY:
     record("models", "SKIP", reason="no key found in the settings cell's scope")
 elif not NETWORK_READY:
-    record("models", "SKIP", reason="api.openai.com not reachable, see network")
+    record("models", "SKIP", reason="the model address is not reachable, see network")
 else:
     try:
         status, out = _model_check()
@@ -721,7 +788,7 @@ def _secrets_absent(text):
     return not found, found
 
 
-REPORT["_notebook"] = {"version": "2026-11-26.2", "order": list(REPORT)}
+REPORT["_notebook"] = {"version": "2026-11-26.3", "order": list(REPORT)}
 text = scrub(json.dumps(REPORT, indent=1, default=str))
 clean, leaked = _secrets_absent(text)
 if not clean:

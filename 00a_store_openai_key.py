@@ -8,13 +8,13 @@
 # MAGIC |---|---|
 # MAGIC | 1 | Creates the scope if it does not exist. Databricks gives its creator full rights |
 # MAGIC | 2 | Reads who can access the scope. If anyone besides you is listed, it stops; if it created the scope in this run, it deletes the empty scope again |
-# MAGIC | 3 | Opens a hidden password box and stores what you type. It never prints it, only its length and how it starts (`sk-proj-`, `sk-`, ...) |
+# MAGIC | 3 | Opens a hidden password box and stores what you type. It never prints it, only its length and its form (`azure-84`, `azure-32`, `sk-proj-`, ...) |
 # MAGIC | 4 | Checks the access list again and reads the value back to confirm it was stored exactly |
 # MAGIC
 # MAGIC **Run it twice:**
 # MAGIC
 # MAGIC 1. With `STEP = "dummy"`: make up a word that is in no cell, for example a fruit and a number, and type it in the box. Afterwards press Ctrl+F and search the page for your word, and look through the notebook's revision history too. It must not appear anywhere. If it does, stop and report back; do not do run 2.
-# MAGIC 2. With `STEP = "real"`: paste the real key in the box. It overwrites the dummy value.
+# MAGIC 2. With `STEP = "real"`: paste the real key in the box. It overwrites the dummy value. Both an Azure OpenAI key (letters and digits, 32 or 84 long) and an OpenAI key (`sk-...`) are accepted.
 # MAGIC
 # MAGIC Then use Clear all outputs. Send back only the lines between the two `COPY` markers.
 # MAGIC
@@ -50,19 +50,25 @@ def _shown(acl):
     return [{"principal": x["principal"] if "@" not in x["principal"] else "another user", "permission": x["permission"]} for x in acl]
 
 
+def _azure(v):
+    return bool(re.fullmatch(r"[A-Za-z0-9]{84}|[A-Za-z0-9]{32}", v))
+
+
 def _kind(v):
+    if _azure(v):
+        return f"azure-{len(v)}"
     return next((p for p in ("sk-proj-", "sk-svcacct-", "sk-admin-", "sk-") if v.startswith(p)), "other")
 
 
 def _check_value(step, v):
     if step == "dummy":
-        if v.startswith("sk-"):
+        if v.startswith("sk-") or _azure(v):
             raise Stop("dummy run: this looks like a real key; nothing stored. Type a made-up word")
-        if not re.fullmatch(r"[A-Za-z0-9]{6,40}", v):
-            raise Stop("dummy run: type a made-up word of 6 to 40 letters or digits")
+        if not re.fullmatch(r"[A-Za-z0-9]{6,20}", v):
+            raise Stop("dummy run: type a made-up word of 6 to 20 letters or digits")
         return
-    if not re.fullmatch(r"sk-[A-Za-z0-9_\-]{20,300}", v):
-        raise Stop(f"real run: this does not look like an OpenAI key (length {len(v)}, starts with {_kind(v)}); nothing stored")
+    if not (_azure(v) or re.fullmatch(r"sk-[A-Za-z0-9_\-]{20,300}", v)):
+        raise Stop(f"real run: this does not look like an Azure OpenAI or OpenAI key (length {len(v)}, form {_kind(v)}); nothing stored")
 
 
 def store_key(w, read_value, secrets_get, scope=KEY_SCOPE, key=KEY_NAME, step=STEP):
